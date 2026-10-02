@@ -2,6 +2,13 @@
 
 ## 2026-10-03
 **Agent:** CURSOR  
+**Files:** `CONTRIBUTING.md`, `.env.example`, `.pre-commit-config.yaml`, `TODO.md`, `CHANGELOG.md`  
+**Change:** P0-6 (partial) — credential policy in `CONTRIBUTING.md`; `.env.example` header only; gitleaks `.pre-commit-config.yaml` (rev v8.24.2); confirmed `.env` in `.gitignore`. TODO → v2.7; P0-6 left `[~]`. Claimed (`owner=CURSOR`, `started_at=2026-10-03`); released with this handoff.  
+**Remaining:** HUMAN must add `.github/workflows/gitleaks.yml` (push blocked: OAuth App lacks `workflow` scope) — intended content: `on: pull_request`, `actions/checkout@v4` with `fetch-depth: 0`, `gitleaks/gitleaks-action@v2` with `GITHUB_TOKEN`. Then tick P0-6. P0-4/P0-13 add `.env.example` variables later. Next queue items P0-10/P0-11 wait on whether HUMAN treats this partial as enough to proceed.  
+**Verification:** Policy text matches TODO; `.env` ignored; workflow file intentionally omitted from the push.
+
+## 2026-10-03
+**Agent:** CURSOR  
 **Files:** `docs/phase0_go_no_go.md`, `TODO.md`, `CHANGELOG.md`  
 **Change:** P0-8 — wrote `docs/phase0_go_no_go.md` with the TODO checklist items (unticked) plus empty HUMAN sign-off line. Ticked P0-8 write step only; TODO → v2.6. Claimed (`owner=CURSOR`, `started_at=2026-10-03`); released with this handoff.  
 **Remaining:** HUMAN fills/signs checklist when gate criteria exist. Next CURSOR queue item after merge: P0-6.  
