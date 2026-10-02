@@ -1,10 +1,10 @@
 # TODO — Multi-AI Workspace (Final structure — some fields pending)
 
-**Version:** v1.1 — 2026-10-03
+**Version:** v2.0 — 2026-10-03
 **Versioning rule:** content edits (wording, filled fields, ticked items) bump the minor version (v1.1, v1.2…); structural changes or newly resolved decisions bump the major version (v2.0). Every bump gets a change-log line.
 
 **Sources:** Claude `[C]` · previous assistant `[G]` · Grok `[Grok]` · ChatGPT GPT-5.6 Luna `[GPT]` · DeepSeek `[DS]` · merge notes `[merge]`
-**Structure finalized:** 2026-10-03. Merged from the consolidated multi-agent review (signed by Grok, 2026-10-03); decisions D1–D10 resolved by the human owner on the same date. "Final" refers to the structure and decisions, not to every field: owners, cost envelope, metric thresholds and D11 are still open (see below).
+**Structure finalized:** 2026-10-03. Merged from the consolidated multi-agent review (signed by Grok, 2026-10-03); decisions D1–D11 resolved by the human owner on the same date. "Final" refers to the structure and decisions, not to every field: owners, cost envelope and metric thresholds are still open (see below).
 
 **Status legend:** `[ ]` todo · `[~]` in progress · `[x]` done. Nothing is ticked until verified by a human or agent.
 
@@ -26,20 +26,9 @@ These are decided. Items that must record them in `DECISIONS.md` still do so as 
 | **D8** | Raw measures keyed on the **measurement site**: `(site_id, source, source_ts)`. The derived per-segment table has its own key built on `segment_id` plus a time identity (e.g. `(segment_id, source, bucket_ts)`); the exact key is fixed in P1-2 once the full `traffic_measure` model is written. | P1-2 |
 | **D9** | Segment IDs: **`seg_<ulid>`**. | P1-3 |
 | **D10** | Template-vs-project split raised to **P1**. | P1-14 |
+| **D11** | Source corrections: **append revisions** (option B, resolved 2026-10-03). Raw key becomes `(site_id, source, source_ts, source_version)`, where `source_version` is the publisher's record version/version time; a `traffic_measure_current` view (latest revision per key) feeds aggregates. Rejected: overwrite (loses the audit trail). Late-correction policy: corrections inside the continuous-aggregate refresh window are picked up automatically; older ones need an explicit refresh, logged in `docs/aggregates_history.md`. `[DS]` `[C]` | P1-2, P1-9, P2-6 |
 
-## Open decision
-
-**D11 · Source corrections on raw measures** (extends D8; applies to P1-2, P1-9, P2-6) `[DS]`
-DATEX publishers can reissue a record for the same `(site_id, source, source_ts)`. The choice propagates into every downstream aggregate.
-
-| Option | What it means | Cost |
-|---|---|---|
-| **A · Overwrite** | Upsert on `(site_id, source, source_ts)`; keep only the latest value. | Simplest. Loses the audit trail; aggregates already built from the old value become unexplainable. |
-| **B · Append revisions** | Key becomes `(site_id, source, source_ts, source_version)`, where `source_version` is the publisher's record version/version time. A `traffic_measure_current` view (latest revision per key) feeds aggregates. | Extra storage and one view. Keeps full provenance (P2-6) and makes aggregate rebuilds reproducible (P1-9). |
-
-**Recommendation: B.** It is the only option consistent with the provenance and aggregate-versioning decisions already taken. Either way, record a late-correction policy: corrections arriving inside the continuous-aggregate refresh window are picked up automatically; older ones need an explicit refresh, logged in `docs/aggregates_history.md`.
-
-**Still to fill in (owner):** D11, owners for every P0 item, the cost envelope (P1-10), and the metric thresholds in `docs/metrics.md` (P1-11).
+**Still to fill in (owner):** owners for every P0 item, the cost envelope (P1-10), and the metric thresholds in `docs/metrics.md` (P1-11).
 
 ---
 
@@ -117,7 +106,7 @@ DATEX publishers can reissue a record for the same `(site_id, source, source_ts)
 - [ ] **P1-1 · Add a `measurement_site` entity and a site-to-segment mapping.** DATEX measures come from point sensors, not segments. Before any collector code. `[C]` `[Grok]`
 
 - [ ] **P1-2 · `traffic_measure` keys and timestamps.** `[C]` `[Grok]` `D8` `D11`
-  - Unique key `(site_id, source, source_ts)` on raw measures, extended with `source_version` if D11 option B is chosen.
+  - Unique key `(site_id, source, source_ts, source_version)` on raw measures (append revisions, per D11), plus the `traffic_measure_current` view (latest revision per key) that feeds aggregates.
   - Derived per-segment table: key includes `segment_id` plus a time identity (candidate: `(segment_id, source, bucket_ts)`). Verify against the complete `traffic_measure` model before the schema is validated; `segment_id` alone is not unique for time-series rows. `[GPT]`
   - Add `source_ts` / `ingest_ts` columns as required by the conventions.
   - Do not fix the compression `segmentby` columns until representative data has been benchmarked (P2-10). `[GPT]` `[DS]`
@@ -136,6 +125,7 @@ DATEX publishers can reissue a record for the same `(site_id, source, source_ts)
 - [ ] **P1-8 · Phase 4 attribution ground truth:** who annotates the 100 test cases and what the ground truth is; label the "traffic density" residual (`OTHER`) as a catch-all, not a cause. `[C]` `[Grok]`
 
 - [ ] **P1-9 · 90-day baselines with 30-day detailed retention** via continuous aggregates, with versioning: an `aggregate_version` column and `docs/aggregates_history.md` (what changed, when, whether history was rebuilt). `[C]` `[DS]` `[Grok]`
+  - Aggregates read from `traffic_measure_current`. Late-correction policy (D11): corrections inside the refresh window are picked up automatically; older ones need an explicit refresh, logged in `docs/aggregates_history.md`.
 
 - [ ] **P1-10 · Schedule assumptions and cost envelope** (phases 0–6 ≈ 53–68 weeks). `[C]` `[GPT]` `[DS]` `[Grok]`
   - State team size, separating human engineering effort from AI-agent activity (more agents ≠ more FTE or shorter calendar). Starting assumption to confirm: 1–2 human FTE + multi-AI support.
@@ -262,3 +252,4 @@ This is the Phase 0–2 task queue and agent-assignment table from the 2026-10-0
 - **v0.4 · 2026-10-03 — ChatGPT review applied.** P0-7 adds licence-text and scope step; P0-4 GDPR marked as an assessment requiring human/legal review; P0-5 gets a minimal claim/release mechanism via `CHANGELOG.md`; P0-8 bootstrap line no longer implies `make`; D8/P1-2 derived-table key clarified (segment + time identity, to verify against the full model); P1-4 requires a defined linear-reference orientation and per-source direction mapping; P1-11 thresholds must not be invented; P2-4 SLA owner override. The reported end-of-file duplication was not present in this file (copy/paste artefact on the reviewer's side).
 - **v1.0 · 2026-10-03 — Baseline.** Grok review: no changes requested. Version number and versioning rule added; this is the reference version for execution of P0.
 - **v1.1 · 2026-10-03 — Committed to repo.** Previous `TODO.md` phase work queue and agent-assignment table carried over verbatim as a dedicated section, instead of being overwritten.
+- **v2.0 · 2026-10-03 — D11 resolved.** HUMAN chose option B (append revisions). D11 moved to the resolved table; P1-2 raw key is now `(site_id, source, source_ts, source_version)` with a `traffic_measure_current` view; P1-9 carries the late-correction policy. No open decisions remain.
