@@ -1,6 +1,6 @@
 # TODO — Multi-AI Workspace (Final structure — some fields pending)
 
-**Version:** v2.5 — 2026-10-03
+**Version:** v2.6 — 2026-10-03
 **Versioning rule:** content edits (wording, filled fields, ticked items) bump the minor version (v1.1, v1.2…); structural changes or newly resolved decisions bump the major version (v2.0). Every bump gets a change-log line.
 
 **Sources:** Claude `[C]` · previous assistant `[G]` · Grok `[Grok]` · ChatGPT GPT-5.6 Luna `[GPT]` · DeepSeek `[DS]` · merge notes `[merge]`
@@ -88,7 +88,7 @@ These are decided. Items that must record them in `DECISIONS.md` still do so as 
   - [ ] Commit the `LICENSE` file consistent with D3 (internal use, all rights reserved). Do not add MIT/Apache-2.0. `[DS]`
   - *Owner:* CURSOR (Auto) — intent ADR · CLAUDE (Opus 5.5) — LICENSE text and scope · HUMAN — sign-off
 
-- [ ] **P0-8 · Phase 0 GO/NO-GO checklist.** Short enough for a human to sign off in about 10 minutes. Nothing in Phase 0 is marked "done" before it exists. `[G]` `[Grok]`
+- [x] **P0-8 · Phase 0 GO/NO-GO checklist.** Short enough for a human to sign off in about 10 minutes. Nothing in Phase 0 is marked "done" before it exists. `[G]` `[Grok]`
   - [ ] `docs/data_sources.md` complete, with licence status per source
   - [ ] GDPR determination recorded
   - [ ] Reproducible environment bootstrap (`make up` or the canonical `uv`/Docker command, as recorded in `CONTRIBUTING.md`). `make` is not adopted until an ADR says so. `[GPT]`
@@ -97,6 +97,7 @@ These are decided. Items that must record them in `DECISIONS.md` still do so as 
   - [ ] Every P0-gate item owned and closed
   - [ ] Human sign-off (name, date)
   - *Owner:* CURSOR (Auto) — writes the checklist · HUMAN — sign-off
+  - Done by CURSOR (`agent/cursor/p0-8-go-no-go`, 2026-10-03) — checklist written in `docs/phase0_go_no_go.md`; checklist boxes and sign-off remain for HUMAN
 
 - [ ] **P0-13 · Dev scaffold `dev/`:** docker-compose (Postgres + PostGIS + TimescaleDB, Redis, Martin), `.env.example` entries, and the canonical bootstrap command recorded in `CONTRIBUTING.md`. Needed by the P0-8 bootstrap line. Carried over from the phase work queue. `[merge]`
   - *Owner:* CLAUDE (Opus 5.5)
@@ -273,3 +274,4 @@ This is the Phase 0–2 task queue and agent-assignment table from the 2026-10-0
 - **v2.3 · 2026-10-03 — CURSOR self-tick rule.** HUMAN decided that CURSOR ticks its own tasks when it completes them, with HUMAN review afterwards; status legend updated. P0-5 ticked (done by CURSOR in PR #3).
 - **v2.4 · 2026-10-03 — P0-1 / P0-2 / P0-7 intent ADR.** CURSOR recorded D1–D11 in `DECISIONS.md`, froze stack + A11 in `MASTER.md`, ticked P0-1 and P0-2; P0-7 intent ADR sub-item ticked (LICENSE text still CLAUDE).
 - **v2.5 · 2026-10-03 — P0-3 docs move.** CURSOR moved `SPEC_PHASES.md` → `docs/SPEC_PHASES.md` with a root redirect stub; updated repo links.
+- **v2.6 · 2026-10-03 — P0-8 checklist written.** CURSOR added `docs/phase0_go_no_go.md` from the P0-8 list; checklist boxes left open for HUMAN sign-off.
