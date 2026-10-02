@@ -1,6 +1,6 @@
 # TODO — Multi-AI Workspace (Final structure — some fields pending)
 
-**Version:** v2.0 — 2026-10-03
+**Version:** v2.1 — 2026-10-03
 **Versioning rule:** content edits (wording, filled fields, ticked items) bump the minor version (v1.1, v1.2…); structural changes or newly resolved decisions bump the major version (v2.0). Every bump gets a change-log line.
 
 **Sources:** Claude `[C]` · previous assistant `[G]` · Grok `[Grok]` · ChatGPT GPT-5.6 Luna `[GPT]` · DeepSeek `[DS]` · merge notes `[merge]`
@@ -28,25 +28,25 @@ These are decided. Items that must record them in `DECISIONS.md` still do so as 
 | **D10** | Template-vs-project split raised to **P1**. | P1-14 |
 | **D11** | Source corrections: **append revisions** (option B, resolved 2026-10-03). Raw key becomes `(site_id, source, source_ts, source_version)`, where `source_version` is the publisher's record version/version time; a `traffic_measure_current` view (latest revision per key) feeds aggregates. Rejected: overwrite (loses the audit trail). Late-correction policy: corrections inside the continuous-aggregate refresh window are picked up automatically; older ones need an explicit refresh, logged in `docs/aggregates_history.md`. `[DS]` `[C]` | P1-2, P1-9, P2-6 |
 
-**Still to fill in (owner):** owners for every P0 item, the cost envelope (P1-10), and the metric thresholds in `docs/metrics.md` (P1-11).
+**Still to fill in (owner):** the cost envelope (P1-10), and the metric thresholds in `docs/metrics.md` (P1-11).
 
 ---
 
 ## P0-gate — must be done before Phase 1 starts
 
 - [ ] **P0-12 · Verify GitHub rendering — do first.** Check `CONTRIBUTING.md` and `CHANGELOG.md` from a logged-out browser (local glitch, or BOM / CRLF / bad Markdown). Moved from hygiene: P0-5 puts the coordination rules in `CONTRIBUTING.md`, so other agents must be able to read it. About 10 minutes. `[G]` `[Grok]` `[DS]`
-  - *Owner:* ______
+  - *Owner:* HUMAN
 
 - [ ] **P0-1 · Freeze stack and pilot axis.** Align `MASTER.md` and `DECISIONS.md`; stop describing the stack as both "frozen" and "proposed". `[C]` `D1`
   - *ADR title:* `2026-10-03 — Stack and pilot axis frozen for Phases 0–1` `[Grok]`
   - *Definition of done:* one ADR line in `DECISIONS.md` stating *"Stack frozen for Phases 0–1 as of 2026-10-03; scope: A11 pilot only for Phases 0–1"*, and a matching sentence in `MASTER.md`, **in the same commit**. `[G]` `[Grok]`
-  - *Owner:* ______
+  - *Owner:* CURSOR (Auto)
 
 - [ ] **P0-2 · Record the `uv` ADR** in `DECISIONS.md`, with the migration note: *"All future Python tooling commands will use `uv` (run, sync, lock, add)."* `[C]` `[Grok]` `D2`
-  - *Owner:* ______
+  - *Owner:* CURSOR (Auto)
 
 - [ ] **P0-3 · Create `docs/` and move `SPEC_PHASES.md`** → `docs/SPEC_PHASES.md`, leaving a short redirect stub at the root. Do this before P0-4 and before any P1 spec edit. `[C]` `[Grok]`
-  - *Owner:* ______
+  - *Owner:* CURSOR (Auto)
 
 - [ ] **P0-4 · `docs/data_sources.md` — the critical path.** `[C]` `[G]` `[Grok]`
   - One sheet per source: URL, format, update frequency, coverage, licence (reuse / redistribution / derivation), contact, personal-data flag, fallback sources.
@@ -58,14 +58,15 @@ These are decided. Items that must record them in `DECISIONS.md` still do so as 
   - **Licence terms:** record the per-source result in `DECISIONS.md`. It is a product decision, not a legal checkbox: it decides whether the platform can ever be open or public-facing. `[C]` `[Grok]`
   - **GDPR determination:** for each source, does it contain personal data? Floating-car data (FCD) is the main risk. If yes, record legal basis, retention limits and anonymisation requirements in `DECISIONS.md`; if no, record that determination and its basis. `[DS]` `[Grok]`
     - This is a documented compliance assessment, not an AI-only legal conclusion. Unresolved legal questions require human/legal review before the source is approved for production use. `[GPT]`
-  - *Owner:* ______
+  - *Owner:* CLAUDE (Opus 5.5) — research and drafting · HUMAN — verifies licence and GDPR conclusions
 
 - [ ] **P0-5 · Minimal coordination rules** in `CONTRIBUTING.md`. `[C]` `[DS]` `[GPT]` `[Grok]` `D4`
   - **Status rule:** *"Status and progress updates go only in `CHANGELOG.md` (append-only). `MASTER.md` is updated only for structural or scope changes."*
   - **Single-writer protocol:** shared files — at least `MASTER.md`, `DECISIONS.md`, `TODO.md`, `CONTRIBUTING.md`, `docs/SPEC_PHASES.md`, `docs/data_sources.md` — may be edited by one agent at a time, with an explicit handoff note.
+    - *Identities:* add `CURSOR` and `GROK` to the identity list in `CONTRIBUTING.md`, so their commits have a valid `<AGENT>:` prefix.
     - *Mechanism (minimal):* the agent claims the file or task by appending a line to `CHANGELOG.md` with `owner` + `started_at`, and releases it with a short handoff note in the same place. No locking tool unless concurrent editing proves problematic. `[GPT]`
   - **Human-approval rule:** AI agents research and propose; the final decision on licensing, architecture freezes, phase GO/NO-GO, external-data redistribution and major infrastructure changes is attributable to the human owner.
-  - *Owner:* ______
+  - *Owner:* CURSOR (Auto) — review by HUMAN
 
 - [ ] **P0-6 · Credential policy, then secret scanning.** `[C]` `[G]` `[Grok]`
   - Policy text for `CONTRIBUTING.md`:
@@ -74,13 +75,13 @@ These are decided. Items that must record them in `DECISIONS.md` still do so as 
     > GitHub Actions secrets are allowed only for CI.
     > No secrets in Markdown, code, or commit messages.
   - Then add `.env.example` and a secret-scanning check (DATEX credentials will exist).
-  - *Owner:* ______
+  - *Owner:* CURSOR (Auto)
 
 - [ ] **P0-7 · Record licence intent, then add `LICENSE`.** `[G]` `[C]` `[Grok]` `D3`
   - [ ] Record the intent ADR in `DECISIONS.md`: *internal use only, re-evaluate at end of Phase 3*.
   - [ ] Choose or draft the exact proprietary licence text and record its intended scope: code, configuration, documentation, derived data. "Internal use only" is an intent, not a complete licence. Scope over derived data is limited by the source licences found in P0-4. `[GPT]` `[merge]`
   - [ ] Commit the `LICENSE` file consistent with D3 (internal use, all rights reserved). Do not add MIT/Apache-2.0. `[DS]`
-  - *Owner:* ______
+  - *Owner:* CURSOR (Auto) — intent ADR · CLAUDE (Opus 5.5) — LICENSE text and scope · HUMAN — sign-off
 
 - [ ] **P0-8 · Phase 0 GO/NO-GO checklist.** Short enough for a human to sign off in about 10 minutes. Nothing in Phase 0 is marked "done" before it exists. `[G]` `[Grok]`
   - [ ] `docs/data_sources.md` complete, with licence status per source
@@ -90,14 +91,23 @@ These are decided. Items that must record them in `DECISIONS.md` still do so as 
   - [ ] Conventions frozen
   - [ ] Every P0-gate item owned and closed
   - [ ] Human sign-off (name, date)
-  - *Owner:* ______
+  - *Owner:* CURSOR (Auto) — writes the checklist · HUMAN — sign-off
 
-- [ ] **P0-9 · Assign an owner to every P0 item** before Phase 1 starts; unowned P0 items are the main cause of Phase 0 stalls. `[G]` `[Grok]`
+- [ ] **P0-13 · Dev scaffold `dev/`:** docker-compose (Postgres + PostGIS + TimescaleDB, Redis, Martin), `.env.example` entries, and the canonical bootstrap command recorded in `CONTRIBUTING.md`. Needed by the P0-8 bootstrap line. Carried over from the phase work queue. `[merge]`
+  - *Owner:* CLAUDE (Opus 5.5)
+
+- [ ] **P0-14 · End-to-end smoke test:** a fake DATEX II XML sample → parser → Postgres → MapLibre map, reproducible from the P0-13 bootstrap. Needed by the P0-8 smoke-test line. Carried over from the phase work queue. `[merge]`
+  - *Owner:* CLAUDE (Opus 5.5)
+
+- [x] **P0-9 · Assign an owner to every P0 item** before Phase 1 starts; unowned P0 items are the main cause of Phase 0 stalls. `[G]` `[Grok]`
+  - Done 2026-10-03 by HUMAN: CURSOR (Auto) for well-specified edits, CLAUDE (Opus 5.5) for research, legal drafting and the scaffold/smoke test, HUMAN for checks and sign-offs.
 
 ## P0-hygiene — due by end of Phase 0, does not block Phase 1 `D5`
 
 - [ ] **P0-10 · `docs/README.md` navigation index**, once the first few docs exist. `[DS]` `[Grok]`
+  - *Owner:* CURSOR (Auto)
 - [ ] **P0-11 · Risk register `docs/RISKS.md`** — columns: Risk / Likelihood / Impact / Mitigation / Owner / Status. Move risks scattered through this TODO into it. `[DS]` `[Grok]`
+  - *Owner:* CURSOR (Auto) — HUMAN reviews likelihood and impact
 
 ---
 
@@ -253,3 +263,4 @@ This is the Phase 0–2 task queue and agent-assignment table from the 2026-10-0
 - **v1.0 · 2026-10-03 — Baseline.** Grok review: no changes requested. Version number and versioning rule added; this is the reference version for execution of P0.
 - **v1.1 · 2026-10-03 — Committed to repo.** Previous `TODO.md` phase work queue and agent-assignment table carried over verbatim as a dedicated section, instead of being overwritten.
 - **v2.0 · 2026-10-03 — D11 resolved.** HUMAN chose option B (append revisions). D11 moved to the resolved table; P1-2 raw key is now `(site_id, source, source_ts, source_version)` with a `traffic_measure_current` view; P1-9 carries the late-correction policy. No open decisions remain.
+- **v2.1 · 2026-10-03 — Owners assigned (P0-9 done).** HUMAN assigned every P0 item to CURSOR (Auto), CLAUDE (Opus 5.5) or HUMAN. Dev scaffold and smoke test added as P0-13 and P0-14 so the GO/NO-GO checklist's prerequisites have owners. P0-5 now adds `CURSOR` and `GROK` identities to `CONTRIBUTING.md`.
