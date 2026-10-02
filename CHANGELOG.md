@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-03
+**Agent:** CLAUDE  
+**Files:** `agents/CURSOR.md`, `CHANGELOG.md`  
+**Change:** Added instruction file for CURSOR (Cursor Auto): role limits, git and changelog rules, files reserved for other owners, and its ordered P0 task queue (P0-1/P0-2/P0-7 intent ADR → P0-3 → P0-8 checklist → P0-6 → P0-10 → P0-11). Task content stays in `TODO.md`.  
+**Remaining:** HUMAN to review P0-5 (PR #3). No instruction file exists yet for GROK.  
+**Verification:** Queue matches the CURSOR owner fields in `TODO.md` v2.2.
+
+## 2026-10-03
 **Agent:** CURSOR  
 **Files:** `CONTRIBUTING.md`, `CHANGELOG.md`  
 **Change:** P0-5 — added status rule, single-writer protocol (claim/release via `CHANGELOG.md` with `owner` + `started_at`), and human-approval rule to `CONTRIBUTING.md`. Identities CURSOR and GROK were already present. Claimed `CONTRIBUTING.md` (`owner=CURSOR`, `started_at=2026-10-03`); released with this handoff.  
