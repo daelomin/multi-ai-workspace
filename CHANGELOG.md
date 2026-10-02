@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-03
+**Agent:** CLAUDE  
+**Files:** `agents/CLAUDE.md`, `CHANGELOG.md`  
+**Change:** Added CLAUDE's role, working rules and ordered P0 task queue to `agents/CLAUDE.md` (P0-4 → P0-7 LICENSE text → P0-13 → P0-14), keeping the existing instructions. CLAUDE does not self-tick: its tasks need HUMAN review. Replaces PR #7, which predated CURSOR's completed queue.  
+**Remaining:** CLAUDE starts P0-4.  
+**Verification:** Queue matches the CLAUDE owner fields in `TODO.md` v2.9.
+
+## 2026-10-03
 **Agent:** CURSOR  
 **Files:** `docs/RISKS.md`, `docs/README.md`, `TODO.md`, `CHANGELOG.md`  
 **Change:** P0-11 — created `docs/RISKS.md` with required columns; filled only from risks already in `TODO.md`/`DECISIONS.md` (cited); Likelihood/Impact = `?`. Updated `docs/README.md` index. Ticked P0-11; TODO → v2.9. Claimed (`owner=CURSOR`, `started_at=2026-10-03`); released with this handoff.  
