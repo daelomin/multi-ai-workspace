@@ -14,7 +14,11 @@ You handle well-specified edits: the task text in `TODO.md` already says what to
 - **Commits:** `CURSOR: <short description>`.
 - **Claim and release** each shared file through `CHANGELOG.md`, as described in `CONTRIBUTING.md`.
 - **Changelog:** add your entry at the top; never edit older entries.
-- **Do not tick boxes in `TODO.md`.** HUMAN ticks after review.
+- **Tick your own task in `TODO.md`** in the same pull request that completes it (HUMAN reviews afterwards):
+  - tick only boxes for items or sub-items whose owner is CURSOR;
+  - add a line under the item: `Done by CURSOR (<branch>, <date>)`;
+  - bump `TODO.md` by one minor version and add a matching line to its change log, as its versioning rule requires;
+  - never tick sign-offs, HUMAN-owned parts, or a task you could not fully complete — leave it `[~]` and explain in `CHANGELOG.md`.
 - **Do not push to a branch whose pull request is already open**; start a new branch instead.
 - **Never invent values:** URLs, licence terms, metric thresholds, costs, owners. Leave `______` blanks as they are.
 
@@ -30,7 +34,7 @@ These belong to other owners in `TODO.md`:
 
 Start each task only when the one before it is merged into `main`.
 
-1. **P0-5 · Coordination rules.** Done (PR #3); awaiting HUMAN review. Nothing to do.
+1. **P0-5 · Coordination rules.** Done (PR #3) and ticked. Nothing to do.
 
 2. **P0-1 + P0-2 + P0-7 (intent ADR only) · Decision records.** One branch, one commit.
    - In `DECISIONS.md`, record decisions D1–D11 from the "Resolved decisions" table in `TODO.md`, one ADR per decision, dated 2026-10-03, decided by HUMAN. Use the ADR title given in P0-1 for D1, and the migration note given in P0-2 for D2.
@@ -44,7 +48,7 @@ Start each task only when the one before it is merged into `main`.
 
 4. **P0-8 · GO/NO-GO checklist (writing only).**
    - Create `docs/phase0_go_no_go.md` containing exactly the checklist in P0-8, plus an empty sign-off line (name, date).
-   - Do not tick anything; signing is HUMAN's.
+   - Do not tick the checklist's own boxes; signing is HUMAN's. Tick only the P0-8 "write the checklist" part in `TODO.md`.
 
 5. **P0-6 · Credential policy and secret scanning.**
    - Add the policy text from P0-6 to `CONTRIBUTING.md`.
