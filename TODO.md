@@ -1,6 +1,6 @@
 # TODO — Multi-AI Workspace (Final structure — some fields pending)
 
-**Version:** v2.3 — 2026-10-03
+**Version:** v2.4 — 2026-10-03
 **Versioning rule:** content edits (wording, filled fields, ticked items) bump the minor version (v1.1, v1.2…); structural changes or newly resolved decisions bump the major version (v2.0). Every bump gets a change-log line.
 
 **Sources:** Claude `[C]` · previous assistant `[G]` · Grok `[Grok]` · ChatGPT GPT-5.6 Luna `[GPT]` · DeepSeek `[DS]` · merge notes `[merge]`
@@ -37,13 +37,15 @@ These are decided. Items that must record them in `DECISIONS.md` still do so as 
 - [ ] **P0-12 · Verify GitHub rendering — do first.** Check `CONTRIBUTING.md` and `CHANGELOG.md` from a logged-out browser (local glitch, or BOM / CRLF / bad Markdown). Moved from hygiene: P0-5 puts the coordination rules in `CONTRIBUTING.md`, so other agents must be able to read it. About 10 minutes. `[G]` `[Grok]` `[DS]`
   - *Owner:* HUMAN
 
-- [ ] **P0-1 · Freeze stack and pilot axis.** Align `MASTER.md` and `DECISIONS.md`; stop describing the stack as both "frozen" and "proposed". `[C]` `D1`
+- [x] **P0-1 · Freeze stack and pilot axis.** Align `MASTER.md` and `DECISIONS.md`; stop describing the stack as both "frozen" and "proposed". `[C]` `D1`
   - *ADR title:* `2026-10-03 — Stack and pilot axis frozen for Phases 0–1` `[Grok]`
   - *Definition of done:* one ADR line in `DECISIONS.md` stating *"Stack frozen for Phases 0–1 as of 2026-10-03; scope: A11 pilot only for Phases 0–1"*, and a matching sentence in `MASTER.md`, **in the same commit**. `[G]` `[Grok]`
   - *Owner:* CURSOR (Auto)
+  - Done by CURSOR (`agent/cursor/p0-1-decisions`, 2026-10-03)
 
-- [ ] **P0-2 · Record the `uv` ADR** in `DECISIONS.md`, with the migration note: *"All future Python tooling commands will use `uv` (run, sync, lock, add)."* `[C]` `[Grok]` `D2`
+- [x] **P0-2 · Record the `uv` ADR** in `DECISIONS.md`, with the migration note: *"All future Python tooling commands will use `uv` (run, sync, lock, add)."* `[C]` `[Grok]` `D2`
   - *Owner:* CURSOR (Auto)
+  - Done by CURSOR (`agent/cursor/p0-1-decisions`, 2026-10-03)
 
 - [ ] **P0-3 · Create `docs/` and move `SPEC_PHASES.md`** → `docs/SPEC_PHASES.md`, leaving a short redirect stub at the root. Do this before P0-4 and before any P1 spec edit. `[C]` `[Grok]`
   - *Owner:* CURSOR (Auto)
@@ -78,8 +80,9 @@ These are decided. Items that must record them in `DECISIONS.md` still do so as 
   - Then add `.env.example` and a secret-scanning check (DATEX credentials will exist).
   - *Owner:* CURSOR (Auto)
 
-- [ ] **P0-7 · Record licence intent, then add `LICENSE`.** `[G]` `[C]` `[Grok]` `D3`
-  - [ ] Record the intent ADR in `DECISIONS.md`: *internal use only, re-evaluate at end of Phase 3*.
+- [~] **P0-7 · Record licence intent, then add `LICENSE`.** `[G]` `[C]` `[Grok]` `D3`
+  - [x] Record the intent ADR in `DECISIONS.md`: *internal use only, re-evaluate at end of Phase 3*.
+    - Done by CURSOR (`agent/cursor/p0-1-decisions`, 2026-10-03)
   - [ ] Choose or draft the exact proprietary licence text and record its intended scope: code, configuration, documentation, derived data. "Internal use only" is an intent, not a complete licence. Scope over derived data is limited by the source licences found in P0-4. `[GPT]` `[merge]`
   - [ ] Commit the `LICENSE` file consistent with D3 (internal use, all rights reserved). Do not add MIT/Apache-2.0. `[DS]`
   - *Owner:* CURSOR (Auto) — intent ADR · CLAUDE (Opus 5.5) — LICENSE text and scope · HUMAN — sign-off
@@ -267,3 +270,4 @@ This is the Phase 0–2 task queue and agent-assignment table from the 2026-10-0
 - **v2.1 · 2026-10-03 — Owners assigned (P0-9 done).** HUMAN assigned every P0 item to CURSOR (Auto), CLAUDE (Opus 5.5) or HUMAN. Dev scaffold and smoke test added as P0-13 and P0-14 so the GO/NO-GO checklist's prerequisites have owners. P0-5 now adds `CURSOR` and `GROK` identities to `CONTRIBUTING.md`.
 - **v2.2 · 2026-10-03 — Sync with main.** v2.0 and v2.1 had missed the merge of PR #1 and are re-submitted together. P0-5 identities sub-task marked done (HUMAN added `CURSOR` and `GROK` to `CONTRIBUTING.md`).
 - **v2.3 · 2026-10-03 — CURSOR self-tick rule.** HUMAN decided that CURSOR ticks its own tasks when it completes them, with HUMAN review afterwards; status legend updated. P0-5 ticked (done by CURSOR in PR #3).
+- **v2.4 · 2026-10-03 — P0-1 / P0-2 / P0-7 intent ADR.** CURSOR recorded D1–D11 in `DECISIONS.md`, froze stack + A11 in `MASTER.md`, ticked P0-1 and P0-2; P0-7 intent ADR sub-item ticked (LICENSE text still CLAUDE).
