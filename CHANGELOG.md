@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-03
+**Agent:** CLAUDE  
+**Files:** `docs/data_sources.md`, `docs/README.md`, `docs/RISKS.md`, `.env.example`, `TODO.md`, `CHANGELOG.md`  
+**Change:** P0-4 draft — `docs/data_sources.md` with the A11 operator map, four Phase 0 source sheets (DIR events, DIR traffic state, Bison Futé restricted action b and action c), VINCI Autoroutes direct status, deferred sources, Alert-C direction conventions and a GDPR proposal. Key findings: the A11 is fully concessioned (Cofiroute + ASF), so its live data needs the Bison Futé restricted portal; SCAs may offer volumes only; feeds are DATEX II 2.2.2. Added restricted-portal credential names to `.env.example`, the file to `docs/README.md`, and one new risk to `docs/RISKS.md`. TODO → v2.10, P0-4 `[~]`. Claimed `docs/README.md`, `docs/RISKS.md`, `.env.example`, `TODO.md` (`owner=CLAUDE`, `started_at=2026-10-03`); released with this handoff.  
+**Remaining:** HUMAN: request restricted access (email in the file), verify licence and GDPR conclusions, then record them in `DECISIONS.md`. Open checks marked ⚠ in the file (bypass operator, SCA speed availability, exact open-directory paths, 2.2.2 element names).  
+**Verification:** Every fact cites a source checked on 2026-10-03; unverified items marked ⚠. Not ticked: needs HUMAN review.
+
+## 2026-10-03
 **Agent:** CURSOR  
 **Files:** `docs/RISKS.md`, `docs/README.md`, `TODO.md`, `CHANGELOG.md`  
 **Change:** P0-11 — created `docs/RISKS.md` with required columns; filled only from risks already in `TODO.md`/`DECISIONS.md` (cited); Likelihood/Impact = `?`. Updated `docs/README.md` index. Ticked P0-11; TODO → v2.9. Claimed (`owner=CURSOR`, `started_at=2026-10-03`); released with this handoff.  
