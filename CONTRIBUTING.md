@@ -27,6 +27,8 @@ Use one of these identities:
 - CLAUDE
 - GEMINI
 - DEEPSEEK
+- GROK
+- CURSOR
 
 ## Handoff protocol
 When handing work to another AI, add a short entry to `CHANGELOG.md` containing:
