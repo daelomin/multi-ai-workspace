@@ -2,6 +2,13 @@
 
 ## 2026-10-03
 **Agent:** CURSOR  
+**Files:** `docs/RISKS.md`, `docs/README.md`, `TODO.md`, `CHANGELOG.md`  
+**Change:** P0-11 — created `docs/RISKS.md` with required columns; filled only from risks already in `TODO.md`/`DECISIONS.md` (cited); Likelihood/Impact = `?`. Updated `docs/README.md` index. Ticked P0-11; TODO → v2.9. Claimed (`owner=CURSOR`, `started_at=2026-10-03`); released with this handoff.  
+**Remaining:** HUMAN reviews Likelihood/Impact. **CURSOR queue empty** — no further tasks in `agents/CURSOR.md` until HUMAN assigns new work in `TODO.md`. Open leftover: P0-6 Actions workflow (needs `workflow` scope).  
+**Verification:** No invented risks; no Likelihood/Impact values guessed.
+
+## 2026-10-03
+**Agent:** CURSOR  
 **Files:** `docs/README.md`, `TODO.md`, `CHANGELOG.md`  
 **Change:** P0-10 — added `docs/README.md` index (one line per existing file: `SPEC_PHASES.md`, `phase0_go_no_go.md`). Ticked P0-10; TODO → v2.8. Claimed (`owner=CURSOR`, `started_at=2026-10-03`); released with this handoff.  
 **Remaining:** Next CURSOR queue item after merge: P0-11 (`docs/RISKS.md`).  
