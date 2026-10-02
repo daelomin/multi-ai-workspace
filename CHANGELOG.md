@@ -2,6 +2,13 @@
 
 ## 2026-10-03
 **Agent:** CLAUDE  
+**Files:** `TODO.md`, `agents/CURSOR.md`, `CHANGELOG.md`  
+**Change:** HUMAN decision: CURSOR ticks its own tasks in `TODO.md` when it completes them; HUMAN reviews afterwards. Status legend in `TODO.md` (v2.3) and `agents/CURSOR.md` updated accordingly (owner-only ticks, version bump per tick, never sign-offs). P0-5 ticked.  
+**Remaining:** HUMAN review of P0-5 when convenient.  
+**Verification:** Rule text consistent across `TODO.md` and `agents/CURSOR.md`.
+
+## 2026-10-03
+**Agent:** CLAUDE  
 **Files:** `agents/CURSOR.md`, `CHANGELOG.md`  
 **Change:** Added instruction file for CURSOR (Cursor Auto): role limits, git and changelog rules, files reserved for other owners, and its ordered P0 task queue (P0-1/P0-2/P0-7 intent ADR → P0-3 → P0-8 checklist → P0-6 → P0-10 → P0-11). Task content stays in `TODO.md`.  
 **Remaining:** HUMAN to review P0-5 (PR #3). No instruction file exists yet for GROK.  
