@@ -3,6 +3,13 @@
 ## 2026-10-03
 **Agent:** CLAUDE  
 **Files:** `TODO.md`, `CHANGELOG.md`  
+**Change:** TODO v2.2. The v2.0 (D11) and v2.1 (P0 owners) commits were pushed after PR #1 was merged, so they were missing from `main`; rebased onto `main` and re-submitted. P0-5 identities sub-task marked done (HUMAN added `CURSOR` and `GROK` to `CONTRIBUTING.md` in 3af0482).  
+**Remaining:** Rest of P0-5 (status rule, single-writer protocol, human-approval rule) for CURSOR.  
+**Verification:** `TODO.md` on this branch reads v2.2; identity list checked in `CONTRIBUTING.md`.
+
+## 2026-10-03
+**Agent:** CLAUDE  
+**Files:** `TODO.md`, `CHANGELOG.md`  
 **Change:** TODO v2.1 — HUMAN assigned owners to every P0 item (P0-9 done): CURSOR (Auto) for well-specified edits (P0-1, P0-2, P0-3, P0-5, P0-6, P0-7 ADR, P0-8 checklist, P0-10, P0-11); CLAUDE (Opus 5.5) for P0-4 research, P0-7 LICENSE text, and new items P0-13 (dev scaffold) and P0-14 (smoke test); HUMAN for P0-12 and all sign-offs.  
 **Remaining:** CURSOR identity is not yet in `CONTRIBUTING.md` (added by P0-5). HUMAN still to fill cost envelope and metric thresholds. Next: P0-12 (HUMAN), then CLAUDE starts P0-4.  
 **Verification:** Document only.

@@ -1,6 +1,6 @@
 # TODO — Multi-AI Workspace (Final structure — some fields pending)
 
-**Version:** v2.1 — 2026-10-03
+**Version:** v2.2 — 2026-10-03
 **Versioning rule:** content edits (wording, filled fields, ticked items) bump the minor version (v1.1, v1.2…); structural changes or newly resolved decisions bump the major version (v2.0). Every bump gets a change-log line.
 
 **Sources:** Claude `[C]` · previous assistant `[G]` · Grok `[Grok]` · ChatGPT GPT-5.6 Luna `[GPT]` · DeepSeek `[DS]` · merge notes `[merge]`
@@ -63,7 +63,7 @@ These are decided. Items that must record them in `DECISIONS.md` still do so as 
 - [ ] **P0-5 · Minimal coordination rules** in `CONTRIBUTING.md`. `[C]` `[DS]` `[GPT]` `[Grok]` `D4`
   - **Status rule:** *"Status and progress updates go only in `CHANGELOG.md` (append-only). `MASTER.md` is updated only for structural or scope changes."*
   - **Single-writer protocol:** shared files — at least `MASTER.md`, `DECISIONS.md`, `TODO.md`, `CONTRIBUTING.md`, `docs/SPEC_PHASES.md`, `docs/data_sources.md` — may be edited by one agent at a time, with an explicit handoff note.
-    - *Identities:* add `CURSOR` and `GROK` to the identity list in `CONTRIBUTING.md`, so their commits have a valid `<AGENT>:` prefix.
+    - [x] *Identities:* add `CURSOR` and `GROK` to the identity list in `CONTRIBUTING.md`, so their commits have a valid `<AGENT>:` prefix. Done by HUMAN on 2026-10-03.
     - *Mechanism (minimal):* the agent claims the file or task by appending a line to `CHANGELOG.md` with `owner` + `started_at`, and releases it with a short handoff note in the same place. No locking tool unless concurrent editing proves problematic. `[GPT]`
   - **Human-approval rule:** AI agents research and propose; the final decision on licensing, architecture freezes, phase GO/NO-GO, external-data redistribution and major infrastructure changes is attributable to the human owner.
   - *Owner:* CURSOR (Auto) — review by HUMAN
@@ -264,3 +264,4 @@ This is the Phase 0–2 task queue and agent-assignment table from the 2026-10-0
 - **v1.1 · 2026-10-03 — Committed to repo.** Previous `TODO.md` phase work queue and agent-assignment table carried over verbatim as a dedicated section, instead of being overwritten.
 - **v2.0 · 2026-10-03 — D11 resolved.** HUMAN chose option B (append revisions). D11 moved to the resolved table; P1-2 raw key is now `(site_id, source, source_ts, source_version)` with a `traffic_measure_current` view; P1-9 carries the late-correction policy. No open decisions remain.
 - **v2.1 · 2026-10-03 — Owners assigned (P0-9 done).** HUMAN assigned every P0 item to CURSOR (Auto), CLAUDE (Opus 5.5) or HUMAN. Dev scaffold and smoke test added as P0-13 and P0-14 so the GO/NO-GO checklist's prerequisites have owners. P0-5 now adds `CURSOR` and `GROK` identities to `CONTRIBUTING.md`.
+- **v2.2 · 2026-10-03 — Sync with main.** v2.0 and v2.1 had missed the merge of PR #1 and are re-submitted together. P0-5 identities sub-task marked done (HUMAN added `CURSOR` and `GROK` to `CONTRIBUTING.md`).
