@@ -1,10 +1,10 @@
 # TODO — Multi-AI Workspace (Final structure — some fields pending)
 
-**Version:** v1.1 — 2026-10-03
+**Version:** v2.2 — 2026-10-03
 **Versioning rule:** content edits (wording, filled fields, ticked items) bump the minor version (v1.1, v1.2…); structural changes or newly resolved decisions bump the major version (v2.0). Every bump gets a change-log line.
 
 **Sources:** Claude `[C]` · previous assistant `[G]` · Grok `[Grok]` · ChatGPT GPT-5.6 Luna `[GPT]` · DeepSeek `[DS]` · merge notes `[merge]`
-**Structure finalized:** 2026-10-03. Merged from the consolidated multi-agent review (signed by Grok, 2026-10-03); decisions D1–D10 resolved by the human owner on the same date. "Final" refers to the structure and decisions, not to every field: owners, cost envelope, metric thresholds and D11 are still open (see below).
+**Structure finalized:** 2026-10-03. Merged from the consolidated multi-agent review (signed by Grok, 2026-10-03); decisions D1–D11 resolved by the human owner on the same date. "Final" refers to the structure and decisions, not to every field: owners, cost envelope and metric thresholds are still open (see below).
 
 **Status legend:** `[ ]` todo · `[~]` in progress · `[x]` done. Nothing is ticked until verified by a human or agent.
 
@@ -26,38 +26,27 @@ These are decided. Items that must record them in `DECISIONS.md` still do so as 
 | **D8** | Raw measures keyed on the **measurement site**: `(site_id, source, source_ts)`. The derived per-segment table has its own key built on `segment_id` plus a time identity (e.g. `(segment_id, source, bucket_ts)`); the exact key is fixed in P1-2 once the full `traffic_measure` model is written. | P1-2 |
 | **D9** | Segment IDs: **`seg_<ulid>`**. | P1-3 |
 | **D10** | Template-vs-project split raised to **P1**. | P1-14 |
+| **D11** | Source corrections: **append revisions** (option B, resolved 2026-10-03). Raw key becomes `(site_id, source, source_ts, source_version)`, where `source_version` is the publisher's record version/version time; a `traffic_measure_current` view (latest revision per key) feeds aggregates. Rejected: overwrite (loses the audit trail). Late-correction policy: corrections inside the continuous-aggregate refresh window are picked up automatically; older ones need an explicit refresh, logged in `docs/aggregates_history.md`. `[DS]` `[C]` | P1-2, P1-9, P2-6 |
 
-## Open decision
-
-**D11 · Source corrections on raw measures** (extends D8; applies to P1-2, P1-9, P2-6) `[DS]`
-DATEX publishers can reissue a record for the same `(site_id, source, source_ts)`. The choice propagates into every downstream aggregate.
-
-| Option | What it means | Cost |
-|---|---|---|
-| **A · Overwrite** | Upsert on `(site_id, source, source_ts)`; keep only the latest value. | Simplest. Loses the audit trail; aggregates already built from the old value become unexplainable. |
-| **B · Append revisions** | Key becomes `(site_id, source, source_ts, source_version)`, where `source_version` is the publisher's record version/version time. A `traffic_measure_current` view (latest revision per key) feeds aggregates. | Extra storage and one view. Keeps full provenance (P2-6) and makes aggregate rebuilds reproducible (P1-9). |
-
-**Recommendation: B.** It is the only option consistent with the provenance and aggregate-versioning decisions already taken. Either way, record a late-correction policy: corrections arriving inside the continuous-aggregate refresh window are picked up automatically; older ones need an explicit refresh, logged in `docs/aggregates_history.md`.
-
-**Still to fill in (owner):** D11, owners for every P0 item, the cost envelope (P1-10), and the metric thresholds in `docs/metrics.md` (P1-11).
+**Still to fill in (owner):** the cost envelope (P1-10), and the metric thresholds in `docs/metrics.md` (P1-11).
 
 ---
 
 ## P0-gate — must be done before Phase 1 starts
 
 - [ ] **P0-12 · Verify GitHub rendering — do first.** Check `CONTRIBUTING.md` and `CHANGELOG.md` from a logged-out browser (local glitch, or BOM / CRLF / bad Markdown). Moved from hygiene: P0-5 puts the coordination rules in `CONTRIBUTING.md`, so other agents must be able to read it. About 10 minutes. `[G]` `[Grok]` `[DS]`
-  - *Owner:* ______
+  - *Owner:* HUMAN
 
 - [ ] **P0-1 · Freeze stack and pilot axis.** Align `MASTER.md` and `DECISIONS.md`; stop describing the stack as both "frozen" and "proposed". `[C]` `D1`
   - *ADR title:* `2026-10-03 — Stack and pilot axis frozen for Phases 0–1` `[Grok]`
   - *Definition of done:* one ADR line in `DECISIONS.md` stating *"Stack frozen for Phases 0–1 as of 2026-10-03; scope: A11 pilot only for Phases 0–1"*, and a matching sentence in `MASTER.md`, **in the same commit**. `[G]` `[Grok]`
-  - *Owner:* ______
+  - *Owner:* CURSOR (Auto)
 
 - [ ] **P0-2 · Record the `uv` ADR** in `DECISIONS.md`, with the migration note: *"All future Python tooling commands will use `uv` (run, sync, lock, add)."* `[C]` `[Grok]` `D2`
-  - *Owner:* ______
+  - *Owner:* CURSOR (Auto)
 
 - [ ] **P0-3 · Create `docs/` and move `SPEC_PHASES.md`** → `docs/SPEC_PHASES.md`, leaving a short redirect stub at the root. Do this before P0-4 and before any P1 spec edit. `[C]` `[Grok]`
-  - *Owner:* ______
+  - *Owner:* CURSOR (Auto)
 
 - [ ] **P0-4 · `docs/data_sources.md` — the critical path.** `[C]` `[G]` `[Grok]`
   - One sheet per source: URL, format, update frequency, coverage, licence (reuse / redistribution / derivation), contact, personal-data flag, fallback sources.
@@ -69,14 +58,15 @@ DATEX publishers can reissue a record for the same `(site_id, source, source_ts)
   - **Licence terms:** record the per-source result in `DECISIONS.md`. It is a product decision, not a legal checkbox: it decides whether the platform can ever be open or public-facing. `[C]` `[Grok]`
   - **GDPR determination:** for each source, does it contain personal data? Floating-car data (FCD) is the main risk. If yes, record legal basis, retention limits and anonymisation requirements in `DECISIONS.md`; if no, record that determination and its basis. `[DS]` `[Grok]`
     - This is a documented compliance assessment, not an AI-only legal conclusion. Unresolved legal questions require human/legal review before the source is approved for production use. `[GPT]`
-  - *Owner:* ______
+  - *Owner:* CLAUDE (Opus 5.5) — research and drafting · HUMAN — verifies licence and GDPR conclusions
 
 - [ ] **P0-5 · Minimal coordination rules** in `CONTRIBUTING.md`. `[C]` `[DS]` `[GPT]` `[Grok]` `D4`
   - **Status rule:** *"Status and progress updates go only in `CHANGELOG.md` (append-only). `MASTER.md` is updated only for structural or scope changes."*
   - **Single-writer protocol:** shared files — at least `MASTER.md`, `DECISIONS.md`, `TODO.md`, `CONTRIBUTING.md`, `docs/SPEC_PHASES.md`, `docs/data_sources.md` — may be edited by one agent at a time, with an explicit handoff note.
+    - [x] *Identities:* add `CURSOR` and `GROK` to the identity list in `CONTRIBUTING.md`, so their commits have a valid `<AGENT>:` prefix. Done by HUMAN on 2026-10-03.
     - *Mechanism (minimal):* the agent claims the file or task by appending a line to `CHANGELOG.md` with `owner` + `started_at`, and releases it with a short handoff note in the same place. No locking tool unless concurrent editing proves problematic. `[GPT]`
   - **Human-approval rule:** AI agents research and propose; the final decision on licensing, architecture freezes, phase GO/NO-GO, external-data redistribution and major infrastructure changes is attributable to the human owner.
-  - *Owner:* ______
+  - *Owner:* CURSOR (Auto) — review by HUMAN
 
 - [ ] **P0-6 · Credential policy, then secret scanning.** `[C]` `[G]` `[Grok]`
   - Policy text for `CONTRIBUTING.md`:
@@ -85,13 +75,13 @@ DATEX publishers can reissue a record for the same `(site_id, source, source_ts)
     > GitHub Actions secrets are allowed only for CI.
     > No secrets in Markdown, code, or commit messages.
   - Then add `.env.example` and a secret-scanning check (DATEX credentials will exist).
-  - *Owner:* ______
+  - *Owner:* CURSOR (Auto)
 
 - [ ] **P0-7 · Record licence intent, then add `LICENSE`.** `[G]` `[C]` `[Grok]` `D3`
   - [ ] Record the intent ADR in `DECISIONS.md`: *internal use only, re-evaluate at end of Phase 3*.
   - [ ] Choose or draft the exact proprietary licence text and record its intended scope: code, configuration, documentation, derived data. "Internal use only" is an intent, not a complete licence. Scope over derived data is limited by the source licences found in P0-4. `[GPT]` `[merge]`
   - [ ] Commit the `LICENSE` file consistent with D3 (internal use, all rights reserved). Do not add MIT/Apache-2.0. `[DS]`
-  - *Owner:* ______
+  - *Owner:* CURSOR (Auto) — intent ADR · CLAUDE (Opus 5.5) — LICENSE text and scope · HUMAN — sign-off
 
 - [ ] **P0-8 · Phase 0 GO/NO-GO checklist.** Short enough for a human to sign off in about 10 minutes. Nothing in Phase 0 is marked "done" before it exists. `[G]` `[Grok]`
   - [ ] `docs/data_sources.md` complete, with licence status per source
@@ -101,14 +91,23 @@ DATEX publishers can reissue a record for the same `(site_id, source, source_ts)
   - [ ] Conventions frozen
   - [ ] Every P0-gate item owned and closed
   - [ ] Human sign-off (name, date)
-  - *Owner:* ______
+  - *Owner:* CURSOR (Auto) — writes the checklist · HUMAN — sign-off
 
-- [ ] **P0-9 · Assign an owner to every P0 item** before Phase 1 starts; unowned P0 items are the main cause of Phase 0 stalls. `[G]` `[Grok]`
+- [ ] **P0-13 · Dev scaffold `dev/`:** docker-compose (Postgres + PostGIS + TimescaleDB, Redis, Martin), `.env.example` entries, and the canonical bootstrap command recorded in `CONTRIBUTING.md`. Needed by the P0-8 bootstrap line. Carried over from the phase work queue. `[merge]`
+  - *Owner:* CLAUDE (Opus 5.5)
+
+- [ ] **P0-14 · End-to-end smoke test:** a fake DATEX II XML sample → parser → Postgres → MapLibre map, reproducible from the P0-13 bootstrap. Needed by the P0-8 smoke-test line. Carried over from the phase work queue. `[merge]`
+  - *Owner:* CLAUDE (Opus 5.5)
+
+- [x] **P0-9 · Assign an owner to every P0 item** before Phase 1 starts; unowned P0 items are the main cause of Phase 0 stalls. `[G]` `[Grok]`
+  - Done 2026-10-03 by HUMAN: CURSOR (Auto) for well-specified edits, CLAUDE (Opus 5.5) for research, legal drafting and the scaffold/smoke test, HUMAN for checks and sign-offs.
 
 ## P0-hygiene — due by end of Phase 0, does not block Phase 1 `D5`
 
 - [ ] **P0-10 · `docs/README.md` navigation index**, once the first few docs exist. `[DS]` `[Grok]`
+  - *Owner:* CURSOR (Auto)
 - [ ] **P0-11 · Risk register `docs/RISKS.md`** — columns: Risk / Likelihood / Impact / Mitigation / Owner / Status. Move risks scattered through this TODO into it. `[DS]` `[Grok]`
+  - *Owner:* CURSOR (Auto) — HUMAN reviews likelihood and impact
 
 ---
 
@@ -117,7 +116,7 @@ DATEX publishers can reissue a record for the same `(site_id, source, source_ts)
 - [ ] **P1-1 · Add a `measurement_site` entity and a site-to-segment mapping.** DATEX measures come from point sensors, not segments. Before any collector code. `[C]` `[Grok]`
 
 - [ ] **P1-2 · `traffic_measure` keys and timestamps.** `[C]` `[Grok]` `D8` `D11`
-  - Unique key `(site_id, source, source_ts)` on raw measures, extended with `source_version` if D11 option B is chosen.
+  - Unique key `(site_id, source, source_ts, source_version)` on raw measures (append revisions, per D11), plus the `traffic_measure_current` view (latest revision per key) that feeds aggregates.
   - Derived per-segment table: key includes `segment_id` plus a time identity (candidate: `(segment_id, source, bucket_ts)`). Verify against the complete `traffic_measure` model before the schema is validated; `segment_id` alone is not unique for time-series rows. `[GPT]`
   - Add `source_ts` / `ingest_ts` columns as required by the conventions.
   - Do not fix the compression `segmentby` columns until representative data has been benchmarked (P2-10). `[GPT]` `[DS]`
@@ -136,6 +135,7 @@ DATEX publishers can reissue a record for the same `(site_id, source, source_ts)
 - [ ] **P1-8 · Phase 4 attribution ground truth:** who annotates the 100 test cases and what the ground truth is; label the "traffic density" residual (`OTHER`) as a catch-all, not a cause. `[C]` `[Grok]`
 
 - [ ] **P1-9 · 90-day baselines with 30-day detailed retention** via continuous aggregates, with versioning: an `aggregate_version` column and `docs/aggregates_history.md` (what changed, when, whether history was rebuilt). `[C]` `[DS]` `[Grok]`
+  - Aggregates read from `traffic_measure_current`. Late-correction policy (D11): corrections inside the refresh window are picked up automatically; older ones need an explicit refresh, logged in `docs/aggregates_history.md`.
 
 - [ ] **P1-10 · Schedule assumptions and cost envelope** (phases 0–6 ≈ 53–68 weeks). `[C]` `[GPT]` `[DS]` `[Grok]`
   - State team size, separating human engineering effort from AI-agent activity (more agents ≠ more FTE or shorter calendar). Starting assumption to confirm: 1–2 human FTE + multi-AI support.
@@ -262,3 +262,6 @@ This is the Phase 0–2 task queue and agent-assignment table from the 2026-10-0
 - **v0.4 · 2026-10-03 — ChatGPT review applied.** P0-7 adds licence-text and scope step; P0-4 GDPR marked as an assessment requiring human/legal review; P0-5 gets a minimal claim/release mechanism via `CHANGELOG.md`; P0-8 bootstrap line no longer implies `make`; D8/P1-2 derived-table key clarified (segment + time identity, to verify against the full model); P1-4 requires a defined linear-reference orientation and per-source direction mapping; P1-11 thresholds must not be invented; P2-4 SLA owner override. The reported end-of-file duplication was not present in this file (copy/paste artefact on the reviewer's side).
 - **v1.0 · 2026-10-03 — Baseline.** Grok review: no changes requested. Version number and versioning rule added; this is the reference version for execution of P0.
 - **v1.1 · 2026-10-03 — Committed to repo.** Previous `TODO.md` phase work queue and agent-assignment table carried over verbatim as a dedicated section, instead of being overwritten.
+- **v2.0 · 2026-10-03 — D11 resolved.** HUMAN chose option B (append revisions). D11 moved to the resolved table; P1-2 raw key is now `(site_id, source, source_ts, source_version)` with a `traffic_measure_current` view; P1-9 carries the late-correction policy. No open decisions remain.
+- **v2.1 · 2026-10-03 — Owners assigned (P0-9 done).** HUMAN assigned every P0 item to CURSOR (Auto), CLAUDE (Opus 5.5) or HUMAN. Dev scaffold and smoke test added as P0-13 and P0-14 so the GO/NO-GO checklist's prerequisites have owners. P0-5 now adds `CURSOR` and `GROK` identities to `CONTRIBUTING.md`.
+- **v2.2 · 2026-10-03 — Sync with main.** v2.0 and v2.1 had missed the merge of PR #1 and are re-submitted together. P0-5 identities sub-task marked done (HUMAN added `CURSOR` and `GROK` to `CONTRIBUTING.md`).
