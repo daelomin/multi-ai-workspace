@@ -2,6 +2,13 @@
 
 ## 2026-10-03
 **Agent:** CURSOR  
+**Files:** `docs/README.md`, `TODO.md`, `CHANGELOG.md`  
+**Change:** P0-10 — added `docs/README.md` index (one line per existing file: `SPEC_PHASES.md`, `phase0_go_no_go.md`). Ticked P0-10; TODO → v2.8. Claimed (`owner=CURSOR`, `started_at=2026-10-03`); released with this handoff.  
+**Remaining:** Next CURSOR queue item after merge: P0-11 (`docs/RISKS.md`).  
+**Verification:** Only existing `docs/` files listed; no invented doc paths as present.
+
+## 2026-10-03
+**Agent:** CURSOR  
 **Files:** `CONTRIBUTING.md`, `.env.example`, `.pre-commit-config.yaml`, `TODO.md`, `CHANGELOG.md`  
 **Change:** P0-6 (partial) — credential policy in `CONTRIBUTING.md`; `.env.example` header only; gitleaks `.pre-commit-config.yaml` (rev v8.24.2); confirmed `.env` in `.gitignore`. TODO → v2.7; P0-6 left `[~]`. Claimed (`owner=CURSOR`, `started_at=2026-10-03`); released with this handoff.  
 **Remaining:** HUMAN must add `.github/workflows/gitleaks.yml` (push blocked: OAuth App lacks `workflow` scope) — intended content: `on: pull_request`, `actions/checkout@v4` with `fetch-depth: 0`, `gitleaks/gitleaks-action@v2` with `GITHUB_TOKEN`. Then tick P0-6. P0-4/P0-13 add `.env.example` variables later. Next queue items P0-10/P0-11 wait on whether HUMAN treats this partial as enough to proceed.  
