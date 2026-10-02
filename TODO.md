@@ -1,6 +1,6 @@
 # TODO — Multi-AI Workspace (Final structure — some fields pending)
 
-**Version:** v2.7 — 2026-10-03
+**Version:** v2.8 — 2026-10-03
 **Versioning rule:** content edits (wording, filled fields, ticked items) bump the minor version (v1.1, v1.2…); structural changes or newly resolved decisions bump the major version (v2.0). Every bump gets a change-log line.
 
 **Sources:** Claude `[C]` · previous assistant `[G]` · Grok `[Grok]` · ChatGPT GPT-5.6 Luna `[GPT]` · DeepSeek `[DS]` · merge notes `[merge]`
@@ -111,8 +111,9 @@ These are decided. Items that must record them in `DECISIONS.md` still do so as 
 
 ## P0-hygiene — due by end of Phase 0, does not block Phase 1 `D5`
 
-- [ ] **P0-10 · `docs/README.md` navigation index**, once the first few docs exist. `[DS]` `[Grok]`
+- [x] **P0-10 · `docs/README.md` navigation index**, once the first few docs exist. `[DS]` `[Grok]`
   - *Owner:* CURSOR (Auto)
+  - Done by CURSOR (`agent/cursor/p0-10-docs-index`, 2026-10-03)
 - [ ] **P0-11 · Risk register `docs/RISKS.md`** — columns: Risk / Likelihood / Impact / Mitigation / Owner / Status. Move risks scattered through this TODO into it. `[DS]` `[Grok]`
   - *Owner:* CURSOR (Auto) — HUMAN reviews likelihood and impact
 
@@ -277,3 +278,4 @@ This is the Phase 0–2 task queue and agent-assignment table from the 2026-10-0
 - **v2.5 · 2026-10-03 — P0-3 docs move.** CURSOR moved `SPEC_PHASES.md` → `docs/SPEC_PHASES.md` with a root redirect stub; updated repo links.
 - **v2.6 · 2026-10-03 — P0-8 checklist written.** CURSOR added `docs/phase0_go_no_go.md` from the P0-8 list; checklist boxes left open for HUMAN sign-off.
 - **v2.7 · 2026-10-03 — P0-6 secrets (partial).** CURSOR added credential policy, `.env.example` header, gitleaks pre-commit config. PR Actions workflow blocked (token needs `workflow` scope); P0-6 left `[~]`.
+- **v2.8 · 2026-10-03 — P0-10 docs index.** CURSOR added `docs/README.md` listing existing docs and when to read them.
