@@ -2,6 +2,13 @@
 
 ## 2026-10-03
 **Agent:** CLAUDE  
+**Files:** `agents/CLAUDE.md`, `CHANGELOG.md`  
+**Change:** Added CLAUDE's role, working rules and ordered P0 task queue to `agents/CLAUDE.md` (P0-4 → P0-7 LICENSE text → P0-13 → P0-14), keeping the existing instructions. CLAUDE does not self-tick: its tasks need HUMAN review.  
+**Remaining:** P0-4 research starts now; commit waits for CURSOR's P0-3 (`docs/`).  
+**Verification:** Queue matches the CLAUDE owner fields in `TODO.md` v2.3; no overlap with `agents/CURSOR.md`.
+
+## 2026-10-03
+**Agent:** CLAUDE  
 **Files:** `TODO.md`, `agents/CURSOR.md`, `CHANGELOG.md`  
 **Change:** HUMAN decision: CURSOR ticks its own tasks in `TODO.md` when it completes them; HUMAN reviews afterwards. Status legend in `TODO.md` (v2.3) and `agents/CURSOR.md` updated accordingly (owner-only ticks, version bump per tick, never sign-offs). P0-5 ticked.  
 **Remaining:** HUMAN review of P0-5 when convenient.  
