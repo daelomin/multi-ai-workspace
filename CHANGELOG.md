@@ -2,6 +2,13 @@
 
 ## 2026-10-03
 **Agent:** CURSOR  
+**Files:** `docs/SPEC_PHASES.md`, `SPEC_PHASES.md`, `MASTER.md`, `README.md`, `DECISIONS.md`, `TODO.md`, `CHANGELOG.md`  
+**Change:** P0-3 — `git mv` `SPEC_PHASES.md` → `docs/SPEC_PHASES.md`; root stub redirect; updated links in `MASTER.md`, `README.md`, `DECISIONS.md`. Ticked P0-3; TODO → v2.5. Claimed shared docs (`owner=CURSOR`, `started_at=2026-10-03`); released with this handoff.  
+**Remaining:** Next CURSOR queue item after merge: P0-8 (GO/NO-GO checklist).  
+**Verification:** Spec content at `docs/SPEC_PHASES.md`; root stub points there; older CHANGELOG entries left unchanged.
+
+## 2026-10-03
+**Agent:** CURSOR  
 **Files:** `DECISIONS.md`, `MASTER.md`, `TODO.md`, `CHANGELOG.md`  
 **Change:** P0-1 + P0-2 + P0-7 intent ADR — recorded D1–D11 as accepted ADRs in `DECISIONS.md` (D1 title and freeze sentence; D2 `uv` migration note; D3 licence intent). Marked prior 2026-10-02 stack/A11 ADRs superseded. Aligned `MASTER.md` (freeze sentence; removed proposed stack/axis and open uv/poetry question). Ticked P0-1, P0-2; P0-7 left `[~]` with intent ADR sub-item done. TODO → v2.4. Claimed `DECISIONS.md`/`MASTER.md`/`TODO.md` (`owner=CURSOR`, `started_at=2026-10-03`); released with this handoff.  
 **Remaining:** CLAUDE for P0-7 LICENSE text/scope; HUMAN sign-off on P0-7. Next CURSOR queue item after merge: P0-3 (`docs/` move).  

@@ -9,7 +9,7 @@
 
 ### What exists
 - Workspace multi-AI (protocoles, agents, templates)
-- Spécification par phases v1.0 : `SPEC_PHASES.md`
+- Spécification par phases v1.0 : `docs/SPEC_PHASES.md`
 - Décisions D1–D11 enregistrées dans `DECISIONS.md` (2026-10-03)
 
 ### What is being built
@@ -22,7 +22,7 @@
 ## Scope
 
 ### In scope
-- Phases 0–7 telles que décrites dans `SPEC_PHASES.md`
+- Phases 0–7 telles que décrites dans `docs/SPEC_PHASES.md`
 - Stack frozen for Phases 0–1 as of 2026-10-03; scope: A11 pilot only for Phases 0–1
 - Axe pilote : A11 Nantes–Paris (~350 km)
 - Stack phases 0–1 : Python 3.12, Postgres 16 + PostGIS + TimescaleDB, FastAPI, MapLibre, Redis, Martin, Docker Compose; tooling Python : `uv`
@@ -36,7 +36,7 @@
 ## Architecture / approach
 
 - Ingestion DATEX II (événements + mesures) → modèle interne → LRS / segments → API FastAPI + tuiles MVT (Martin) → frontend MapLibre
-- Source de vérité projet : ce fichier ; détail livrable : `SPEC_PHASES.md`
+- Source de vérité projet : ce fichier ; détail livrable : `docs/SPEC_PHASES.md`
 - Décisions durables : `DECISIONS.md` ; file d’attente : `TODO.md`
 
 ## Current priorities

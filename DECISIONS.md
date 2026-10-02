@@ -27,11 +27,11 @@ Record durable decisions here. Do not use this file for temporary discussion.
 Le workspace multi-AI n’avait pas encore de projet métier. Une spécification détaillée (phases 0–7) a été fournie.
 
 **Options considered**  
-- Adopter `SPEC_PHASES.md` comme feuille de route canonique  
+- Adopter `docs/SPEC_PHASES.md` comme feuille de route canonique  
 - Réécrire / simplifier avant engagement
 
 **Decision**  
-Adopter `SPEC_PHASES.md` v1.0 comme découpage livrable. `MASTER.md` reste l’état courant ; le détail des phases vit dans `SPEC_PHASES.md`.
+Adopter `docs/SPEC_PHASES.md` v1.0 comme découpage livrable. `MASTER.md` reste l’état courant ; le détail des phases vit dans `docs/SPEC_PHASES.md`.
 
 **Consequences**  
 Travail immédiat = Phase 0. Jalons GO/NO-GO humains en fin de chaque phase. Stack figée phases 0–1 (Compose, pas K8s/Kafka).
