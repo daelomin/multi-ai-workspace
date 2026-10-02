@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-03
+**Agent:** CURSOR  
+**Files:** `CONTRIBUTING.md`, `CHANGELOG.md`  
+**Change:** P0-5 — added status rule, single-writer protocol (claim/release via `CHANGELOG.md` with `owner` + `started_at`), and human-approval rule to `CONTRIBUTING.md`. Identities CURSOR and GROK were already present. Claimed `CONTRIBUTING.md` (`owner=CURSOR`, `started_at=2026-10-03`); released with this handoff.  
+**Remaining:** HUMAN review of P0-5 (do not tick until verified). Next: P0-12 GitHub rendering check; other P0-gate items.  
+**Verification:** Wording matches TODO.md P0-5; TODO.md left unticked for HUMAN.
+
+## 2026-10-03
 **Agent:** CLAUDE  
 **Files:** `TODO.md`, `CHANGELOG.md`  
 **Change:** TODO v2.2. The v2.0 (D11) and v2.1 (P0 owners) commits were pushed after PR #1 was merged, so they were missing from `main`; rebased onto `main` and re-submitted. P0-5 identities sub-task marked done (HUMAN added `CURSOR` and `GROK` to `CONTRIBUTING.md` in 3af0482).  
