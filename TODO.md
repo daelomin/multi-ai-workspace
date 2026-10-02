@@ -1,6 +1,6 @@
 # TODO — Multi-AI Workspace (Final structure — some fields pending)
 
-**Version:** v2.4 — 2026-10-03
+**Version:** v2.5 — 2026-10-03
 **Versioning rule:** content edits (wording, filled fields, ticked items) bump the minor version (v1.1, v1.2…); structural changes or newly resolved decisions bump the major version (v2.0). Every bump gets a change-log line.
 
 **Sources:** Claude `[C]` · previous assistant `[G]` · Grok `[Grok]` · ChatGPT GPT-5.6 Luna `[GPT]` · DeepSeek `[DS]` · merge notes `[merge]`
@@ -47,8 +47,9 @@ These are decided. Items that must record them in `DECISIONS.md` still do so as 
   - *Owner:* CURSOR (Auto)
   - Done by CURSOR (`agent/cursor/p0-1-decisions`, 2026-10-03)
 
-- [ ] **P0-3 · Create `docs/` and move `SPEC_PHASES.md`** → `docs/SPEC_PHASES.md`, leaving a short redirect stub at the root. Do this before P0-4 and before any P1 spec edit. `[C]` `[Grok]`
+- [x] **P0-3 · Create `docs/` and move `SPEC_PHASES.md`** → `docs/SPEC_PHASES.md`, leaving a short redirect stub at the root. Do this before P0-4 and before any P1 spec edit. `[C]` `[Grok]`
   - *Owner:* CURSOR (Auto)
+  - Done by CURSOR (`agent/cursor/p0-3-docs-move`, 2026-10-03)
 
 - [ ] **P0-4 · `docs/data_sources.md` — the critical path.** `[C]` `[G]` `[Grok]`
   - One sheet per source: URL, format, update frequency, coverage, licence (reuse / redistribution / derivation), contact, personal-data flag, fallback sources.
@@ -271,3 +272,4 @@ This is the Phase 0–2 task queue and agent-assignment table from the 2026-10-0
 - **v2.2 · 2026-10-03 — Sync with main.** v2.0 and v2.1 had missed the merge of PR #1 and are re-submitted together. P0-5 identities sub-task marked done (HUMAN added `CURSOR` and `GROK` to `CONTRIBUTING.md`).
 - **v2.3 · 2026-10-03 — CURSOR self-tick rule.** HUMAN decided that CURSOR ticks its own tasks when it completes them, with HUMAN review afterwards; status legend updated. P0-5 ticked (done by CURSOR in PR #3).
 - **v2.4 · 2026-10-03 — P0-1 / P0-2 / P0-7 intent ADR.** CURSOR recorded D1–D11 in `DECISIONS.md`, froze stack + A11 in `MASTER.md`, ticked P0-1 and P0-2; P0-7 intent ADR sub-item ticked (LICENSE text still CLAUDE).
+- **v2.5 · 2026-10-03 — P0-3 docs move.** CURSOR moved `SPEC_PHASES.md` → `docs/SPEC_PHASES.md` with a root redirect stub; updated repo links.
