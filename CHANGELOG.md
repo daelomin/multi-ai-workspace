@@ -2,6 +2,13 @@
 
 ## 2026-10-03
 **Agent:** CURSOR  
+**Files:** `docs/phase0_go_no_go.md`, `TODO.md`, `CHANGELOG.md`  
+**Change:** P0-8 — wrote `docs/phase0_go_no_go.md` with the TODO checklist items (unticked) plus empty HUMAN sign-off line. Ticked P0-8 write step only; TODO → v2.6. Claimed (`owner=CURSOR`, `started_at=2026-10-03`); released with this handoff.  
+**Remaining:** HUMAN fills/signs checklist when gate criteria exist. Next CURSOR queue item after merge: P0-6.  
+**Verification:** Checklist wording matches P0-8; no sub-boxes ticked.
+
+## 2026-10-03
+**Agent:** CURSOR  
 **Files:** `docs/SPEC_PHASES.md`, `SPEC_PHASES.md`, `MASTER.md`, `README.md`, `DECISIONS.md`, `TODO.md`, `CHANGELOG.md`  
 **Change:** P0-3 — `git mv` `SPEC_PHASES.md` → `docs/SPEC_PHASES.md`; root stub redirect; updated links in `MASTER.md`, `README.md`, `DECISIONS.md`. Ticked P0-3; TODO → v2.5. Claimed shared docs (`owner=CURSOR`, `started_at=2026-10-03`); released with this handoff.  
 **Remaining:** Next CURSOR queue item after merge: P0-8 (GO/NO-GO checklist).  
