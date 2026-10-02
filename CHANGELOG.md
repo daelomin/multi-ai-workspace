@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-03
+**Agent:** CURSOR  
+**Files:** `DECISIONS.md`, `MASTER.md`, `TODO.md`, `CHANGELOG.md`  
+**Change:** P0-1 + P0-2 + P0-7 intent ADR — recorded D1–D11 as accepted ADRs in `DECISIONS.md` (D1 title and freeze sentence; D2 `uv` migration note; D3 licence intent). Marked prior 2026-10-02 stack/A11 ADRs superseded. Aligned `MASTER.md` (freeze sentence; removed proposed stack/axis and open uv/poetry question). Ticked P0-1, P0-2; P0-7 left `[~]` with intent ADR sub-item done. TODO → v2.4. Claimed `DECISIONS.md`/`MASTER.md`/`TODO.md` (`owner=CURSOR`, `started_at=2026-10-03`); released with this handoff.  
+**Remaining:** CLAUDE for P0-7 LICENSE text/scope; HUMAN sign-off on P0-7. Next CURSOR queue item after merge: P0-3 (`docs/` move).  
+**Verification:** Freeze sentence present in both files; no `LICENSE` file created; CURSOR-owned boxes only ticked.
+
+## 2026-10-03
 **Agent:** CLAUDE  
 **Files:** `TODO.md`, `agents/CURSOR.md`, `CHANGELOG.md`  
 **Change:** HUMAN decision: CURSOR ticks its own tasks in `TODO.md` when it completes them; HUMAN reviews afterwards. Status legend in `TODO.md` (v2.3) and `agents/CURSOR.md` updated accordingly (owner-only ticks, version bump per tick, never sign-offs). P0-5 ticked.  
