@@ -31,6 +31,14 @@ Shared files — at least `MASTER.md`, `DECISIONS.md`, `TODO.md`, `CONTRIBUTING.
 ## Human-approval rule
 AI agents research and propose; the final decision on licensing, architecture freezes, phase GO/NO-GO, external-data redistribution and major infrastructure changes is attributable to the human owner.
 
+## Credential policy
+All secrets live in `.env` (never committed).
+`.env.example` must list every required variable with a dummy value.
+GitHub Actions secrets are allowed only for CI.
+No secrets in Markdown, code, or commit messages.
+
+Secret scanning uses **gitleaks** (pre-commit hook; GitHub Actions workflow on pull requests to be added when a token with `workflow` scope is available — see P0-6 / CHANGELOG).
+
 ## Change attribution
 Use one of these identities:
 - HUMAN

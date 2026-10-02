@@ -1,6 +1,6 @@
 # TODO — Multi-AI Workspace (Final structure — some fields pending)
 
-**Version:** v2.6 — 2026-10-03
+**Version:** v2.7 — 2026-10-03
 **Versioning rule:** content edits (wording, filled fields, ticked items) bump the minor version (v1.1, v1.2…); structural changes or newly resolved decisions bump the major version (v2.0). Every bump gets a change-log line.
 
 **Sources:** Claude `[C]` · previous assistant `[G]` · Grok `[Grok]` · ChatGPT GPT-5.6 Luna `[GPT]` · DeepSeek `[DS]` · merge notes `[merge]`
@@ -72,7 +72,7 @@ These are decided. Items that must record them in `DECISIONS.md` still do so as 
   - *Owner:* CURSOR (Auto) — review by HUMAN
   - Done by CURSOR (PR #3, 2026-10-03); ticked under the CURSOR self-tick rule, HUMAN review to follow.
 
-- [ ] **P0-6 · Credential policy, then secret scanning.** `[C]` `[G]` `[Grok]`
+- [~] **P0-6 · Credential policy, then secret scanning.** `[C]` `[G]` `[Grok]`
   - Policy text for `CONTRIBUTING.md`:
     > All secrets live in `.env` (never committed).
     > `.env.example` must list every required variable with a dummy value.
@@ -80,6 +80,7 @@ These are decided. Items that must record them in `DECISIONS.md` still do so as 
     > No secrets in Markdown, code, or commit messages.
   - Then add `.env.example` and a secret-scanning check (DATEX credentials will exist).
   - *Owner:* CURSOR (Auto)
+  - Partial by CURSOR (`agent/cursor/p0-6-secrets`, 2026-10-03) — policy in `CONTRIBUTING.md`; `.env.example` header; gitleaks `.pre-commit-config.yaml`; `.env` already gitignored. **Blocked:** GitHub Actions workflow `.github/workflows/gitleaks.yml` could not be pushed (OAuth token missing `workflow` scope). HUMAN to add the workflow or grant scope, then tick.
 
 - [~] **P0-7 · Record licence intent, then add `LICENSE`.** `[G]` `[C]` `[Grok]` `D3`
   - [x] Record the intent ADR in `DECISIONS.md`: *internal use only, re-evaluate at end of Phase 3*.
@@ -275,3 +276,4 @@ This is the Phase 0–2 task queue and agent-assignment table from the 2026-10-0
 - **v2.4 · 2026-10-03 — P0-1 / P0-2 / P0-7 intent ADR.** CURSOR recorded D1–D11 in `DECISIONS.md`, froze stack + A11 in `MASTER.md`, ticked P0-1 and P0-2; P0-7 intent ADR sub-item ticked (LICENSE text still CLAUDE).
 - **v2.5 · 2026-10-03 — P0-3 docs move.** CURSOR moved `SPEC_PHASES.md` → `docs/SPEC_PHASES.md` with a root redirect stub; updated repo links.
 - **v2.6 · 2026-10-03 — P0-8 checklist written.** CURSOR added `docs/phase0_go_no_go.md` from the P0-8 list; checklist boxes left open for HUMAN sign-off.
+- **v2.7 · 2026-10-03 — P0-6 secrets (partial).** CURSOR added credential policy, `.env.example` header, gitleaks pre-commit config. PR Actions workflow blocked (token needs `workflow` scope); P0-6 left `[~]`.
