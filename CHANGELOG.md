@@ -2,6 +2,10 @@
 
 ## 2026-10-03
 **Agent:** CLAUDE  
+**Files:** `dev/docker-compose.yml`, `dev/Makefile`, `dev/martin.yaml`, `dev/db/init/001_extensions.sql`, `dev/README.md`, `pyproject.toml`, `uv.lock`, `src/traffic/__init__.py`, `tests/test_package.py`, `.env.example`, `CHANGELOG.md`  
+**Change:** P0-13 — dev scaffold: Docker Compose stack (TimescaleDB-HA pg16 with PostGIS, Redis 7, Martin with auto-publish), Makefile wrapper, first-start extension script, `uv` Python project with pytest, and dev variables in `.env.example`. Proposed canonical bootstrap command: `make -C dev up`. Claimed `.env.example` (`owner=CLAUDE`, `started_at=2026-10-03`); released with this handoff.  
+**Remaining:** HUMAN: run `make -C dev up` on a machine with Docker (images could not be pulled here), approve or change the bootstrap command; once approved, record it in `CONTRIBUTING.md`. Pin image tags after the first successful start.  
+**Verification:** `docker compose config` passes; `make -n` dry run correct; `uv lock` and `uv run pytest` pass. Containers not started (registry access blocked in this environment).
 **Files:** `LICENSE`, `CHANGELOG.md`  
 **Change:** P0-7 — drafted the proprietary internal-use `LICENSE` (D3): all rights reserved; scope covers code, configuration, documentation and derived data; use limited to the Owner and people/agents it authorises; third-party data stays under its own licence (Licence Ouverte 2.0; Bison Futé action b v9), with their attribution and last-update duties summarised from P0-4.  
 **Remaining:** HUMAN: fill in the copyright holder (left as Remi Montroty), review the text (ideally with legal advice), then tick the two remaining P0-7 sub-items. `TODO.md` not edited to avoid version conflicts with open PRs.  

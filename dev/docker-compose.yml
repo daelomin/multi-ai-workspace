@@ -1,0 +1,51 @@
+# Phase 0 development stack (P0-13).
+# Postgres 16 + PostGIS + TimescaleDB, Redis, Martin vector-tile server.
+# Start with:  make -C dev up   (proposed canonical bootstrap command, see dev/README.md)
+
+name: traffic-dev
+
+services:
+  db:
+    # timescaledb-ha ships Postgres 16 with both TimescaleDB and PostGIS.
+    # Pin an exact tag (e.g. pg16.x-ts2.15.x) once the first `make up` succeeds.
+    image: timescale/timescaledb-ha:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - db-data:/home/postgres/pgdata
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  martin:
+    image: ghcr.io/maplibre/martin:latest
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    command: ["--config", "/config/martin.yaml"]
+    volumes:
+      - ./martin.yaml:/config/martin.yaml:ro
+    ports:
+      - "${MARTIN_PORT:-3000}:3000"
+
+volumes:
+  db-data:
