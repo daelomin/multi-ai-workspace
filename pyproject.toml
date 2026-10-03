@@ -3,7 +3,10 @@ name = "traffic-platform"
 version = "0.1.0"
 description = "Plateforme nationale de trafic routier — ingestion DATEX II, LRS, cartographie"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "lxml>=6.1.3",
+    "psycopg[binary]>=3.3.6",
+]
 
 [dependency-groups]
 dev = ["pytest>=8"]

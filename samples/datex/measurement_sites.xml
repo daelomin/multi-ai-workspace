@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SYNTHETIC sample for the P0-14 smoke test. Fictional sites and coordinates; not real data.
+     Structure follows DATEX II 2.2 (MeasurementSiteTablePublication). -->
+<d2LogicalModel xmlns="http://datex2.eu/schema/2/2_0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                modelBaseVersion="2">
+  <exchange>
+    <supplierIdentification>
+      <country>fr</country>
+      <nationalIdentifier>SMOKE</nationalIdentifier>
+    </supplierIdentification>
+  </exchange>
+  <payloadPublication xsi:type="MeasurementSiteTablePublication" lang="fr">
+    <publicationTime>2026-10-03T06:00:00Z</publicationTime>
+    <publicationCreator>
+      <country>fr</country>
+      <nationalIdentifier>SMOKE</nationalIdentifier>
+    </publicationCreator>
+    <headerInformation>
+      <confidentiality>noRestriction</confidentiality>
+      <informationStatus>test</informationStatus>
+    </headerInformation>
+    <measurementSiteTable id="SMOKE_TABLE" version="1">
+      <measurementSiteRecord id="SMOKE_SITE_001" version="1">
+        <measurementSiteRecordVersionTime>2026-10-03T06:00:00Z</measurementSiteRecordVersionTime>
+        <measurementSiteName>
+          <values><value lang="fr">Site fictif 001</value></values>
+        </measurementSiteName>
+        <measurementSiteNumberOfLanes>2</measurementSiteNumberOfLanes>
+        <measurementSpecificCharacteristics index="1">
+          <measurementSpecificCharacteristics>
+            <period>360</period>
+            <specificMeasurementValueType>trafficFlow</specificMeasurementValueType>
+          </measurementSpecificCharacteristics>
+        </measurementSpecificCharacteristics>
+        <measurementSpecificCharacteristics index="2">
+          <measurementSpecificCharacteristics>
+            <period>360</period>
+            <specificMeasurementValueType>trafficSpeed</specificMeasurementValueType>
+          </measurementSpecificCharacteristics>
+        </measurementSpecificCharacteristics>
+        <measurementSiteLocation xsi:type="Point">
+          <pointByCoordinates>
+            <pointCoordinates>
+              <latitude>47.2500</latitude>
+              <longitude>-1.4500</longitude>
+            </pointCoordinates>
+          </pointByCoordinates>
+        </measurementSiteLocation>
+      </measurementSiteRecord>
+      <measurementSiteRecord id="SMOKE_SITE_002" version="1">
+        <measurementSiteRecordVersionTime>2026-10-03T06:00:00Z</measurementSiteRecordVersionTime>
+        <measurementSiteName>
+          <values><value lang="fr">Site fictif 002</value></values>
+        </measurementSiteName>
+        <measurementSiteNumberOfLanes>2</measurementSiteNumberOfLanes>
+        <measurementSpecificCharacteristics index="1">
+          <measurementSpecificCharacteristics>
+            <period>360</period>
+            <specificMeasurementValueType>trafficFlow</specificMeasurementValueType>
+          </measurementSpecificCharacteristics>
+        </measurementSpecificCharacteristics>
+        <measurementSpecificCharacteristics index="2">
+          <measurementSpecificCharacteristics>
+            <period>360</period>
+            <specificMeasurementValueType>trafficSpeed</specificMeasurementValueType>
+          </measurementSpecificCharacteristics>
+        </measurementSpecificCharacteristics>
+        <measurementSiteLocation xsi:type="Point">
+          <pointByCoordinates>
+            <pointCoordinates>
+              <latitude>47.3800</latitude>
+              <longitude>-0.9000</longitude>
+            </pointCoordinates>
+          </pointByCoordinates>
+        </measurementSiteLocation>
+      </measurementSiteRecord>
+      <measurementSiteRecord id="SMOKE_SITE_003" version="1">
+        <measurementSiteRecordVersionTime>2026-10-03T06:00:00Z</measurementSiteRecordVersionTime>
+        <measurementSiteName>
+          <values><value lang="fr">Site fictif 003</value></values>
+        </measurementSiteName>
+        <measurementSiteNumberOfLanes>3</measurementSiteNumberOfLanes>
+        <measurementSpecificCharacteristics index="1">
+          <measurementSpecificCharacteristics>
+            <period>360</period>
+            <specificMeasurementValueType>trafficFlow</specificMeasurementValueType>
+          </measurementSpecificCharacteristics>
+        </measurementSpecificCharacteristics>
+        <measurementSpecificCharacteristics index="2">
+          <measurementSpecificCharacteristics>
+            <period>360</period>
+            <specificMeasurementValueType>trafficSpeed</specificMeasurementValueType>
+          </measurementSpecificCharacteristics>
+        </measurementSpecificCharacteristics>
+        <measurementSiteLocation xsi:type="Point">
+          <pointByCoordinates>
+            <pointCoordinates>
+              <latitude>47.4700</latitude>
+              <longitude>-0.5500</longitude>
+            </pointCoordinates>
+          </pointByCoordinates>
+        </measurementSiteLocation>
+      </measurementSiteRecord>
+    </measurementSiteTable>
+  </payloadPublication>
+</d2LogicalModel>

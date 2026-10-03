@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SYNTHETIC sample for the P0-14 smoke test. Fictional values.
+     Structure follows DATEX II 2.2 (MeasuredDataPublication). -->
+<d2LogicalModel xmlns="http://datex2.eu/schema/2/2_0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                modelBaseVersion="2">
+  <exchange>
+    <supplierIdentification>
+      <country>fr</country>
+      <nationalIdentifier>SMOKE</nationalIdentifier>
+    </supplierIdentification>
+  </exchange>
+  <payloadPublication xsi:type="MeasuredDataPublication" lang="fr">
+    <publicationTime>2026-10-03T07:00:00Z</publicationTime>
+    <publicationCreator>
+      <country>fr</country>
+      <nationalIdentifier>SMOKE</nationalIdentifier>
+    </publicationCreator>
+    <measurementSiteTableReference targetClass="MeasurementSiteTable" id="SMOKE_TABLE" version="1"/>
+    <headerInformation>
+      <confidentiality>noRestriction</confidentiality>
+      <informationStatus>test</informationStatus>
+    </headerInformation>
+    <siteMeasurements>
+      <measurementSiteReference targetClass="MeasurementSiteRecord" id="SMOKE_SITE_001" version="1"/>
+      <measurementTimeDefault>2026-10-03T06:54:00Z</measurementTimeDefault>
+      <measuredValue index="1">
+        <measuredValue>
+          <basicData xsi:type="TrafficFlow">
+            <vehicleFlow>
+              <vehicleFlowRate>1820</vehicleFlowRate>
+            </vehicleFlow>
+          </basicData>
+        </measuredValue>
+      </measuredValue>
+      <measuredValue index="2">
+        <measuredValue>
+          <basicData xsi:type="TrafficSpeed">
+            <averageVehicleSpeed>
+              <speed>112.0</speed>
+            </averageVehicleSpeed>
+          </basicData>
+        </measuredValue>
+      </measuredValue>
+    </siteMeasurements>
+    <siteMeasurements>
+      <measurementSiteReference targetClass="MeasurementSiteRecord" id="SMOKE_SITE_002" version="1"/>
+      <measurementTimeDefault>2026-10-03T06:54:00Z</measurementTimeDefault>
+      <measuredValue index="1">
+        <measuredValue>
+          <basicData xsi:type="TrafficFlow">
+            <vehicleFlow>
+              <vehicleFlowRate>2410</vehicleFlowRate>
+            </vehicleFlow>
+          </basicData>
+        </measuredValue>
+      </measuredValue>
+      <measuredValue index="2">
+        <measuredValue>
+          <basicData xsi:type="TrafficSpeed">
+            <averageVehicleSpeed>
+              <speed>64.5</speed>
+            </averageVehicleSpeed>
+          </basicData>
+        </measuredValue>
+      </measuredValue>
+    </siteMeasurements>
+    <siteMeasurements>
+      <measurementSiteReference targetClass="MeasurementSiteRecord" id="SMOKE_SITE_003" version="1"/>
+      <measurementTimeDefault>2026-10-03T06:54:00Z</measurementTimeDefault>
+      <measuredValue index="1">
+        <measuredValue>
+          <basicData xsi:type="TrafficFlow">
+            <vehicleFlow>
+              <vehicleFlowRate>3100</vehicleFlowRate>
+            </vehicleFlow>
+          </basicData>
+        </measuredValue>
+      </measuredValue>
+      <measuredValue index="2">
+        <measuredValue>
+          <basicData xsi:type="TrafficSpeed">
+            <averageVehicleSpeed>
+              <speed>23.0</speed>
+            </averageVehicleSpeed>
+          </basicData>
+        </measuredValue>
+      </measuredValue>
+    </siteMeasurements>
+  </payloadPublication>
+</d2LogicalModel>

@@ -30,6 +30,8 @@ docker compose --env-file .env -f dev/docker-compose.yml up -d --wait
 | `make -C dev logs` | Follow the logs |
 | `make -C dev ps` | Show service status |
 | `make -C dev psql` | Open a `psql` shell in the database |
+| `make -C dev smoke` | Run the end-to-end smoke test (P0-14), then open `web/smoke_map.html` |
+| `make -C dev test` | Run the unit tests (no database needed) |
 
 ## Services
 
@@ -55,3 +57,25 @@ Host-side tools read `DATABASE_URL` and `REDIS_URL` from `.env`.
 - **Not yet started for real.** The compose file passes `docker compose config`, but the images could not be pulled in the environment where it was written (registry access blocked). The first `make -C dev up` on a real machine is the actual test.
 - **Image tags are not pinned yet.** Pin exact `timescaledb-ha` and `martin` tags once the first start succeeds.
 - **Not production settings.** Passwords in `.env.example` are dummy development values; see the credential policy in `CONTRIBUTING.md`.
+
+## Smoke test (P0-14)
+
+```sh
+make -C dev up
+make -C dev smoke
+```
+
+Then open `web/smoke_map.html` in a browser: three fictional sites appear, coloured by speed, served by Martin from Postgres.
+
+What it does:
+
+1. Parses three **synthetic** DATEX II 2.2 files in `samples/datex/`: a measurement-site table, a measured-data publication, and a correction of one measurement.
+2. Creates the Phase 0 measure model (`sql/001_measures.sql`): `measurement_site`, `traffic_measure` keyed on `(site_id, source, source_ts, source_version)` (D8, D11), the `traffic_measure_current` view, and the `site_latest_traffic` map view. `traffic_measure` becomes a hypertable when TimescaleDB is present.
+3. Loads the files, re-delivers one of them, and checks: 3 sites; 4 raw rows (the correction is kept as a revision; the re-delivery adds nothing); the current view shows the corrected value; the map view has a speed for every site.
+
+It only touches rows with `source = 'smoke'`, so it can be re-run safely.
+
+Limits:
+
+- **The sample files are synthetic.** Their structure follows DATEX II 2.2 but has not been validated against the official schema. The next step is to run the parser on real files from the open DIR feeds (`docs/data_sources.md`, S-1 and S-2).
+- **Checked here:** parser, schema and loader against Postgres 16 + PostGIS, including the `make -C dev smoke` target. **Not checked here:** TimescaleDB (not installable in the build environment), Martin and the map page in a browser.
