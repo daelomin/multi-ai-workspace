@@ -1,0 +1,73 @@
+PROPRIETARY LICENCE — INTERNAL USE ONLY
+
+Copyright (c) 2026 ______ (the "Owner"). All rights reserved.
+
+This repository is not open source. No licence is granted except as stated
+below.
+
+1. SCOPE
+
+   This licence covers everything in this repository that the Owner or its
+   contributors created, including:
+
+   (a) source code, scripts and tests;
+   (b) configuration, infrastructure and deployment files;
+   (c) documentation, specifications and decision records; and
+   (d) derived data: datasets, aggregates, models, maps and other outputs
+       produced by this software, to the extent that they are not governed by
+       a third-party data licence (see section 4).
+
+2. PERMITTED USE
+
+   Use, copying and modification are permitted only:
+
+   (a) by the Owner; and
+   (b) by people and AI agents the Owner has authorised to work on this
+       project, solely for the purpose of developing, testing and operating it
+       for the Owner.
+
+3. RESTRICTIONS
+
+   Unless the Owner gives prior written permission, no one may:
+
+   (a) distribute, publish, sublicense, sell or otherwise make available any
+       part of the repository or its derived data to any third party;
+   (b) use any part of it for any purpose other than the one in section 2(b);
+       or
+   (c) remove or alter this notice or any third-party attribution.
+
+4. THIRD-PARTY DATA
+
+   Data obtained from third parties remains subject to its own licence, which
+   takes precedence over this one for that data and anything derived from it.
+   The sources and their licences are listed in docs/data_sources.md.
+   Current sources include:
+
+   (a) Licence Ouverte / Open Licence 2.0 (Etalab), for open data from the
+       French national access point: reuse requires attribution of the source
+       and the date of the last update; and
+   (b) the Bison Futé reuse licence for real-time traffic information
+       ("action b", version 9), for restricted-access data: reuse requires
+       the attribution "Information provided by [producer]", display of the
+       last-update time to end users, no alteration or misrepresentation of
+       the content, and that any third party receiving the data accepts the
+       same conditions.
+
+   Nothing in this licence restricts rights that a third-party licence grants
+   to others, and the Owner grants no rights in third-party data beyond those
+   that licence allows.
+
+5. THIRD-PARTY SOFTWARE
+
+   Third-party libraries, tools and container images used by this project
+   remain under their own licences.
+
+6. NO WARRANTY
+
+   The repository and its derived data are provided "as is", without warranty
+   of any kind. The Owner is not liable for any damage arising from their use.
+
+7. REVIEW
+
+   This licence reflects the decision to keep the project internal until the
+   end of Phase 3 (DECISIONS.md, D3). It will be reviewed at that point.

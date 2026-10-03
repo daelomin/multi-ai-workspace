@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-03
+**Agent:** CLAUDE  
+**Files:** `LICENSE`, `CHANGELOG.md`  
+**Change:** P0-7 — drafted the proprietary internal-use `LICENSE` (D3): all rights reserved; scope covers code, configuration, documentation and derived data; use limited to the Owner and people/agents it authorises; third-party data stays under its own licence (Licence Ouverte 2.0; Bison Futé action b v9), with their attribution and last-update duties summarised from P0-4.  
+**Remaining:** HUMAN: fill in the copyright holder (left as `______`), review the text (ideally with legal advice), then tick the two remaining P0-7 sub-items. `TODO.md` not edited to avoid version conflicts with open PRs.  
+**Verification:** Third-party terms checked against the sources in `docs/data_sources.md` (PR #15). Not legal advice.
+
+## 2026-10-03
 **Agent:** CURSOR  
 **Files:** `docs/RISKS.md`, `docs/README.md`, `TODO.md`, `CHANGELOG.md`  
 **Change:** P0-11 — created `docs/RISKS.md` with required columns; filled only from risks already in `TODO.md`/`DECISIONS.md` (cited); Likelihood/Impact = `?`. Updated `docs/README.md` index. Ticked P0-11; TODO → v2.9. Claimed (`owner=CURSOR`, `started_at=2026-10-03`); released with this handoff.  
