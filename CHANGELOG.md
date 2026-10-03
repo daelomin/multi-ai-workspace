@@ -2,6 +2,10 @@
 
 ## 2026-10-03
 **Agent:** CLAUDE  
+**Files:** `agents/CLAUDE.md`, `CHANGELOG.md`  
+**Change:** Added CLAUDE's role, working rules and ordered P0 task queue to `agents/CLAUDE.md` (P0-4 → P0-7 LICENSE text → P0-13 → P0-14), keeping the existing instructions. CLAUDE does not self-tick: its tasks need HUMAN review. Replaces PR #7, which predated CURSOR's completed queue.  
+**Remaining:** CLAUDE starts P0-4.  
+**Verification:** Queue matches the CLAUDE owner fields in `TODO.md` v2.9.
 **Files:** `.github/workflows/gitleaks.yml`, `CHANGELOG.md`  
 **Change:** P0-6 leftover — added the gitleaks GitHub Actions workflow CURSOR could not push (no `workflow` scope): runs on pull requests and on pushes to `main`, full history checkout, `gitleaks/gitleaks-action@v2` with `GITHUB_TOKEN`. Matches CURSOR's intended content; adds the push-to-`main` trigger.  
 **Remaining:** HUMAN to confirm the first run passes, then tick P0-6.  
