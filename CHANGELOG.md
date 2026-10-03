@@ -6,6 +6,22 @@
 **Change:** P0-13 — dev scaffold: Docker Compose stack (TimescaleDB-HA pg16 with PostGIS, Redis 7, Martin with auto-publish), Makefile wrapper, first-start extension script, `uv` Python project with pytest, and dev variables in `.env.example`. Proposed canonical bootstrap command: `make -C dev up`. Claimed `.env.example` (`owner=CLAUDE`, `started_at=2026-10-03`); released with this handoff.  
 **Remaining:** HUMAN: run `make -C dev up` on a machine with Docker (images could not be pulled here), approve or change the bootstrap command; once approved, record it in `CONTRIBUTING.md`. Pin image tags after the first successful start.  
 **Verification:** `docker compose config` passes; `make -n` dry run correct; `uv lock` and `uv run pytest` pass. Containers not started (registry access blocked in this environment).
+**Files:** `LICENSE`, `CHANGELOG.md`  
+**Change:** P0-7 — drafted the proprietary internal-use `LICENSE` (D3): all rights reserved; scope covers code, configuration, documentation and derived data; use limited to the Owner and people/agents it authorises; third-party data stays under its own licence (Licence Ouverte 2.0; Bison Futé action b v9), with their attribution and last-update duties summarised from P0-4.  
+**Remaining:** HUMAN: fill in the copyright holder (left as Remi Montroty), review the text (ideally with legal advice), then tick the two remaining P0-7 sub-items. `TODO.md` not edited to avoid version conflicts with open PRs.  
+**Verification:** Third-party terms checked against the sources in `docs/data_sources.md` (PR #15). Not legal advice.
+**Files:** `docs/data_sources.md`, `docs/README.md`, `docs/RISKS.md`, `.env.example`, `TODO.md`, `CHANGELOG.md`  
+**Change:** P0-4 draft — `docs/data_sources.md` with the A11 operator map, four Phase 0 source sheets (DIR events, DIR traffic state, Bison Futé restricted action b and action c), VINCI Autoroutes direct status, deferred sources, Alert-C direction conventions and a GDPR proposal. Key findings: the A11 is fully concessioned (Cofiroute + ASF), so its live data needs the Bison Futé restricted portal; SCAs may offer volumes only; feeds are DATEX II 2.2.2. Added restricted-portal credential names to `.env.example`, the file to `docs/README.md`, and one new risk to `docs/RISKS.md`. TODO → v2.10, P0-4 `[~]`. Claimed `docs/README.md`, `docs/RISKS.md`, `.env.example`, `TODO.md` (`owner=CLAUDE`, `started_at=2026-10-03`); released with this handoff.  
+**Remaining:** HUMAN: request restricted access (email in the file), verify licence and GDPR conclusions, then record them in `DECISIONS.md`. Open checks marked ⚠ in the file (bypass operator, SCA speed availability, exact open-directory paths, 2.2.2 element names).  
+**Verification:** Every fact cites a source checked on 2026-10-03; unverified items marked ⚠. Not ticked: needs HUMAN review.
+**Files:** `agents/CLAUDE.md`, `CHANGELOG.md`  
+**Change:** Added CLAUDE's role, working rules and ordered P0 task queue to `agents/CLAUDE.md` (P0-4 → P0-7 LICENSE text → P0-13 → P0-14), keeping the existing instructions. CLAUDE does not self-tick: its tasks need HUMAN review. Replaces PR #7, which predated CURSOR's completed queue.  
+**Remaining:** CLAUDE starts P0-4.  
+**Verification:** Queue matches the CLAUDE owner fields in `TODO.md` v2.9.
+**Files:** `.github/workflows/gitleaks.yml`, `CHANGELOG.md`  
+**Change:** P0-6 leftover — added the gitleaks GitHub Actions workflow CURSOR could not push (no `workflow` scope): runs on pull requests and on pushes to `main`, full history checkout, `gitleaks/gitleaks-action@v2` with `GITHUB_TOKEN`. Matches CURSOR's intended content; adds the push-to-`main` trigger.  
+**Remaining:** HUMAN to confirm the first run passes, then tick P0-6.  
+**Verification:** YAML written; not yet run on GitHub.
 
 ## 2026-10-03
 **Agent:** CURSOR  
