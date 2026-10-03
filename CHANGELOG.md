@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-03
+**Agent:** CLAUDE  
+**Files:** `dev/docker-compose.yml`, `dev/Makefile`, `dev/martin.yaml`, `dev/db/init/001_extensions.sql`, `dev/README.md`, `pyproject.toml`, `uv.lock`, `src/traffic/__init__.py`, `tests/test_package.py`, `.env.example`, `CHANGELOG.md`  
+**Change:** P0-13 — dev scaffold: Docker Compose stack (TimescaleDB-HA pg16 with PostGIS, Redis 7, Martin with auto-publish), Makefile wrapper, first-start extension script, `uv` Python project with pytest, and dev variables in `.env.example`. Proposed canonical bootstrap command: `make -C dev up`. Claimed `.env.example` (`owner=CLAUDE`, `started_at=2026-10-03`); released with this handoff.  
+**Remaining:** HUMAN: run `make -C dev up` on a machine with Docker (images could not be pulled here), approve or change the bootstrap command; once approved, record it in `CONTRIBUTING.md`. Pin image tags after the first successful start.  
+**Verification:** `docker compose config` passes; `make -n` dry run correct; `uv lock` and `uv run pytest` pass. Containers not started (registry access blocked in this environment).
+
+## 2026-10-03
 **Agent:** CURSOR  
 **Files:** `docs/RISKS.md`, `docs/README.md`, `TODO.md`, `CHANGELOG.md`  
 **Change:** P0-11 — created `docs/RISKS.md` with required columns; filled only from risks already in `TODO.md`/`DECISIONS.md` (cited); Likelihood/Impact = `?`. Updated `docs/README.md` index. Ticked P0-11; TODO → v2.9. Claimed (`owner=CURSOR`, `started_at=2026-10-03`); released with this handoff.  

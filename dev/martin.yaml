@@ -1,0 +1,8 @@
+# Martin vector-tile server configuration (P0-13).
+# Tile sources are added here as tables and views appear (P0-14 adds the smoke-test layer).
+listen_addresses: "0.0.0.0:3000"
+
+postgres:
+  connection_string: ${DATABASE_URL}
+  # Publish every table and view with a geometry column, so new layers need no config change.
+  auto_publish: true
