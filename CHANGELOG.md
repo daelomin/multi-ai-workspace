@@ -2,6 +2,10 @@
 
 ## 2026-10-03
 **Agent:** CLAUDE  
+**Files:** `LICENSE`, `CHANGELOG.md`  
+**Change:** P0-7 — drafted the proprietary internal-use `LICENSE` (D3): all rights reserved; scope covers code, configuration, documentation and derived data; use limited to the Owner and people/agents it authorises; third-party data stays under its own licence (Licence Ouverte 2.0; Bison Futé action b v9), with their attribution and last-update duties summarised from P0-4.  
+**Remaining:** HUMAN: fill in the copyright holder (left as Remi Montroty), review the text (ideally with legal advice), then tick the two remaining P0-7 sub-items. `TODO.md` not edited to avoid version conflicts with open PRs.  
+**Verification:** Third-party terms checked against the sources in `docs/data_sources.md` (PR #15). Not legal advice.
 **Files:** `docs/data_sources.md`, `docs/README.md`, `docs/RISKS.md`, `.env.example`, `TODO.md`, `CHANGELOG.md`  
 **Change:** P0-4 draft — `docs/data_sources.md` with the A11 operator map, four Phase 0 source sheets (DIR events, DIR traffic state, Bison Futé restricted action b and action c), VINCI Autoroutes direct status, deferred sources, Alert-C direction conventions and a GDPR proposal. Key findings: the A11 is fully concessioned (Cofiroute + ASF), so its live data needs the Bison Futé restricted portal; SCAs may offer volumes only; feeds are DATEX II 2.2.2. Added restricted-portal credential names to `.env.example`, the file to `docs/README.md`, and one new risk to `docs/RISKS.md`. TODO → v2.10, P0-4 `[~]`. Claimed `docs/README.md`, `docs/RISKS.md`, `.env.example`, `TODO.md` (`owner=CLAUDE`, `started_at=2026-10-03`); released with this handoff.  
 **Remaining:** HUMAN: request restricted access (email in the file), verify licence and GDPR conclusions, then record them in `DECISIONS.md`. Open checks marked ⚠ in the file (bypass operator, SCA speed availability, exact open-directory paths, 2.2.2 element names).  
