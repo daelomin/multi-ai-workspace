@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-03
+**Agent:** CLAUDE  
+**Files:** `.github/workflows/gitleaks.yml`, `CHANGELOG.md`  
+**Change:** P0-6 leftover — added the gitleaks GitHub Actions workflow CURSOR could not push (no `workflow` scope): runs on pull requests and on pushes to `main`, full history checkout, `gitleaks/gitleaks-action@v2` with `GITHUB_TOKEN`. Matches CURSOR's intended content; adds the push-to-`main` trigger.  
+**Remaining:** HUMAN to confirm the first run passes, then tick P0-6.  
+**Verification:** YAML written; not yet run on GitHub.
+
+## 2026-10-03
 **Agent:** CURSOR  
 **Files:** `docs/RISKS.md`, `docs/README.md`, `TODO.md`, `CHANGELOG.md`  
 **Change:** P0-11 — created `docs/RISKS.md` with required columns; filled only from risks already in `TODO.md`/`DECISIONS.md` (cited); Likelihood/Impact = `?`. Updated `docs/README.md` index. Ticked P0-11; TODO → v2.9. Claimed (`owner=CURSOR`, `started_at=2026-10-03`); released with this handoff.  
