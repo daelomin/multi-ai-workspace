@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Smoke test map</title>
+  <!-- P0-14: shows the `site_latest_traffic` layer served by Martin from Postgres.
+       Needs the dev stack (`make -C dev up`) and the smoke data (`make -C dev smoke`). -->
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <style>
+    html, body, #map { margin: 0; height: 100%; }
+    #status {
+      position: absolute; top: 10px; left: 10px; z-index: 1;
+      background: #fff; padding: 6px 10px; border-radius: 4px;
+      font: 13px/1.4 system-ui, sans-serif; box-shadow: 0 1px 4px rgba(0,0,0,.3);
+    }
+  </style>
+</head>
+<body>
+  <div id="status">Loading layer from Martin…</div>
+  <div id="map"></div>
+  <script>
+    // Change if MARTIN_PORT in .env is not 3000.
+    const MARTIN = "http://localhost:3000";
+    const LAYER = "site_latest_traffic";
+    const status = document.getElementById("status");
+
+    const map = new maplibregl.Map({
+      container: "map",
+      style: {
+        version: 8,
+        sources: {
+          osm: {
+            type: "raster",
+            tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+            tileSize: 256,
+            attribution: "© OpenStreetMap contributors"
+          },
+          sites: { type: "vector", url: `${MARTIN}/${LAYER}` }
+        },
+        layers: [
+          { id: "osm", type: "raster", source: "osm" },
+          {
+            id: "sites", type: "circle", source: "sites", "source-layer": LAYER,
+            paint: {
+              "circle-radius": 9,
+              "circle-stroke-width": 2,
+              "circle-stroke-color": "#ffffff",
+              // Speed bands (km/h): congested < 30, dense < 70, fluid otherwise.
+              "circle-color": ["step", ["coalesce", ["get", "avg_speed"], -1],
+                "#9e9e9e", 0, "#d32f2f", 30, "#f9a825", 70, "#2e7d32"]
+            }
+          }
+        ]
+      },
+      center: [-1.0, 47.37],
+      zoom: 8
+    });
+
+    map.on("sourcedata", (e) => {
+      if (e.sourceId === "sites" && e.isSourceLoaded) {
+        const n = map.querySourceFeatures("sites", { sourceLayer: LAYER }).length;
+        status.textContent = n ? `${n} site(s) loaded from Postgres via Martin` : "Layer loaded, no sites visible here";
+      }
+    });
+    map.on("error", (e) => {
+      status.textContent = `Could not load the layer from ${MARTIN} — is the dev stack running?`;
+      console.error(e.error || e);
+    });
+
+    map.on("click", "sites", (e) => {
+      const p = e.features[0].properties;
+      new maplibregl.Popup()
+        .setLngLat(e.lngLat)
+        .setHTML(`<b>${p.name ?? p.site_id}</b><br>${p.avg_speed ?? "?"} km/h · ${p.flow ?? "?"} veh/h<br><small>${p.source_ts ?? ""}</small>`)
+        .addTo(map);
+    });
+    map.on("mouseenter", "sites", () => (map.getCanvas().style.cursor = "pointer"));
+    map.on("mouseleave", "sites", () => (map.getCanvas().style.cursor = ""));
+  </script>
+</body>
+</html>

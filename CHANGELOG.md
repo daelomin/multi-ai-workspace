@@ -2,6 +2,13 @@
 
 ## 2026-10-03
 **Agent:** CLAUDE  
+**Files:** `samples/datex/*.xml`, `src/traffic/datex/parser.py`, `src/traffic/load.py`, `src/traffic/smoke.py`, `sql/001_measures.sql`, `web/smoke_map.html`, `tests/test_datex_parser.py`, `tests/test_smoke_db.py`, `dev/Makefile`, `dev/README.md`, `pyproject.toml`, `uv.lock`, `CHANGELOG.md`  
+**Change:** P0-14 — end-to-end smoke test: synthetic DATEX II 2.2 samples (site table, measured data, one correction) → tolerant lxml parser → Postgres model per D8/D11 (`measurement_site`, `traffic_measure` with `source_version`, `traffic_measure_current`, map view `site_latest_traffic`, hypertable when TimescaleDB present) → MapLibre page via Martin. `make -C dev smoke` and `make -C dev test` targets. Builds on P0-13 (PR #17).  
+**Remaining:** HUMAN: run `make -C dev up && make -C dev smoke` and open `web/smoke_map.html` on a machine with Docker; tick the smoke-test line of the GO/NO-GO checklist if it works. Next technical step: run the parser on real open DIR files (S-1/S-2).  
+**Verification:** Parser unit tests pass; smoke run passes twice (idempotent) against local Postgres 16 + PostGIS, also via `make -C dev smoke`; map view registered in `geometry_columns` (Point, 4326). Not verified here: TimescaleDB, Martin, browser rendering; samples not validated against the official DATEX II XSD.
+
+## 2026-10-03
+**Agent:** CLAUDE  
 **Files:** `dev/docker-compose.yml`, `dev/Makefile`, `dev/martin.yaml`, `dev/db/init/001_extensions.sql`, `dev/README.md`, `pyproject.toml`, `uv.lock`, `src/traffic/__init__.py`, `tests/test_package.py`, `.env.example`, `CHANGELOG.md`  
 **Change:** P0-13 — dev scaffold: Docker Compose stack (TimescaleDB-HA pg16 with PostGIS, Redis 7, Martin with auto-publish), Makefile wrapper, first-start extension script, `uv` Python project with pytest, and dev variables in `.env.example`. Proposed canonical bootstrap command: `make -C dev up`. Claimed `.env.example` (`owner=CLAUDE`, `started_at=2026-10-03`); released with this handoff.  
 **Remaining:** HUMAN: run `make -C dev up` on a machine with Docker (images could not be pulled here), approve or change the bootstrap command; once approved, record it in `CONTRIBUTING.md`. Pin image tags after the first successful start.  
