@@ -1,6 +1,6 @@
 # TODO — Multi-AI Workspace (Final structure — some fields pending)
 
-**Version:** v2.9 — 2026-10-03
+**Version:** v2.10 — 2026-10-03
 **Versioning rule:** content edits (wording, filled fields, ticked items) bump the minor version (v1.1, v1.2…); structural changes or newly resolved decisions bump the major version (v2.0). Every bump gets a change-log line.
 
 **Sources:** Claude `[C]` · previous assistant `[G]` · Grok `[Grok]` · ChatGPT GPT-5.6 Luna `[GPT]` · DeepSeek `[DS]` · merge notes `[merge]`
@@ -51,7 +51,7 @@ These are decided. Items that must record them in `DECISIONS.md` still do so as 
   - *Owner:* CURSOR (Auto)
   - Done by CURSOR (`agent/cursor/p0-3-docs-move`, 2026-10-03)
 
-- [ ] **P0-4 · `docs/data_sources.md` — the critical path.** `[C]` `[G]` `[Grok]`
+- [~] **P0-4 · `docs/data_sources.md` — the critical path.** `[C]` `[G]` `[Grok]`
   - One sheet per source: URL, format, update frequency, coverage, licence (reuse / redistribution / derivation), contact, personal-data flag, fallback sources.
   - **Phase 0 sources (A11 pilot, per D1):** `[Grok]` `[merge]`
     1. Point d'Accès National (transport.data.gouv.fr / DATEX)
@@ -281,3 +281,4 @@ This is the Phase 0–2 task queue and agent-assignment table from the 2026-10-0
 - **v2.7 · 2026-10-03 — P0-6 secrets (partial).** CURSOR added credential policy, `.env.example` header, gitleaks pre-commit config. PR Actions workflow blocked (token needs `workflow` scope); P0-6 left `[~]`.
 - **v2.8 · 2026-10-03 — P0-10 docs index.** CURSOR added `docs/README.md` listing existing docs and when to read them.
 - **v2.9 · 2026-10-03 — P0-11 risk register.** CURSOR added `docs/RISKS.md` from risks already in TODO/DECISIONS; Likelihood/Impact left for HUMAN.
+- **v2.10 · 2026-10-03 — P0-4 draft.** CLAUDE added `docs/data_sources.md` (draft); P0-4 marked `[~]` pending HUMAN verification of licence and GDPR conclusions and the restricted-access request. Finding: the A11 is operated by Cofiroute **and ASF** (both VINCI Autoroutes), so row 3 of P0-4 should read "VINCI Autoroutes (Cofiroute and ASF)".
