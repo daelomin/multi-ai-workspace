@@ -4,6 +4,8 @@ A shared workspace designed for ChatGPT, Claude, Gemini, DeepSeek and human coll
 
 **Current project:** Plateforme nationale de trafic routier — phased delivery in [`docs/SPEC_PHASES.md`](docs/SPEC_PHASES.md).
 
+**Also hosted:** FuelBuddy charging diagnostic spec and its multi-AI review rounds — [`projects/fuelbuddy/charging-diagnostic/`](projects/fuelbuddy/charging-diagnostic/README.md).
+
 ## Core rule
 `MASTER.md` is the canonical project state. AI agents must read it before making changes and must record meaningful changes in `CHANGELOG.md`. Phase detail lives in `docs/SPEC_PHASES.md` (root `SPEC_PHASES.md` is a redirect stub).
 

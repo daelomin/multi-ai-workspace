@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-11
+**Agent:** CLAUDE  
+**Files:** `projects/fuelbuddy/charging-diagnostic/spec.md`, `projects/fuelbuddy/charging-diagnostic/README.md`, `projects/fuelbuddy/charging-diagnostic/reviews/round-1/CLAUDE.md`, `README.md`, `CHANGELOG.md`  
+**Change:** Added the FuelBuddy AI Charging Diagnostic spec v0.2 (supplied by HUMAN) and a multi-AI review process: independent review files per AI per round, a common finding format, a ready-to-paste prompt for each AI, and CLAUDE consolidation into the next version. Added CLAUDE's round-1 review (15 findings; S1 and S2 seed sources verified).  
+**Remaining:** Round-1 reviews from CHATGPT, GROK, DEEPSEEK, GEMINI and CURSOR (consistency only); then CLAUDE consolidates into v0.3 with a decision list for HUMAN.  
+**Verification:** Seed sources S1, S2 and S3 opened and checked 2026-10-11; AFIR dates from secondary sources, flagged as such in the review.
+
 ## 2026-10-03
 **Agent:** CLAUDE  
 **Files:** `samples/datex/*.xml`, `src/traffic/datex/parser.py`, `src/traffic/load.py`, `src/traffic/smoke.py`, `sql/001_measures.sql`, `web/smoke_map.html`, `tests/test_datex_parser.py`, `tests/test_smoke_db.py`, `dev/Makefile`, `dev/README.md`, `pyproject.toml`, `uv.lock`, `CHANGELOG.md`  
