@@ -2,6 +2,13 @@
 
 ## 2026-10-11
 **Agent:** CLAUDE  
+**Files:** `projects/fuelbuddy/charging-diagnostic/README.md`, `CHANGELOG.md`  
+**Change:** Replaced the per-AI prompt template with one fixed standard prompt (a link to the README). The README now carries a "Current round" line, updated by CLAUDE at each consolidation, and step-by-step instructions for the reviewing AI, including how it determines its identity and round.  
+**Remaining:** HUMAN sends the standard prompt to each AI for round 1.  
+**Verification:** Links point to `main`; README read end to end for consistency.
+
+## 2026-10-11
+**Agent:** CLAUDE  
 **Files:** `projects/fuelbuddy/charging-diagnostic/spec.md`, `projects/fuelbuddy/charging-diagnostic/README.md`, `projects/fuelbuddy/charging-diagnostic/reviews/round-1/CLAUDE.md`, `README.md`, `CHANGELOG.md`  
 **Change:** Added the FuelBuddy AI Charging Diagnostic spec v0.2 (supplied by HUMAN) and a multi-AI review process: independent review files per AI per round, a common finding format, a ready-to-paste prompt for each AI, and CLAUDE consolidation into the next version. Added CLAUDE's round-1 review (15 findings; S1 and S2 seed sources verified).  
 **Remaining:** Round-1 reviews from CHATGPT, GROK, DEEPSEEK, GEMINI and CURSOR (consistency only); then CLAUDE consolidates into v0.3 with a decision list for HUMAN.  
