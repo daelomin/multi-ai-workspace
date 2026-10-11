@@ -1,6 +1,14 @@
 # Changelog
 
 ## 2026-10-11
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-diagnostic/spec.md`, `projects/fuelbuddy/charging-diagnostic/reviews/round-1/CONSOLIDATION.md`, `projects/fuelbuddy/charging-diagnostic/README.md`, `CHANGELOG.md`
+**Claim / handoff:** `owner=CLAUDE`, `started_at=2026-10-11`; claimed and released with this entry (shared files: `CHANGELOG.md`; plus CLAUDE-owned `spec.md` and the round-1 README "Current round" line).
+**Change:** Round-1 consolidation. Merged the three round-1 reviews (CLAUDE 15, CHATGPT 15, DEEPSEEK 15 findings) into `spec.md` **v0.3**: 45 raw findings → 27 distinct items (19 accepted, 1 partial, 0 rejected, 7 routed to HUMAN as FB-D1…FB-D7). Key v0.3 changes: one canonical observation record (§3.2) fixing the broken `source_type` enum; method-dependent session stages; CHAdeMO / IEC 61851-1 control-pilot / SLAC namespaces and OCPP 2.x message+field identity; split LLM validation with rendered executable guidance; fully defined ranking terms plus the `decision_status` abstention contract; a charging-model interface for §6.4; per-campaign `vehicle_campaign_status` and `safety_rule_ids`; session revisions and dependency-aware release manifests; three-valued applicability predicates; a measurable release-evaluation manifest; the AFIR source class; and the photo/sensitive-content data boundary. Re-labelled §7 as illustrative sourced examples; removed the unverifiable `FAILED_AlignmentError` example. Added `reviews/round-1/CONSOLIDATION.md` (accepted/decided/rejected, traceability matrix, decision list) and moved the README to round 2 on v0.3.
+**Remaining:** HUMAN decides FB-D1 (MVP market), FB-D2 (safety clearance semantics), FB-D3 (emergency stop / stuck cable), FB-D4 (GDPR/DPIA), FB-D5 (offline degradation), FB-D6 (photo boundary/retention), FB-D7 (ranking approach). Round-1 is missing GROK/GEMINI/CURSOR; recommended that CURSOR run its consistency pass on v0.3 in the round-2 window. Stop rule not met (blocking-class items still open pending FB-D2/FB-D1).
+**Verification:** Read all three round-1 reviews in full (CHATGPT's and DEEPSEEK's from their branches, not yet merged to `main`); every one of the 45 findings appears in the traceability table. Spec checked for stale identifiers (`operator_integration`, scalar `recall_status`, `FAILED_AlignmentError`, `DIN SPEC 99003`) and section cross-references. No external source was re-fetched; the AFIR dates remain flagged as secondary. Findings are proposals; safety/legal/scope items were left for HUMAN rather than decided.
+
+## 2026-10-11
 **Agent:** CLAUDE  
 **Files:** `projects/fuelbuddy/charging-diagnostic/README.md`, `CHANGELOG.md`  
 **Change:** Replaced the per-AI prompt template with one fixed standard prompt (a link to the README). The README now carries a "Current round" line, updated by CLAUDE at each consolidation, and step-by-step instructions for the reviewing AI, including how it determines its identity and round.  
