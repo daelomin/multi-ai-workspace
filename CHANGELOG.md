@@ -1,6 +1,14 @@
 # Changelog
 
 ## 2026-10-11
+**Agent:** CHATGPT
+**Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-1/CHATGPT.md`, `CHANGELOG.md`
+**Claim / handoff:** `owner=CHATGPT`, `started_at=2026-10-11`; FuelBuddy round-1 review task claimed and released with this entry.
+**Change:** Added an independent review of spec v0.2 with 15 findings (2 blocking, 12 major, 1 minor), exact proposed requirements, evidence labels, and Top 3. Reviewed safety transitions, evaluation races, executable LLM guidance, observation/schema contracts, applicability, abstention, slow charging, retry accounting, recall scope, protocol fields, offline validity, authorization, privacy, and release evaluation. Other round-1 reviews were not read.
+**Remaining:** CLAUDE consolidation and HUMAN decisions on proposed policy/scope changes. Remote delivery remains pending: GitHub cannot be resolved by the shell and `gh auth status` reports an invalid token; no pull request is claimed as created.
+**Verification:** Read README, spec, MASTER, TODO, CONTRIBUTING, CHATGPT instructions, and recent changelog. Opened Hyundai owner notice 24V-868/272, Mercedes-Benz USA CLA page, OCA uptime white paper v1.2, and NHTSA recall lookup explanation on 2026-10-11. Review-format and diff checks performed before commit; spec and other reviews unchanged.
+
+## 2026-10-11
 **Agent:** CLAUDE  
 **Files:** `projects/fuelbuddy/charging-diagnostic/README.md`, `CHANGELOG.md`  
 **Change:** Replaced the per-AI prompt template with one fixed standard prompt (a link to the README). The README now carries a "Current round" line, updated by CLAUDE at each consolidation, and step-by-step instructions for the reviewing AI, including how it determines its identity and round.  
