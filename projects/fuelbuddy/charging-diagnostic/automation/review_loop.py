@@ -245,7 +245,8 @@ def run_claude(profile: str, prompt: str, root: Path, logfile: Path, timeout: in
 
 def run_codex(prompt: str, root: Path, logfile: Path, timeout: int) -> None:
     last = logfile.with_suffix(".last.md")
-    args = ["codex", "exec", "--full-auto", "--skip-git-repo-check", "-C", str(root),
+    # codex-cli 0.162 dropped --full-auto; exec never asks for approval anyway.
+    args = ["codex", "exec", "-s", "workspace-write", "--skip-git-repo-check", "-C", str(root),
             "--output-last-message", str(last), *CODEX_EXTRA_ARGS, prompt]
     res = run(args, cwd=root, check=False, timeout=timeout)
     logfile.write_text(f"$ codex exec\n--- stdout\n{res.stdout}\n--- stderr\n{res.stderr}\n", encoding="utf-8")
@@ -350,14 +351,21 @@ def preflight(root: Path) -> None:
     log(f"DeepSeek key: {'found' if deepseek_key() else 'MISSING'}")
     LOG_DIR.mkdir(exist_ok=True)
     probe = "Reply with the single word OK."
-    run_claude("DEEPSEEK", probe, root, LOG_DIR / "preflight-deepseek.log", 300)
-    run_claude("ANTHROPIC", probe, root, LOG_DIR / "preflight-claude.log", 300)
-    res = run(["codex", "exec", "--skip-git-repo-check", "-C", str(root), *CODEX_EXTRA_ARGS, probe],
-              check=False, timeout=300)
-    (LOG_DIR / "preflight-codex.log").write_text(res.stdout + "\n" + res.stderr, encoding="utf-8")
-    if res.returncode != 0:
-        raise SystemExit("codex exec probe failed; see automation/logs/preflight-codex.log")
-    log("codex ok")
+    # Run every probe, so one preflight shows everything that needs fixing.
+    failures = []
+    for profile, name in (("DEEPSEEK", "deepseek"), ("ANTHROPIC", "claude")):
+        try:
+            run_claude(profile, probe, root, LOG_DIR / f"preflight-{name}.log", 300)
+        except SystemExit as exc:
+            failures.append(str(exc))
+            log(f"FAILED: {exc}")
+    try:
+        run_codex(probe, root, LOG_DIR / "preflight-codex.log", 300)
+    except SystemExit as exc:
+        failures.append(str(exc))
+        log(f"FAILED: {exc}")
+    if failures:
+        raise SystemExit(f"preflight failed ({len(failures)} of 3 probes)")
     log("preflight passed")
 
 
