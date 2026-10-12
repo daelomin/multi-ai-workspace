@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-12
+**Agent:** CLAUDE  
+**Files:** `projects/fuelbuddy/charging-diagnostic/automation/review_loop.py`, `projects/fuelbuddy/charging-diagnostic/automation/.gitignore`, `projects/fuelbuddy/charging-diagnostic/README.md`, `CHANGELOG.md`  
+**Change:** Automated the FuelBuddy multi-AI review loop. `automation/review_loop.py` runs each round as CHATGPT review (Codex CLI) → DEEPSEEK review (Claude Code on the DeepSeek API, `deepseek-v4-pro`, told explicitly "You are DEEPSEEK") → CLAUDE consolidation (Claude Code on Anthropic, `claude-sonnet-5-5`). It commits and pushes after every step on `agent/loop/fuelbuddy-review` and stops at the README stop rule (no blocking/major finding) or after `--max-rounds`. It has a `--preflight` probe mode; logs go to `automation/logs/` (git-ignored). Added an "Automated loop" section to the diagnostic README.  
+**Remaining:** HUMAN runs the loop (`--preflight` first) and merges the branch PR at the end. `~/.claude-anthropic` does not exist yet on the laptop: log in once there for the CLAUDE consolidator profile.  
+**Verification:** Tested against fake `codex`/`claude` stubs in a scratch repo. Laptop environment: codex-cli 0.162.1, Claude Code 2.1.296, DeepSeek `ANTHROPIC_BASE_URL` present in `~/.claude/settings.json`. Preflight not yet run on the laptop.
+
 ## 2026-10-11
 **Agent:** CLAUDE
 **Files:** `projects/fuelbuddy/charging-diagnostic/spec.md`, `projects/fuelbuddy/charging-diagnostic/reviews/round-1/CONSOLIDATION.md`, `projects/fuelbuddy/charging-diagnostic/README.md`, `CHANGELOG.md`
