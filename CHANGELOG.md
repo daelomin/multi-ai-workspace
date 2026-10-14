@@ -163,3 +163,35 @@
 **Change:** Workspace initialized.  
 **Remaining:** Define project.  
 **Verification:** Not applicable.
+
+
+## 2026-10-14 — inline proposal review claim
+**Agent:** CHATGPT (GPT-6.1 SOL)
+**Owner:** CHATGPT
+**Started_at:** 2026-10-14T10:27:06+02:00
+**Files:** `projects/fuelbuddy/charging-diagnostic/PROPOSAL-fix-review-loop.md`
+**Change:** Claim the proposal for inline review of the available model feedback, as requested by HUMAN. Preserve existing author text and add attributed comments only.
+
+
+## 2026-10-14 — inline proposal review handoff
+**Agent:** CHATGPT (GPT-6.1 SOL)
+**Files:** `projects/fuelbuddy/charging-diagnostic/PROPOSAL-fix-review-loop.md`, `CHANGELOG.md`
+**Change:** Added attributed inline replies to DEEPSEEK-1 through DEEPSEEK-6 and remaining SOL findings on resume, zero-finding reviews, Git isolation and live testing. Existing proposal and model comments preserved.
+**Remaining:** Incorporate the corrections and validate the runners before a live unattended loop. Architecture accepted in principle, proposal not approved as written.
+**Verification:** Compared feedback with the current runner code; document-only edit, no model calls or implementation. Proposal file released for the next contributor.
+
+
+## 2026-10-14 — moderator decision on review-loop proposal
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-diagnostic/PROPOSAL-fix-review-loop.md`, `CHANGELOG.md`
+**Change:** Consolidated DEEPSEEK and CHATGPT comments, decided all open points (D1–D12) and appended a phased roadmap. Noted that my earlier counterproposal had been lost from the file and folded it into the decisions.
+**Remaining:** HUMAN Phase 0 (credentials); then implement from Phase 1.
+**Verification:** Document-only; checked Codex/Cursor CLI flags earlier. No model calls.
+
+
+## 2026-10-14 — GROK added to the FuelBuddy review loop
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-diagnostic/automation/review_loop.py`, `projects/fuelbuddy/charging-diagnostic/automation/run_review_loop.sh`, `projects/fuelbuddy/charging-diagnostic/README.md`, `agents/GROK.md`, `CHANGELOG.md`
+**Change:** Added `run_cursor_agent` and a runner map (fixes the dispatcher that sent every non-CHATGPT reviewer to DeepSeek), reviewer-name validation, GROK/CURSOR identity prompts, default reviewers `CHATGPT,DEEPSEEK,GROK`, selected-backend preflight with a write probe, `agents/GROK.md`, README update, and the `run_review_loop.sh` launcher. Proposal D6/D11 (partial).
+**Remaining:** Codex `--full-auto` fix, DeepSeek model/identity hardening, resume safety, git worktree isolation, mocked tests.
+**Verification:** Live preflight `--reviewers GROK --skip-consolidator` passed on `grok-4.7-high` (nonce file written and verified). Reviewer validation checked with unknown and duplicate names. Codex and DeepSeek paths not exercised.

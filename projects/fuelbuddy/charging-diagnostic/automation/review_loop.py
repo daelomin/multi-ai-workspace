@@ -2,7 +2,8 @@
 """Automated multi-AI review loop for the FuelBuddy charging diagnostic spec.
 
 One round = CHATGPT review (Codex CLI) -> DEEPSEEK review (Claude Code on the
-DeepSeek API) -> CLAUDE consolidation (Claude Code on Anthropic, Sonnet).
+DeepSeek API) -> GROK review (Cursor agent, Grok 4.7) -> CLAUDE consolidation
+(Claude Code on Anthropic, Sonnet).
 The script commits and pushes after each step, then starts the next round,
 until a round has no `blocking` or `major` finding (README stop rule) or
 --max-rounds is reached.
@@ -44,11 +45,17 @@ CLAUDE_MODEL = os.environ.get("CLAUDE_CONSOLIDATOR_MODEL", "claude-sonnet-5-5")
 ANTHROPIC_CONFIG_DIR = Path(
     os.environ.get("ANTHROPIC_CLAUDE_CONFIG_DIR", str(Path.home() / ".claude-anthropic"))
 ).expanduser()
+GROK_MODEL = os.environ.get("GROK_MODEL", "grok-4.7-high")
+CURSOR_REVIEW_MODEL = os.environ.get("CURSOR_REVIEW_MODEL", "auto")
+CURSOR_AGENT_BIN = os.environ.get(
+    "CURSOR_AGENT_BIN", shutil.which("cursor-agent") or shutil.which("agent") or "cursor-agent"
+)
 STEP_TIMEOUT = int(os.environ.get("REVIEW_STEP_TIMEOUT", str(90 * 60)))
 CODEX_EXTRA_ARGS = os.environ.get(
     "CODEX_EXTRA_ARGS", "-c sandbox_workspace_write.network_access=true"
 ).split()
 
+KNOWN_REVIEWERS = {"CHATGPT", "DEEPSEEK", "GROK", "CURSOR"}
 SEVERITY_RE = re.compile(r"\*\*Severity:\*\*\s*\**\s*(blocking|major|minor)", re.I)
 ROUND_RE = re.compile(r"\*\*Round (\d+)\*\*")
 VERSION_RE = re.compile(r"version (\d+\.\d+)", re.I)
@@ -254,6 +261,25 @@ def run_codex(prompt: str, root: Path, logfile: Path, timeout: int) -> None:
     log("codex ok")
 
 
+def run_cursor_agent(prompt: str, root: Path, logfile: Path, timeout: int, model: str) -> None:
+    """Run the Cursor agent CLI headless. Never --mode plan: reviewers must write files."""
+    if not shutil.which(CURSOR_AGENT_BIN):
+        raise SystemExit(f"Cursor agent binary not found: {CURSOR_AGENT_BIN} (set CURSOR_AGENT_BIN)")
+    args = [CURSOR_AGENT_BIN, "-p", prompt, "--workspace", str(root), "--trust", "--force",
+            "--model", model, "--output-format", "text"]
+    try:
+        res = run(args, cwd=root, check=False, timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        logfile.write_text(f"$ cursor-agent --model {model}\nTIMEOUT after {timeout}s\n--- stdout\n"
+                           f"{exc.stdout or ''}\n--- stderr\n{exc.stderr or ''}\n", encoding="utf-8")
+        raise SystemExit(f"cursor agent ({model}) timed out after {timeout}s; see {logfile}")
+    logfile.write_text(f"$ cursor-agent --model {model}\n--- stdout\n{res.stdout}\n--- stderr\n"
+                       f"{res.stderr}\n", encoding="utf-8")
+    if res.returncode != 0:
+        raise SystemExit(f"cursor agent ({model}) failed ({res.returncode}); see {logfile}")
+    log(f"cursor agent ok on {model}")
+
+
 # --- steps ---------------------------------------------------------------
 
 def review_prompt(agent: str, n: int) -> str:
@@ -263,6 +289,15 @@ def review_prompt(agent: str, n: int) -> str:
         who = ("You are DEEPSEEK. You are running inside the Claude Code tool, but your identity for "
                "this task is DEEPSEEK, not CLAUDE: sign the review, the finding ids (DEEPSEEK-1, …) "
                "and the CHANGELOG entry as DEEPSEEK.")
+    elif agent == "GROK":
+        who = ("You are GROK. You are running inside the Cursor agent on Grok 4.7, but your identity "
+               "for this task is GROK, not CURSOR: sign the review, the finding ids (GROK-1, …) and the "
+               "CHANGELOG entry as GROK. You may use web evidence; cite source and date, and do not "
+               "invent error codes, campaign numbers or standard clauses.")
+    elif agent == "CURSOR":
+        who = ("You are CURSOR. Consistency-only review: cross-references, undefined fields, enum "
+               "drift, schema gaps. Do not research external standards. Sign the review, the finding "
+               "ids (CURSOR-1, …) and the CHANGELOG entry as CURSOR.")
     return (f"{who}\n\nRead {REL_PROJECT}/README.md and follow its 'Instructions for the reviewing AI' "
             f"for round {n}: read spec.md (the local file, current version v{spec_version()}), and from "
             f"round 2 read reviews/round-{n - 1}/ first. Write your review to {review_path}, starting "
@@ -301,10 +336,17 @@ def do_review(agent: str, n: int, root: Path) -> None:
     round_dir(n).mkdir(parents=True, exist_ok=True)
     log(f"round {n}: {agent} reviewing spec v{spec_version()}")
     logfile = LOG_DIR / f"r{n}-{agent.lower()}.log"
+    prompt = review_prompt(agent, n)
     if agent == "CHATGPT":
-        run_codex(review_prompt(agent, n), root, logfile, STEP_TIMEOUT)
+        run_codex(prompt, root, logfile, STEP_TIMEOUT)
+    elif agent == "DEEPSEEK":
+        run_claude("DEEPSEEK", prompt, root, logfile, STEP_TIMEOUT)
+    elif agent == "GROK":
+        run_cursor_agent(prompt, root, logfile, STEP_TIMEOUT, GROK_MODEL)
+    elif agent == "CURSOR":
+        run_cursor_agent(prompt, root, logfile, STEP_TIMEOUT, CURSOR_REVIEW_MODEL)
     else:
-        run_claude("DEEPSEEK", review_prompt(agent, n), root, logfile, STEP_TIMEOUT)
+        raise SystemExit(f"no runner for reviewer {agent!r}")
     if not path.exists() or not SEVERITY_RE.search(path.read_text(encoding="utf-8")):
         raise SystemExit(f"{agent} did not write a review with findings at {path}; see {logfile}")
     rel = str(path.relative_to(root))
@@ -336,29 +378,72 @@ def do_consolidation(n: int, reviewers: list[str], converged: bool, root: Path) 
     commit_and_push(root, rel, f"CLAUDE: consolidate FuelBuddy round {n} into spec v{spec_version()}")
 
 
-def preflight(root: Path) -> None:
+def probe_cursor_write(root: Path, model: str, name: str) -> None:
+    """Prove the Cursor agent can *write* a file headless, not just answer."""
+    nonce = f"{name}-{int(time.time())}-{os.getpid()}"
+    pdir = LOG_DIR / f"probe-{nonce}"
+    pdir.mkdir(parents=True)
+    target = pdir / "probe.txt"
+    try:
+        rel = target.relative_to(root)
+        run_cursor_agent(f"Create the file {rel} containing exactly the text {nonce} and nothing "
+                         f"else. Do not touch any other file. Then stop.",
+                         root, LOG_DIR / f"preflight-{name.lower()}.log", 300, model)
+        if not target.exists() or target.read_text(encoding="utf-8").strip() != nonce:
+            raise SystemExit(f"{name} probe did not write the expected file; see "
+                             f"automation/logs/preflight-{name.lower()}.log")
+    finally:
+        shutil.rmtree(pdir, ignore_errors=True)
+    log(f"{name} write probe ok on {model}")
+
+
+def preflight(root: Path, reviewers: list[str], with_consolidator: bool) -> None:
+    tools = ["git"]
+    if "CHATGPT" in reviewers:
+        tools.append("codex")
+    if "DEEPSEEK" in reviewers or with_consolidator:
+        tools.append("claude")
+    if {"GROK", "CURSOR"} & set(reviewers):
+        tools.append(CURSOR_AGENT_BIN)
     ok = True
-    for tool in ("git", "codex", "claude"):
+    for tool in tools:
         found = shutil.which(tool)
         log(f"{tool}: {found or 'MISSING'}")
         ok &= bool(found)
     if not ok:
         raise SystemExit("missing tools")
-    log(run(["codex", "--version"], check=False).stdout.strip())
-    log(run(["claude", "--version"], check=False).stdout.strip())
-    log(f"round {current_round()}, spec v{spec_version()}")
-    log(f"DeepSeek key: {'found' if deepseek_key() else 'MISSING'}")
+    log(f"round {current_round()}, spec v{spec_version()}, reviewers {','.join(reviewers)}")
     LOG_DIR.mkdir(exist_ok=True)
     probe = "Reply with the single word OK."
-    run_claude("DEEPSEEK", probe, root, LOG_DIR / "preflight-deepseek.log", 300)
-    run_claude("ANTHROPIC", probe, root, LOG_DIR / "preflight-claude.log", 300)
-    res = run(["codex", "exec", "--skip-git-repo-check", "-C", str(root), *CODEX_EXTRA_ARGS, probe],
-              check=False, timeout=300)
-    (LOG_DIR / "preflight-codex.log").write_text(res.stdout + "\n" + res.stderr, encoding="utf-8")
-    if res.returncode != 0:
-        raise SystemExit("codex exec probe failed; see automation/logs/preflight-codex.log")
-    log("codex ok")
+    if "DEEPSEEK" in reviewers:
+        log(f"DeepSeek key: {'found' if deepseek_key() else 'MISSING'}")
+        run_claude("DEEPSEEK", probe, root, LOG_DIR / "preflight-deepseek.log", 300)
+    if with_consolidator:
+        run_claude("ANTHROPIC", probe, root, LOG_DIR / "preflight-claude.log", 300)
+    if "CHATGPT" in reviewers:
+        res = run(["codex", "exec", "--skip-git-repo-check", "-C", str(root), *CODEX_EXTRA_ARGS, probe],
+                  check=False, timeout=300)
+        (LOG_DIR / "preflight-codex.log").write_text(res.stdout + "\n" + res.stderr, encoding="utf-8")
+        if res.returncode != 0:
+            raise SystemExit("codex exec probe failed; see automation/logs/preflight-codex.log")
+        log("codex ok")
+    if "GROK" in reviewers:
+        probe_cursor_write(root, GROK_MODEL, "GROK")
+    if "CURSOR" in reviewers:
+        probe_cursor_write(root, CURSOR_REVIEW_MODEL, "CURSOR")
     log("preflight passed")
+
+
+def parse_reviewers(raw: str) -> list[str]:
+    names = [r.strip().upper() for r in raw.split(",")]
+    if not names or any(not r for r in names):
+        raise SystemExit(f"empty reviewer name in --reviewers {raw!r}")
+    if len(set(names)) != len(names):
+        raise SystemExit(f"duplicate reviewer in --reviewers {raw!r}")
+    unknown = [r for r in names if r not in KNOWN_REVIEWERS]
+    if unknown:
+        raise SystemExit(f"no runner for reviewer(s) {unknown}; known: {sorted(KNOWN_REVIEWERS)}")
+    return names
 
 
 def main() -> None:
@@ -366,17 +451,20 @@ def main() -> None:
     ap.add_argument("--max-rounds", type=int, default=int(os.environ.get("REVIEW_MAX_ROUNDS", "5")),
                     help="stop after this many rounds in this run even without convergence (default 5)")
     ap.add_argument("--preflight", action="store_true",
-                    help="check codex, claude and both model profiles with a tiny prompt, then exit")
-    ap.add_argument("--reviewers", default="CHATGPT,DEEPSEEK")
+                    help="probe the backends of the selected reviewers (plus the consolidator), then exit")
+    ap.add_argument("--skip-consolidator", action="store_true",
+                    help="with --preflight: do not probe the Anthropic consolidator profile")
+    ap.add_argument("--reviewers", default=os.environ.get("REVIEWERS", "CHATGPT,DEEPSEEK,GROK"),
+                    help="comma-separated, from CHATGPT,DEEPSEEK,GROK,CURSOR (default CHATGPT,DEEPSEEK,GROK)")
     opts = ap.parse_args()
 
+    reviewers = parse_reviewers(opts.reviewers)
     root = repo_root()
     LOG_DIR.mkdir(exist_ok=True)
     if opts.preflight:
-        preflight(root)
+        preflight(root, reviewers, not opts.skip_consolidator)
         return
 
-    reviewers = [r.strip().upper() for r in opts.reviewers.split(",") if r.strip()]
     ensure_branch(root)
     for _ in range(opts.max_rounds):
         n = current_round()

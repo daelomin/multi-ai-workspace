@@ -67,17 +67,18 @@ If you were sent here with the standard prompt, follow these steps.
 
 ## Automated loop (HUMAN's laptop)
 
-From round 2 the rounds run unattended with `automation/review_loop.py`. The reviewers are **CHATGPT** and **DEEPSEEK**; **CLAUDE** consolidates. One round is:
+From round 2 the rounds run unattended with `automation/review_loop.py`. The reviewers are **CHATGPT**, **DEEPSEEK** and **GROK** (**CURSOR** optional, consistency only); **CLAUDE** consolidates. One round is:
 
 1. **CHATGPT** reviews through the Codex CLI (`codex exec`) and writes `reviews/round-N/CHATGPT.md`.
 2. **DEEPSEEK** reviews through Claude Code pointed at the DeepSeek API, model `deepseek-v4-pro` (the script checks the model actually used). Its prompt says explicitly *"You are DEEPSEEK"*, since it runs inside Claude Code.
-3. **CLAUDE** consolidates through Claude Code on Anthropic, model `claude-sonnet-5-5`: `CONSOLIDATION.md`, the next `spec.md` version and the *Current round* line above.
+3. **GROK** reviews through the Cursor agent CLI (`agent`/`cursor-agent -p`), model `grok-4.7-high` (override with `GROK_MODEL`). Its prompt says explicitly *"You are GROK"*; it signs as GROK, never CURSOR (`agents/GROK.md`).
+4. **CLAUDE** consolidates through Claude Code on Anthropic, model `claude-sonnet-5-5`: `CONSOLIDATION.md`, the next `spec.md` version and the *Current round* line above.
 
 The script commits each file as `<AGENT>: …` on the branch `agent/loop/fuelbuddy-review` and pushes after every step, so the relay passes through GitHub. It stops when a round has no `blocking` or `major` finding (the stop rule), or after `--max-rounds` rounds (default 5). Steps whose file already exists are skipped, so it can be stopped and rerun. HUMAN decisions are not waited for during the loop: they stay in the carried-forward FB-D list, and reviewers must not re-raise them as `blocking`/`major`. HUMAN merges the branch's pull request at the end.
 
 ```bash
 cd ~/GIT/multi-ai-workspace
-python3 projects/fuelbuddy/charging-diagnostic/automation/review_loop.py --preflight   # tiny probe of all three models
+python3 projects/fuelbuddy/charging-diagnostic/automation/review_loop.py --preflight   # probe the backends; add --reviewers GROK --skip-consolidator to test Grok alone
 python3 projects/fuelbuddy/charging-diagnostic/automation/review_loop.py
 ```
 
