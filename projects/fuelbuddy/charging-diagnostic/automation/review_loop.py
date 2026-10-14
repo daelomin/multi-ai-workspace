@@ -569,17 +569,28 @@ def preflight(root: Path, reviewers: list[str], with_consolidator: bool) -> None
     log(f"round {current_round()}, spec v{spec_version()}, reviewers {','.join(reviewers)}")
     LOG_DIR.mkdir(exist_ok=True)
     probe = "Reply with the single word OK."
+    # Run every probe, so one preflight shows everything that needs fixing.
+    probes = []
     if "DEEPSEEK" in reviewers:
         log(f"DeepSeek key: {'found' if deepseek_key() else 'MISSING'}")
-        run_claude("DEEPSEEK", probe, root, LOG_DIR / "preflight-deepseek.log", 300)
+        probes.append(("DEEPSEEK", lambda: run_claude("DEEPSEEK", probe, root, LOG_DIR / "preflight-deepseek.log", 300)))
     if with_consolidator:
-        run_claude("ANTHROPIC", probe, root, LOG_DIR / "preflight-claude.log", 300)
+        probes.append(("ANTHROPIC", lambda: run_claude("ANTHROPIC", probe, root, LOG_DIR / "preflight-claude.log", 300)))
     if "CHATGPT" in reviewers:
-        probe_write(root, "CHATGPT", lambda p, lf: run_codex(p, root, lf, 300))
+        probes.append(("CHATGPT", lambda: probe_write(root, "CHATGPT", lambda p, lf: run_codex(p, root, lf, 300))))
     if "GROK" in reviewers:
-        probe_write(root, "GROK", lambda p, lf: run_cursor_agent(p, root, lf, 300, GROK_MODEL))
+        probes.append(("GROK", lambda: probe_write(root, "GROK", lambda p, lf: run_cursor_agent(p, root, lf, 300, GROK_MODEL))))
     if "CURSOR" in reviewers:
-        probe_write(root, "CURSOR", lambda p, lf: run_cursor_agent(p, root, lf, 300, CURSOR_REVIEW_MODEL))
+        probes.append(("CURSOR", lambda: probe_write(root, "CURSOR", lambda p, lf: run_cursor_agent(p, root, lf, 300, CURSOR_REVIEW_MODEL))))
+    failures = []
+    for name, fn in probes:
+        try:
+            fn()
+        except SystemExit as exc:
+            failures.append(name)
+            log(f"FAILED {name}: {exc}")
+    if failures:
+        raise SystemExit(f"preflight failed ({len(failures)} of {len(probes)} probes): {', '.join(failures)}")
     log("preflight passed")
 
 
