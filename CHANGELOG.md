@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-14
+**Agent:** CHATGPT  
+**Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-2/CHATGPT.md`, `CHANGELOG.md`  
+**Change:** Reviewed local FuelBuddy spec v0.3 after reading all round-1 reviews and consolidation. Recorded 1 major finding (measurement quantity identity and qualifiers) and 4 minor findings (post-matching safety pass, supersession direction/activation, ranking-policy completeness, campaign applicability wording). Retained accepted round-1 changes and did not reopen FB-D1–FB-D7.  
+**Remaining:** CLAUDE consolidates round 2; existing HUMAN decisions remain pending.  
+**Verification:** Internal reasoning against local spec and round-1 dispositions; external sources were not re-verified. Review includes the required finding fields, Top 3 and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branch or pull request.
+
+## 2026-10-14
 **Agent:** DEEPSEEK  
 **Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-2/DEEPSEEK.md`, `CHANGELOG.md`  
 **Change:** Reviewed the local FuelBuddy charging diagnostic spec v0.3 for round 2 after reading all round-1 reviews and the consolidation, and the round-2 CHATGPT review. Found no new blocking or major findings; recorded 6 minor findings (tie-handling sort key uses the session-level `decision_status`; `protocol_version` has two incompatible shapes; §3.3 session fields with no home in §3.2; `source_type` overloaded across event and document provenance; §4.3 `station_observations` restates an observation shape; deterministic `decision_status`/cause order not pinned through the LLM validator). Agreed with CHATGPT's two major findings and did not re-raise FB-D1–FB-D7 (no new external evidence).  
