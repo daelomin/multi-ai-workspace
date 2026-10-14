@@ -277,3 +277,11 @@
 **Change:** HUMAN clarified FB-D1: Europe = EU/EEA plus the UK and Switzerland, and generally all countries that have an API. Recorded in `decisions.md` with consolidator notes: "has an API" is the inclusion rule; which API, launch order and handling of countries without one stay open questions for HUMAN.
 **Remaining:** FB-D2–FB-D7 open. Round 3 not yet run.
 **Verification:** Document-only edit.
+
+
+## 2026-10-14 — HUMAN decision FB-D7: Option A (documented ranking ordering)
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-diagnostic/decisions.md`, `CHANGELOG.md`
+**Change:** Recorded HUMAN's decision FB-D7 = Option A (ship the documented ordering; calibration deferred to §6.3; ranking not blocked) with consolidator notes. `spec.md` unchanged until the next consolidation.
+**Remaining:** FB-D2–FB-D6 open. Round 3 not yet run.
+**Verification:** Document-only edit.
