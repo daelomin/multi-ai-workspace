@@ -56,6 +56,20 @@ STEP_TIMEOUT = int(os.environ.get("REVIEW_STEP_TIMEOUT", str(90 * 60)))
 CODEX_EXTRA_ARGS = shlex.split(
     os.environ.get("CODEX_EXTRA_ARGS", "-c sandbox_workspace_write.network_access=true")
 )
+CODEX_SESSIONS = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))) / "sessions"
+# USD per 1M tokens: (fresh input, cached input, cache write, output). Source:
+# https://developers.openai.com/api/docs/pricing (read 2026-10-14). Override with CODEX_PRICING_JSON,
+# e.g. '{"m": {"standard": {"short": [2, 0.1, 2.5, 10], "long": [4, 0.2, 5, 15]}, "fast": {...}}}'.
+CODEX_PRICES = {"gpt-6.1-sol": {
+    "standard": {"short": (2.00, 0.10, 2.50, 10.00), "long": (4.00, 0.20, 5.00, 15.00)},
+    "fast": {"short": (4.00, 0.20, 5.00, 20.00), "long": (8.00, 0.40, 10.00, 30.00)}}}
+if os.environ.get("CODEX_PRICING_JSON"):
+    CODEX_PRICES.update(json.loads(os.environ["CODEX_PRICING_JSON"]))
+# Codex Fast service tier (about 2x speed at 2x price on gpt-6.1-sol). Empty = standard tier.
+CODEX_SERVICE_TIER = os.environ.get("CODEX_SERVICE_TIER", "").strip()
+# Per-request input size above which the long-context tier applies. Unknown by default: the
+# cost is then reported for both tiers (short = estimate, long = upper bound).
+CODEX_LONG_CONTEXT_TOKENS = int(os.environ.get("CODEX_LONG_CONTEXT_TOKENS", "0")) or None
 DEEPSEEK_FALLBACK_MODEL = "deepseek-chat"
 # Without served-model telemetry (empty modelUsage) a DeepSeek review is "unverified";
 # unattended runs must opt in to that explicitly.
@@ -360,11 +374,89 @@ def codex_args(prompt: str, root: Path, last: Path | None = None) -> list[str]:
     else:
         mode = ["--approve-for-me"]  # selects the workspace-write sandbox itself
     out = ["--output-last-message", str(last)] if last else []
+    if CODEX_SERVICE_TIER:
+        out += ["-c", f'service_tier="{CODEX_SERVICE_TIER}"']
     return ["codex", "exec", *mode, "--skip-git-repo-check", "-C", str(root), *out,
             *CODEX_EXTRA_ARGS, prompt]
 
 
-def run_codex(prompt: str, root: Path, logfile: Path, timeout: int) -> None:
+def codex_usage(log_text: str) -> dict | None:
+    """Total tokens, context size and estimated cost of one `codex exec`, from its session file.
+
+    Cost integrates every request: fresh input, cached input, cache writes and output (reasoning
+    tokens are part of output). Returns None when the session file cannot be found.
+    """
+    sid = re.search(r"session id:\s*(\S+)", log_text)
+    model = re.search(r"^model:\s*(\S+)", log_text, re.M)
+    if not sid:
+        return None
+    files = list(CODEX_SESSIONS.rglob(f"*{sid.group(1)}*.jsonl"))
+    if not files:
+        return None
+    keys = ("input_tokens", "cached_input_tokens", "cache_write_input_tokens", "output_tokens",
+            "reasoning_output_tokens")
+    prev = dict.fromkeys(keys, 0)
+    tot = dict.fromkeys(keys, 0)
+    window = max_req = requests = 0
+    short = long_ = 0.0
+    prices = CODEX_PRICES.get(model.group(1) if model else "", {}).get(
+        "fast" if CODEX_SERVICE_TIER else "standard")
+    for line in files[0].read_text(encoding="utf-8").splitlines():
+        try:
+            pl = json.loads(line).get("payload", {})
+        except ValueError:
+            continue
+        info = pl.get("info") if pl.get("type") == "token_count" else None
+        if not info or not info.get("total_token_usage"):
+            continue
+        window = info.get("model_context_window") or window
+        now = {k: info["total_token_usage"].get(k, 0) for k in keys}
+        delta = {k: now[k] - prev[k] for k in keys}
+        if delta["input_tokens"] <= 0 and delta["output_tokens"] <= 0:
+            continue  # repeated event, nothing new
+        prev = now
+        requests += 1
+        ctx = (info.get("last_token_usage") or {}).get("input_tokens", delta["input_tokens"])
+        max_req = max(max_req, ctx)
+        for k in keys:
+            tot[k] += delta[k]
+        if prices:
+            fresh = delta["input_tokens"] - delta["cached_input_tokens"] - delta["cache_write_input_tokens"]
+            vol = (fresh, delta["cached_input_tokens"], delta["cache_write_input_tokens"], delta["output_tokens"])
+            c_short = sum(v * r for v, r in zip(vol, prices["short"])) / 1e6
+            c_long = sum(v * r for v, r in zip(vol, prices["long"])) / 1e6
+            if CODEX_LONG_CONTEXT_TOKENS:
+                c_short = c_long if ctx > CODEX_LONG_CONTEXT_TOKENS else c_short
+                c_long = c_short
+            short += c_short
+            long_ += c_long
+    usage = {"model": model.group(1) if model else None,
+             "service_tier": CODEX_SERVICE_TIER or "standard", "requests": requests, **tot,
+             "total_tokens": tot["input_tokens"] + tot["output_tokens"],
+             "fresh_input_tokens": tot["input_tokens"] - tot["cached_input_tokens"] - tot["cache_write_input_tokens"],
+             "context_window": window, "max_request_context_tokens": max_req,
+             "max_request_context_pct": round(100 * max_req / window, 1) if window else None,
+             "cost_usd": round(short, 4) if prices else None,
+             "cost_usd_upper_bound": round(long_, 4) if prices else None}
+    return usage
+
+
+def log_codex_usage(usage: dict | None) -> None:
+    if not usage:
+        log("codex usage: session file not found, tokens/cost unavailable")
+        return
+    cost = ("no price known for this model (set CODEX_PRICING_JSON)" if usage["cost_usd"] is None else
+            f"est. cost ${usage['cost_usd']:.3f}" + (
+                f" (${usage['cost_usd_upper_bound']:.3f} if the long-context tier applied)"
+                if usage["cost_usd_upper_bound"] != usage["cost_usd"] else ""))
+    log(f"codex {usage['model']} ({usage['service_tier']} tier): {usage['requests']} requests, input {usage['input_tokens']:,} "
+        f"(cached {usage['cached_input_tokens']:,}, fresh {usage['fresh_input_tokens']:,}), "
+        f"output {usage['output_tokens']:,} (reasoning {usage['reasoning_output_tokens']:,}); "
+        f"largest request {usage['max_request_context_tokens']:,} of {usage['context_window']:,} "
+        f"window tokens ({usage['max_request_context_pct']}%); {cost}")
+
+
+def run_codex(prompt: str, root: Path, logfile: Path, timeout: int) -> dict | None:
     args = codex_args(prompt, root, logfile.with_suffix(".last.md"))
     try:
         res = run(args, cwd=root, check=False, timeout=timeout)
@@ -376,25 +468,38 @@ def run_codex(prompt: str, root: Path, logfile: Path, timeout: int) -> None:
     if res.returncode != 0:
         raise SystemExit(f"codex exec failed ({res.returncode}); see {logfile}")
     log("codex ok")
+    usage = codex_usage(res.stdout + "\n" + res.stderr)
+    log_codex_usage(usage)
+    if usage:
+        logfile.with_suffix(".usage.json").write_text(json.dumps(usage, indent=2), encoding="utf-8")
+    return usage
 
 
 def run_cursor_agent(prompt: str, root: Path, logfile: Path, timeout: int, model: str) -> None:
-    """Run the Cursor agent CLI headless. Never --mode plan: reviewers must write files."""
+    """Run the Cursor agent CLI headless. Never --mode plan: reviewers must write files.
+
+    Output goes straight to the log file, so `tail -f` shows progress while it runs.
+    """
     if not shutil.which(CURSOR_AGENT_BIN):
         raise SystemExit(f"Cursor agent binary not found: {CURSOR_AGENT_BIN} (set CURSOR_AGENT_BIN)")
     args = [CURSOR_AGENT_BIN, "-p", prompt, "--workspace", str(root), "--trust", "--force",
             "--model", model, "--output-format", "text"]
-    try:
-        res = run(args, cwd=root, check=False, timeout=timeout)
-    except subprocess.TimeoutExpired as exc:
-        logfile.write_text(f"$ cursor-agent --model {model}\nTIMEOUT after {timeout}s\n--- stdout\n"
-                           f"{exc.stdout or ''}\n--- stderr\n{exc.stderr or ''}\n", encoding="utf-8")
-        raise SystemExit(f"cursor agent ({model}) timed out after {timeout}s; see {logfile}")
-    logfile.write_text(f"$ cursor-agent --model {model}\n--- stdout\n{res.stdout}\n--- stderr\n"
-                       f"{res.stderr}\n", encoding="utf-8")
-    if res.returncode != 0:
-        raise SystemExit(f"cursor agent ({model}) failed ({res.returncode}); see {logfile}")
-    log(f"cursor agent ok on {model}")
+    started = time.time()
+    with logfile.open("w", encoding="utf-8") as fh:
+        fh.write(f"$ cursor-agent --model {model}\n--- output (live)\n")
+        fh.flush()
+        proc = subprocess.Popen(args, cwd=root, text=True, stdin=subprocess.DEVNULL,
+                                stdout=fh, stderr=subprocess.STDOUT)
+        try:
+            code = proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+            fh.write(f"\nTIMEOUT after {timeout}s\n")
+            raise SystemExit(f"cursor agent ({model}) timed out after {timeout}s; see {logfile}")
+    if code != 0:
+        raise SystemExit(f"cursor agent ({model}) failed ({code}); see {logfile}")
+    log(f"cursor agent ok on {model} in {time.time() - started:.0f}s")
 
 
 # --- steps ---------------------------------------------------------------
@@ -478,7 +583,10 @@ def do_review(agent: str, n: int, root: Path) -> dict:
     prov = {"requested": "default configuration", "reported": [], "verified": False,
             "note": "backend does not report the served model"}
     if agent == "CHATGPT":
-        run_codex(prompt, root, logfile, STEP_TIMEOUT)
+        usage = run_codex(prompt, root, logfile, STEP_TIMEOUT)
+        if usage:
+            prov = {"requested": usage["model"], "reported": [usage["model"]] if usage["model"] else [],
+                    "verified": False, "note": "model from the Codex banner", "usage": usage}
     elif agent == "DEEPSEEK":
         prov = run_claude("DEEPSEEK", prompt, root, logfile, STEP_TIMEOUT)["_provenance"]
     elif agent == "GROK":

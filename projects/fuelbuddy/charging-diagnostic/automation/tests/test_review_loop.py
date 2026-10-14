@@ -62,6 +62,60 @@ class CodexArgs(unittest.TestCase):
             self.assertIn("TIMEOUT", log.read_text())
 
 
+class CodexUsage(unittest.TestCase):
+    def session(self, d, events):
+        f = Path(d) / "2026/10/14/rollout-x-abc123.jsonl"
+        f.parent.mkdir(parents=True)
+        f.write_text("\n".join(json.dumps({"payload": {"type": "token_count", "info": e}}) for e in events))
+
+    def ev(self, tin, cached, out, last_in, window=475000):
+        return {"total_token_usage": {"input_tokens": tin, "cached_input_tokens": cached,
+                                      "cache_write_input_tokens": 0, "output_tokens": out,
+                                      "reasoning_output_tokens": 0, "total_tokens": tin + out},
+                "last_token_usage": {"input_tokens": last_in}, "model_context_window": window}
+
+    LOG = "model: gpt-6.1-sol\nsession id: abc123\n"
+
+    def test_sums_requests_dedupes_and_prices(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(rl, "CODEX_SESSIONS", Path(d)):
+            self.session(d, [self.ev(1000, 0, 100, 1000), self.ev(1000, 0, 100, 1000),
+                             self.ev(3000, 1000, 300, 2000)])
+            u = rl.codex_usage(self.LOG)
+        self.assertEqual((u["requests"], u["input_tokens"], u["cached_input_tokens"], u["output_tokens"]),
+                         (2, 3000, 1000, 300))
+        self.assertEqual(u["max_request_context_tokens"], 2000)
+        self.assertEqual(u["context_window"], 475000)
+        # fresh 2000*2 + cached 1000*0.1 + out 300*10 = 4000+100+3000 per 1e6
+        self.assertAlmostEqual(u["cost_usd"], 0.0071, places=4)
+        self.assertGreater(u["cost_usd_upper_bound"], u["cost_usd"])
+
+    def test_long_context_threshold_selects_tier(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(rl, "CODEX_SESSIONS", Path(d)), \
+                mock.patch.object(rl, "CODEX_LONG_CONTEXT_TOKENS", 1500):
+            self.session(d, [self.ev(2000, 0, 0, 2000)])
+            u = rl.codex_usage(self.LOG)
+        self.assertEqual(u["cost_usd"], u["cost_usd_upper_bound"])
+        self.assertAlmostEqual(u["cost_usd"], 0.008, places=4)  # 2000 * $4/M
+
+    def test_fast_tier_doubles_cost_and_is_passed_to_codex(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(rl, "CODEX_SESSIONS", Path(d)):
+            self.session(d, [self.ev(1000, 0, 100, 1000)])
+            std = rl.codex_usage(self.LOG)
+            with mock.patch.object(rl, "CODEX_SERVICE_TIER", "fast"):
+                fast = rl.codex_usage(self.LOG)
+                self.assertIn('service_tier="fast"', rl.codex_args("p", Path("/r")))
+        self.assertEqual(fast["service_tier"], "fast")
+        self.assertAlmostEqual(fast["cost_usd"], 2 * std["cost_usd"], places=4)
+        self.assertNotIn('service_tier="fast"', rl.codex_args("p", Path("/r")))
+
+    def test_unknown_model_and_missing_session(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(rl, "CODEX_SESSIONS", Path(d)):
+            self.session(d, [self.ev(1000, 0, 100, 1000)])
+            self.assertIsNone(rl.codex_usage(self.LOG.replace("gpt-6.1-sol", "other"))["cost_usd"])
+            self.assertIsNone(rl.codex_usage("model: x\nsession id: nope\n"))
+            self.assertIsNone(rl.codex_usage("no session line"))
+
+
 class Provenance(unittest.TestCase):
     def fake(self, usage, out_extra=""):
         res = subprocess.CompletedProcess([], 0, stdout="", stderr=out_extra)

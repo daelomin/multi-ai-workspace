@@ -11,6 +11,13 @@ REPO="${REPO:-$HOME/GIT/multi-ai-workspace}"
 LOOP="$REPO/projects/fuelbuddy/charging-diagnostic/automation/review_loop.py"
 BRANCH="agent/loop/fuelbuddy-review"
 
+# FAST=1 -> Codex Fast service tier (about 2x speed, 2x price) and Grok 4.7 high-fast.
+# DeepSeek and the Anthropic consolidator have no fast variant, so they are unchanged.
+if [ "${FAST:-0}" = "1" ]; then
+  export GROK_MODEL="${GROK_MODEL:-grok-4.7-high-fast}"
+  export CODEX_SERVICE_TIER="${CODEX_SERVICE_TIER:-fast}"
+fi
+
 # --- configuration (override by exporting before running) ---
 export GROK_MODEL="${GROK_MODEL:-grok-4.7-high}"
 export DEEPSEEK_MODEL="${DEEPSEEK_MODEL:-deepseek-v4-pro}"
