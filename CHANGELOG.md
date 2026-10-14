@@ -203,3 +203,11 @@
 **Change:** Codex: one shared `codex_args` builder (`--approve-for-me`, opt-in `CODEX_DANGEROUS_FULL_ACCESS`), timeout logging, `shlex` args. All subprocesses now run with `stdin=DEVNULL` (`codex exec` otherwise hangs waiting for piped stdin). DeepSeek: requested vs reported model recorded in `_provenance`, contradictory model fails, empty `modelUsage` needs `DEEPSEEK_ACCEPT_UNVERIFIED=1`, one retry with `deepseek-chat` on `unrecognized_model` (not on 401), Anthropic consolidator always uses `~/.claude-anthropic`. Write probes for all backends (nonce, orchestrator-verified). Proposal D1, D2, D4, D10.
 **Remaining:** DeepSeek preflight still fails with 401 using the key in `~/.claude/settings.json`; HUMAN must export a valid `DEEPSEEK_API_KEY`. Resume safety, git worktree, mocked tests, provenance in CONSOLIDATION.
 **Verification:** Live preflight passed for CHATGPT (write probe) and GROK; DeepSeek live probe returned 401 (invalid key), so the model/telemetry path is untested.
+
+
+## 2026-10-14 — resume safety, git guards and tests for the FuelBuddy review loop
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-diagnostic/automation/review_loop.py`, `projects/fuelbuddy/charging-diagnostic/automation/tests/test_review_loop.py`, `projects/fuelbuddy/charging-diagnostic/README.md`, `CHANGELOG.md`
+**Change:** Reviews must end with `Result: complete` and carry findings or `Findings: none` (clean reviews accepted, partial ones rejected). A step is skipped only when complete and pushed; complete-but-unpushed resumes at push; unfinished files stop the loop. Clean tree/index checked before each step, unrelated staged paths refused, local branch never reset, pending local commits pushed on start, lockfile against overlapping loops. Reviewer provenance (requested vs served model) is passed to the consolidator. 17 mocked tests. Proposal D7–D9 (partial), D12.
+**Remaining:** Dedicated git worktree (D9) deferred: the lockfile plus clean-tree checks cover the concrete failure cases; completion records tied to a spec hash (D7) replaced by git-based "pushed with identical content" check. One-round live integration test (Phase 4).
+**Verification:** `python3 -m unittest discover -s tests`: 17 passed. Live preflight passed for GROK, CHATGPT, DEEPSEEK (served model verified) and the Anthropic consolidator.

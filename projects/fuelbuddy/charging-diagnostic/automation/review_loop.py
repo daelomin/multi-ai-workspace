@@ -19,6 +19,7 @@ Run from anywhere:
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 import re
@@ -78,6 +79,8 @@ comment on them only if you have new evidence, as a `question` of severity `mino
 problems that would make the spec unsafe, wrong or unimplementable. Use `minor` for the rest.
 - Do not repeat findings that the previous consolidation already accepted and merged, \
 unless the merged text is still wrong.
+- End the review file with a line `Result: complete`. If you have no findings, write a line \
+`Findings: none` before it. A file without `Result: complete` is treated as unfinished.
 - When the file is written, stop."""
 
 
@@ -129,37 +132,91 @@ def severity_counts(path: Path) -> dict[str, int]:
     return counts
 
 
+COMPLETE_RE = re.compile(r"^\s*Result:\s*complete\s*$", re.I | re.M)
+NONE_RE = re.compile(r"^\s*Findings:\s*none\s*$", re.I | re.M)
+
+
+def validate_review(text: str) -> str | None:
+    """Return an error string, or None when the review is complete and well formed."""
+    has_findings = bool(SEVERITY_RE.search(text))
+    if not COMPLETE_RE.search(text):
+        return "missing the 'Result: complete' line"
+    if has_findings and NONE_RE.search(text):
+        return "contradictory: has findings and 'Findings: none'"
+    if not has_findings and not NONE_RE.search(text):
+        return "no Severity findings and no 'Findings: none' line"
+    return None
+
+
 # --- git -----------------------------------------------------------------
 
 def ensure_branch(root: Path) -> None:
     run(["git", "fetch", "origin"], cwd=root)
     branch = run(["git", "branch", "--show-current"], cwd=root).stdout.strip()
-    if branch == BRANCH:
-        return
-    dirty = run(["git", "status", "--porcelain"], cwd=root).stdout.strip()
-    if dirty:
-        raise SystemExit(f"working tree not clean on {branch}; commit or stash first:\n{dirty}")
-    exists = run(["git", "rev-parse", "--verify", "--quiet", f"origin/{BRANCH}"],
-                 cwd=root, check=False).returncode == 0
-    if exists:
-        run(["git", "checkout", "-B", BRANCH, f"origin/{BRANCH}"], cwd=root)
-    else:
-        run(["git", "checkout", "-B", BRANCH, "origin/main"], cwd=root)
+    if branch != BRANCH:
+        dirty = run(["git", "status", "--porcelain"], cwd=root).stdout.strip()
+        if dirty:
+            raise SystemExit(f"working tree not clean on {branch}; commit or stash first:\n{dirty}")
+        local = run(["git", "rev-parse", "--verify", "--quiet", BRANCH], cwd=root, check=False).returncode == 0
+        remote = run(["git", "rev-parse", "--verify", "--quiet", f"origin/{BRANCH}"],
+                     cwd=root, check=False).returncode == 0
+        if local:
+            run(["git", "checkout", BRANCH], cwd=root)
+        else:
+            run(["git", "checkout", "-b", BRANCH, f"origin/{BRANCH}" if remote else "origin/main"], cwd=root)
+    # Never reset a local branch: it may hold commits that are not pushed yet.
+    if run(["git", "rev-parse", "--verify", "--quiet", f"origin/{BRANCH}"], cwd=root, check=False).returncode == 0:
+        if run(["git", "merge", "--ff-only", f"origin/{BRANCH}"], cwd=root, check=False).returncode != 0:
+            log(f"WARNING: local {BRANCH} has diverged from origin; left untouched")
+    ahead = run(["git", "rev-list", "--count", f"origin/{BRANCH}..HEAD"], cwd=root, check=False).stdout.strip()
+    if ahead and ahead != "0":
+        log(f"{ahead} local commit(s) not pushed; pushing before continuing")
+        push_branch(root, "pending commits")
     log(f"on branch {BRANCH}")
 
 
+def staged_paths(root: Path) -> list[str]:
+    return run(["git", "diff", "--cached", "--name-only"], cwd=root).stdout.split()
+
+
+def assert_clean(root: Path, allow: set[str] = frozenset()) -> None:
+    """Refuse to start a step on a dirty tree or a non-empty index (except allowed paths)."""
+    extra = unexpected_changes(root, set(allow))
+    pre = [p for p in staged_paths(root) if p not in allow]
+    if extra or pre:
+        raise SystemExit(f"working tree or index not clean before the step: changed={extra} staged={pre}")
+
+
 def commit_and_push(root: Path, paths: list[str], message: str) -> None:
+    pre = [p for p in staged_paths(root) if p not in set(paths)]
+    if pre:
+        raise SystemExit(f"unrelated paths already staged, refusing to commit them: {pre}")
     run(["git", "add", "--", *paths], cwd=root)
-    if run(["git", "diff", "--cached", "--quiet"], cwd=root, check=False).returncode == 0:
-        log("nothing to commit")
-        return
-    run(["git", "commit", "-m", message], cwd=root)
+    staged = staged_paths(root)
+    stray = [p for p in staged if p not in set(paths)]
+    if stray:
+        raise SystemExit(f"unexpected staged paths: {stray}")
+    if staged:
+        run(["git", "commit", "-m", message], cwd=root)
+    else:
+        log("nothing new to commit")
+    push_branch(root, message)
+
+
+def push_branch(root: Path, label: str) -> None:
     for attempt in range(4):
         if run(["git", "push", "-u", "origin", BRANCH], cwd=root, check=False).returncode == 0:
-            log(f"pushed: {message}")
+            log(f"pushed: {label}")
             return
         time.sleep(2 ** (attempt + 1))
-    raise SystemExit("git push failed 4 times")
+    raise SystemExit("git push failed 4 times; rerun to resume at the push")
+
+
+def is_pushed(root: Path, rel: str) -> bool:
+    """True when origin/BRANCH has this file with identical content."""
+    if not run(["git", "ls-tree", f"origin/{BRANCH}", "--", rel], cwd=root, check=False).stdout.strip():
+        return False
+    return run(["git", "diff", "--quiet", f"origin/{BRANCH}", "--", rel], cwd=root, check=False).returncode == 0
 
 
 def unexpected_changes(root: Path, allowed: set[str]) -> list[str]:
@@ -365,7 +422,7 @@ def review_prompt(agent: str, n: int) -> str:
             + REVIEW_RULES.format(review_path=review_path, agent=agent, n=n))
 
 
-def consolidation_prompt(n: int, reviewers: list[str], converged: bool) -> str:
+def consolidation_prompt(n: int, reviewers: list[str], converged: bool, provenance: dict | None = None) -> str:
     nxt = n + 1
     files = ", ".join(f"reviews/round-{n}/{a}.md" for a in reviewers)
     final = ("This round has no blocking or major finding, so it is the LAST round: apply the accepted "
@@ -373,6 +430,15 @@ def consolidation_prompt(n: int, reviewers: list[str], converged: bool) -> str:
              f"review converged at round {n} on the new spec version." if converged else
              f"Then set README.md 'Current round' to **Round {nxt}**, reviewing the new spec version, "
              f"with reviews in `reviews/round-{nxt}/`.")
+    prov_lines = ""
+    if provenance:
+        rows = "; ".join(
+            f"{a}: requested={p.get('requested')}, "
+            f"served={','.join(p.get('reported') or []) or 'unverified'}"
+            for a, p in provenance.items())
+        prov_lines = (f"\n\nReviewer provenance (requested vs served model; 'unverified' means the "
+                      f"provider reported no served model): {rows}. Add a short 'Reviewer provenance' "
+                      f"section to CONSOLIDATION.md stating which reviewers were unverified.")
     return (
         f"You are CLAUDE, the consolidator of the FuelBuddy spec review. Read {REL_PROJECT}/README.md, "
         f"spec.md (v{spec_version()}), reviews/round-{n - 1}/CONSOLIDATION.md if it exists, and the "
@@ -385,46 +451,74 @@ def consolidation_prompt(n: int, reviewers: list[str], converged: bool) -> str:
         f"for decisions and do not decide them yourself. {final}\n\n"
         "Also add a CHANGELOG.md entry at the top (Agent: CLAUDE). Do not run git: the loop commits "
         "and pushes for you. Only edit spec.md, README.md, CHANGELOG.md and the CONSOLIDATION.md file."
+        + prov_lines
     )
 
 
-def do_review(agent: str, n: int, root: Path) -> None:
+def do_review(agent: str, n: int, root: Path) -> dict:
+    """Run or resume one review; return its provenance record."""
     path = round_dir(n) / f"{agent}.md"
+    rel = str(path.relative_to(root))
     if path.exists():
-        log(f"round {n}: {agent} review already there, skipping")
-        return
+        err = validate_review(path.read_text(encoding="utf-8"))
+        if err:
+            raise SystemExit(f"{rel} exists but is unfinished ({err}); inspect it, delete it to rerun")
+        assert_clean(root, {rel, "CHANGELOG.md"})
+        if is_pushed(root, rel):
+            log(f"round {n}: {agent} review complete and pushed, skipping")
+        else:
+            log(f"round {n}: {agent} review complete but not pushed, resuming at commit/push")
+            commit_and_push(root, [rel, "CHANGELOG.md"], f"{agent}: FuelBuddy spec review round {n}")
+        return {"requested": "n/a", "reported": [], "verified": False, "note": "resumed, not rerun"}
+    assert_clean(root)
     round_dir(n).mkdir(parents=True, exist_ok=True)
     log(f"round {n}: {agent} reviewing spec v{spec_version()}")
     logfile = LOG_DIR / f"r{n}-{agent.lower()}.log"
     prompt = review_prompt(agent, n)
+    prov = {"requested": "default configuration", "reported": [], "verified": False,
+            "note": "backend does not report the served model"}
     if agent == "CHATGPT":
         run_codex(prompt, root, logfile, STEP_TIMEOUT)
     elif agent == "DEEPSEEK":
-        run_claude("DEEPSEEK", prompt, root, logfile, STEP_TIMEOUT)
+        prov = run_claude("DEEPSEEK", prompt, root, logfile, STEP_TIMEOUT)["_provenance"]
     elif agent == "GROK":
         run_cursor_agent(prompt, root, logfile, STEP_TIMEOUT, GROK_MODEL)
+        prov["requested"] = GROK_MODEL
     elif agent == "CURSOR":
         run_cursor_agent(prompt, root, logfile, STEP_TIMEOUT, CURSOR_REVIEW_MODEL)
+        prov["requested"] = CURSOR_REVIEW_MODEL
     else:
         raise SystemExit(f"no runner for reviewer {agent!r}")
-    if not path.exists() or not SEVERITY_RE.search(path.read_text(encoding="utf-8")):
-        raise SystemExit(f"{agent} did not write a review with findings at {path}; see {logfile}")
-    rel = str(path.relative_to(root))
+    if not path.exists():
+        raise SystemExit(f"{agent} did not write {path}; see {logfile}")
+    err = validate_review(path.read_text(encoding="utf-8"))
+    if err:
+        raise SystemExit(f"{agent} review is unfinished ({err}); see {logfile}")
     extra = unexpected_changes(root, {rel, "CHANGELOG.md"})
     if extra:
         raise SystemExit(f"{agent} changed files outside its review: {extra}")
+    (LOG_DIR / f"r{n}-{agent.lower()}.provenance.json").write_text(json.dumps(prov, indent=2), encoding="utf-8")
     commit_and_push(root, [rel, "CHANGELOG.md"], f"{agent}: FuelBuddy spec review round {n}")
+    return prov
 
 
-def do_consolidation(n: int, reviewers: list[str], converged: bool, root: Path) -> None:
+def do_consolidation(n: int, reviewers: list[str], converged: bool, root: Path,
+                     provenance: dict | None = None) -> None:
     path = round_dir(n) / "CONSOLIDATION.md"
+    rel_all = [str(p.relative_to(root)) for p in (path, SPEC, README)] + ["CHANGELOG.md"]
     if path.exists():
-        log(f"round {n}: consolidation already there, skipping")
+        if is_pushed(root, rel_all[0]):
+            log(f"round {n}: consolidation complete and pushed, skipping")
+        else:
+            log(f"round {n}: consolidation written but not pushed, resuming at commit/push")
+            assert_clean(root, set(rel_all))
+            commit_and_push(root, rel_all, f"CLAUDE: consolidate FuelBuddy round {n} into spec v{spec_version()}")
         return
+    assert_clean(root)
     before = spec_version()
     log(f"round {n}: CLAUDE consolidating (spec v{before})")
     logfile = LOG_DIR / f"r{n}-claude.log"
-    run_claude("ANTHROPIC", consolidation_prompt(n, reviewers, converged), root, logfile, STEP_TIMEOUT)
+    run_claude("ANTHROPIC", consolidation_prompt(n, reviewers, converged, provenance), root, logfile, STEP_TIMEOUT)
     if not path.exists():
         raise SystemExit(f"CLAUDE did not write {path}; see {logfile}")
     if spec_version() == before:
@@ -516,6 +610,11 @@ def main() -> None:
     reviewers = parse_reviewers(opts.reviewers)
     root = repo_root()
     LOG_DIR.mkdir(exist_ok=True)
+    lock = open(LOG_DIR / ".loop.lock", "w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        raise SystemExit("another review loop is already running (automation/logs/.loop.lock)")
     if opts.preflight:
         preflight(root, reviewers, not opts.skip_consolidator)
         return
@@ -523,15 +622,16 @@ def main() -> None:
     ensure_branch(root)
     for _ in range(opts.max_rounds):
         n = current_round()
+        provenance = {}
         for agent in reviewers:
-            do_review(agent, n, root)
+            provenance[agent] = do_review(agent, n, root)
         totals = {"blocking": 0, "major": 0, "minor": 0}
         for agent in reviewers:
             for k, v in severity_counts(round_dir(n) / f"{agent}.md").items():
                 totals[k] += v
         converged = totals["blocking"] == 0 and totals["major"] == 0
         log(f"round {n}: {totals['blocking']} blocking, {totals['major']} major, {totals['minor']} minor")
-        do_consolidation(n, reviewers, converged, root)
+        do_consolidation(n, reviewers, converged, root, provenance)
         if converged:
             log(f"converged at round {n}: spec v{spec_version()}")
             return
