@@ -5,6 +5,7 @@ Decisions made by HUMAN. A decision listed here is **settled**: reviewers must n
 | ID | Decision | Date | Decided by |
 | --- | --- | --- | --- |
 | FB-D1 | **The MVP market is Europe.** Clarified the same day: Europe means the EU/EEA **plus the UK and Switzerland**, and generally **all countries that have an API**. | 2026-10-14 | HUMAN |
+| FB-D2 | **Approved with amendments:** the proposed clearance semantics of §5 stand (restrictions are cleared only by evidence and an authorized actor, never by time, a missing warning or a later successful session), amended as in the FB-D2 notes below. | 2026-10-14 | HUMAN |
 | FB-D7 | **Option A:** ship the documented ordering (ordinary causes first, specificity gated as in §6.2). Calibrated base rates stay deferred to §6.3; ranking is not blocked until calibration. | 2026-10-14 | HUMAN |
 
 ## Notes for the consolidator on FB-D1
@@ -23,3 +24,25 @@ HUMAN gave the decision as "Europe" only. Do not invent more precision than that
 - Replace the FB-D7 "Pending HUMAN decision" passage in §6.2 with the Option A text as the settled design, and remove FB-D7 from the carried-forward open list.
 - Keep the calibration work in §6.3 as planned follow-up, and keep the release-gate wording consistent with a documented, not yet calibrated, ordering. Do not add calibrated numbers or sources that nobody has provided.
 - D6 of round 2 (ordinary-cause ordering) referred to FB-D7; re-check that reference now reads as settled.
+
+## Notes for the consolidator on FB-D2
+
+Replace the FB-D2 "Pending HUMAN decision" passages (§4.4 `restriction` enum, §5 clearance semantics) with the settled text, apply these amendments, and remove FB-D2 from the carried-forward open list:
+
+1. **Fail closed on unknowns.** `other`, or any restriction value without a human-approved mapping, behaves as `do_not_charge` until a reviewed mapping exists. Free text is never read to infer a milder behaviour.
+2. **Authorized actor per class.** Recall restriction: cleared only by an authority or OEM source showing that campaign completed (VIN-level lookup or remedy record), never by driver statement. Damaged or faulted charging equipment: cleared by the operator or site owner, or their status feed. Vehicle high-voltage fault or fire/thermal event: cleared by qualified service or an OEM-authorized inspection.
+3. **Users can raise, not clear.** A driver report can raise a restriction. Self-clearing is out of MVP scope.
+4. **Scope.** Equipment-scoped restrictions (charger, connector) stay with that equipment and do not block the vehicle elsewhere. Vehicle-scoped and campaign-scoped restrictions follow the vehicle. When restrictions conflict, the most restrictive wins.
+5. **Equipment restrictions get a re-verification prompt, not an expiry.** After a period HUMAN approves, advice to other drivers downgrades to "unverified, last reported on <date>, check the operator". The restriction is never cleared by time alone. The period is an open parameter: list it as a question for HUMAN and do not invent a number.
+
+Restriction values map to driver-facing behaviour as follows:
+
+| Value | Driver-facing behaviour |
+| --- | --- |
+| `none` | Normal flow with the usual bounded approved actions |
+| `do_not_charge` | No retry or alternate-charging advice; show the exact approved text; escalate to OEM or service |
+| `charge_limited` | Only the approved limited-charging instructions as published; nothing else |
+| `do_not_charge_indoor` | Outdoor-only guidance with the approved warning |
+| `other` or unmapped | Treated as `do_not_charge` (amendment 1) |
+
+Emergency numbers stay reviewed per-country configuration (EU/EEA, UK, Switzerland); do not hard-code them. The wording of this safety policy should get legal review, together with FB-D4; that is not a blocker for the loop.
