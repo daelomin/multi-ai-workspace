@@ -7,6 +7,7 @@ Decisions made by HUMAN. A decision listed here is **settled**: reviewers must n
 | FB-D1 | **The MVP market is Europe.** Clarified the same day: Europe means the EU/EEA **plus the UK and Switzerland**, and generally **all countries that have an API**. | 2026-10-14 | HUMAN |
 | FB-D2 | **Approved with amendments:** the proposed clearance semantics of §5 stand (restrictions are cleared only by evidence and an authorized actor, never by time, a missing warning or a later successful session), amended as in the FB-D2 notes below. | 2026-10-14 | HUMAN |
 | FB-D3 | **Approved as recommended, simplified.** (1) The app never originates a "press the station's emergency stop" instruction. (2) A stuck connector after charging gets an OEM-sourced playbook. (3) Every session screens for hazards. See the FB-D3 notes below. | 2026-10-14 | HUMAN |
+| FB-D5 | **Approved as recommended:** when package validity cannot be established, the app degrades by risk (see the FB-D5 notes below); stale data never makes it more permissive than fresh data. | 2026-10-14 | HUMAN |
 | FB-D7 | **Option A:** ship the documented ordering (ordinary causes first, specificity gated as in §6.2). Calibrated base rates stay deferred to §6.3; ranking is not blocked until calibration. | 2026-10-14 | HUMAN |
 
 ## Notes for the consolidator on FB-D1
@@ -57,3 +58,19 @@ Replace the FB-D3 "Pending HUMAN decision" passage in §4.7 with the settled tex
 3. **Hazard screening.** Every session begins with a hazard screening question (smoke, sparks, melted or burnt parts, burning smell). A yes goes straight to the emergency message. The same check runs on free-text and voice input. A photo can at most raise a hazard hint that becomes a question to the driver, never a conclusion. Fault codes from a station feed (for example OCPP `GroundFailure`, `OverCurrentFailure`, `HighTemperature`) are not by themselves evidence of fire (§5).
 4. Do not treat the app as a smoke or fire detector anywhere in the spec; check the wording of §5 so its "observation" rows are visibly driver-reported or feed-reported.
 5. The emergency-message wording should get legal review together with FB-D4; that is not a blocker for the loop.
+
+## Notes for the consolidator on FB-D5
+
+Replace the FB-D5 reference in the §12 offline/failure row, and add the settled behaviour where the spec describes cached knowledge packages. Remove FB-D5 from the carried-forward open list.
+
+Principle: stale or unverifiable data must never make the app more permissive than verified data would.
+
+| Cached content | Behaviour when validity cannot be established |
+| --- | --- |
+| Safety rules and the hazard message | Always available and always shown; they are conservative, so staleness cannot make them more dangerous. |
+| Restrictions and recall campaigns | Known restrictions stay in force and are never cleared offline. Show "last checked <date>". A missing or old recall status is never treated as "no recall" (it stays `unknown`). |
+| Approved diagnostic playbooks | Available with a visible "may be out of date, last updated <date>" notice; only bounded approved actions with fixed retry limits. |
+| Items marked withdrawn or superseded | Not shown once the app knows. When it cannot know, show as "unverified", not as current guidance. |
+| LLM-written explanations | Not available offline; fall back to the approved rendered text (§9). |
+
+A package that is merely old keeps working with the notice. A package older than a hard limit is restricted to safety content plus a plain "update when you have signal" message. **The hard limit is an open parameter for HUMAN: list it as a question, do not invent a number.** Also record that weak connectivity is common at charging sites, so a hard block on "cannot verify" is not acceptable behaviour.

@@ -301,3 +301,11 @@
 **Change:** Recorded FB-D3: the app never originates an emergency-stop instruction; hazard handling is driven by what the driver (or an operator feed) reports; add an OEM-sourced stuck-connector playbook; add a hazard screening question at the start of every session. Recorded on HUMAN's "continue" after the recommendation was presented. `spec.md` unchanged until the next consolidation.
 **Remaining:** FB-D4–FB-D6 open. Round 3 not yet run.
 **Verification:** Document-only edit.
+
+
+## 2026-10-14 — HUMAN decision FB-D5: approved as recommended
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-diagnostic/decisions.md`, `CHANGELOG.md`
+**Change:** Recorded FB-D5: offline/unverifiable-package behaviour degrades by risk (safety content always available, restrictions never cleared offline, playbooks with a staleness notice, withdrawn items shown as unverified, LLM explanations unavailable offline). The hard staleness limit is left as an open question for HUMAN. `spec.md` unchanged until the next consolidation.
+**Remaining:** FB-D4 and FB-D6 (legal) open. Round 3 not yet run.
+**Verification:** Document-only edit.
