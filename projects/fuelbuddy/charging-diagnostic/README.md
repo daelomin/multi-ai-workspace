@@ -4,14 +4,15 @@ This folder holds the **FuelBuddy AI Charging Diagnostic System** specification 
 
 ## Current round
 
-**Round 2** — reviewing `spec.md` **v0.3**. Reviews go in `reviews/round-2/`.
-Round 1 ran on v0.2 (CLAUDE, CHATGPT, DEEPSEEK; consensus in `reviews/round-1/CONSOLIDATION.md`).
+**Round 3** — reviewing `spec.md` **v0.4**. Reviews go in `reviews/round-3/`.
+Round 1 ran on v0.2 (CLAUDE, CHATGPT, DEEPSEEK; consensus in `reviews/round-1/CONSOLIDATION.md`). Round 2 ran on v0.3 (CHATGPT, DEEPSEEK, GROK; consensus in `reviews/round-2/CONSOLIDATION.md`, which also carries the open HUMAN decisions FB-D1 … FB-D7).
 *(Updated by CLAUDE at each consolidation.)*
 
 | File | What it is |
 |---|---|
-| `spec.md` | The specification. **Current version: v0.3** (11 October 2026). v0.2 was supplied by HUMAN; v0.3 is CLAUDE's round-1 consolidation. Only CLAUDE edits it, when consolidating a round. |
+| `spec.md` | The specification. **Current version: v0.4** (14 October 2026). v0.2 was supplied by HUMAN; v0.3 and v0.4 are CLAUDE's round-1 and round-2 consolidations. Only CLAUDE edits it, when consolidating a round. |
 | `reviews/round-N/<AGENT>.md` | One review per AI per round. Each AI writes only its own file. |
+| `decisions.md` | Decisions HUMAN has settled (FB-D ids). Reviewers treat them as fixed; CLAUDE applies them to `spec.md` at the next consolidation. |
 | `reviews/round-N/CONSOLIDATION.md` | CLAUDE's merge of round N: what was accepted, what changed, and the conflicts HUMAN must decide. |
 
 ## How a round works
@@ -64,6 +65,25 @@ If you were sent here with the standard prompt, follow these steps.
    - If you cannot: output the whole review as one Markdown document starting with `# <AGENT> review — round N`, so HUMAN can add it.
 
 **CURSOR** has a narrower role (see `agents/CURSOR.md`: no external research): its review checks internal consistency only — section cross-references, field names used in one section but not defined in another, enum values that differ between sections, schema gaps.
+
+## Automated loop (HUMAN's laptop)
+
+From round 2 the rounds run unattended with `automation/review_loop.py`. The reviewers are **CHATGPT**, **DEEPSEEK** and **GROK** (**CURSOR** optional, consistency only); **CLAUDE** consolidates. One round is:
+
+1. **CHATGPT** reviews through the Codex CLI (`codex exec`) and writes `reviews/round-N/CHATGPT.md`.
+2. **DEEPSEEK** reviews through Claude Code pointed at the DeepSeek API, model `deepseek-v4-pro` (the script checks the model actually used). Its prompt says explicitly *"You are DEEPSEEK"*, since it runs inside Claude Code.
+3. **GROK** reviews through the Cursor agent CLI (`agent`/`cursor-agent -p`), model `grok-4.7-high` (override with `GROK_MODEL`). Its prompt says explicitly *"You are GROK"*; it signs as GROK, never CURSOR (`agents/GROK.md`).
+4. **CLAUDE** consolidates through Claude Code on Anthropic, model `claude-sonnet-5-5`: `CONSOLIDATION.md`, the next `spec.md` version and the *Current round* line above.
+
+The script commits each file as `<AGENT>: …` on the branch `agent/loop/fuelbuddy-review` and pushes after every step, so the relay passes through GitHub. It stops when a round has no `blocking` or `major` finding (the stop rule), or after `--max-rounds` rounds (default 5). A step is skipped only when its file is complete (it ends with `Result: complete`, and has findings or `Findings: none`) and is pushed; a complete but unpushed file resumes at the push, and an unfinished file stops the loop for inspection. Only one loop runs at a time, and the working tree and index must be clean before each step. Tests: `python3 -m unittest discover -s projects/fuelbuddy/charging-diagnostic/automation/tests`. HUMAN decisions are not waited for during the loop: they stay in the carried-forward FB-D list, and reviewers must not re-raise them as `blocking`/`major`. HUMAN merges the branch's pull request at the end.
+
+```bash
+cd ~/GIT/multi-ai-workspace
+python3 projects/fuelbuddy/charging-diagnostic/automation/review_loop.py --preflight   # probe the backends; add --reviewers GROK --skip-consolidator to test Grok alone
+python3 projects/fuelbuddy/charging-diagnostic/automation/review_loop.py
+```
+
+Setup: the DeepSeek key is read from `DEEPSEEK_API_KEY` or from `~/.claude/settings.json`. When `~/.claude/settings.json` points Claude Code at DeepSeek, CLAUDE runs from a separate profile, `~/.claude-anthropic` (log in once with `CLAUDE_CONFIG_DIR=~/.claude-anthropic claude`, then `/login`). Logs go to `automation/logs/` (not committed).
 
 ## Standard prompt (HUMAN)
 
