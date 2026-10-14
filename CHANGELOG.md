@@ -269,3 +269,11 @@
 **Change:** Recorded HUMAN's decision FB-D1 ("The MVP market is Europe") in a new `decisions.md`. Review and consolidation prompts now tell reviewers to treat listed decisions as settled and CLAUDE to apply them to `spec.md` at the next consolidation, without inventing precision HUMAN did not give (EU vs EEA/UK stays an open question). `spec.md` is not edited by hand; it still shows FB-D1 as pending until round 3 consolidates.
 **Remaining:** FB-D2–FB-D7 still open; FB-D4 (legal basis) is not settled by this decision. Round 3 not yet run.
 **Verification:** 21 tests pass; both prompts reference `decisions.md`.
+
+
+## 2026-10-14 — FB-D1 clarified: UK, Switzerland and every country with an API
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-diagnostic/decisions.md`, `CHANGELOG.md`
+**Change:** HUMAN clarified FB-D1: Europe = EU/EEA plus the UK and Switzerland, and generally all countries that have an API. Recorded in `decisions.md` with consolidator notes: "has an API" is the inclusion rule; which API, launch order and handling of countries without one stay open questions for HUMAN.
+**Remaining:** FB-D2–FB-D7 open. Round 3 not yet run.
+**Verification:** Document-only edit.

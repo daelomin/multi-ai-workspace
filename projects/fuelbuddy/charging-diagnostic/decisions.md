@@ -4,13 +4,15 @@ Decisions made by HUMAN. A decision listed here is **settled**: reviewers must n
 
 | ID | Decision | Date | Decided by |
 | --- | --- | --- | --- |
-| FB-D1 | **The MVP market is Europe.** | 2026-10-14 | HUMAN |
+| FB-D1 | **The MVP market is Europe.** Clarified the same day: Europe means the EU/EEA **plus the UK and Switzerland**, and generally **all countries that have an API**. | 2026-10-14 | HUMAN |
 
 ## Notes for the consolidator on FB-D1
 
 HUMAN gave the decision as "Europe" only. Do not invent more precision than that:
 
 - Apply it where the spec depends on the market (§1.1 scope; in-scope connector types; the recall/safety source class; seed sources and examples, which are US today; the privacy frame in §10 as a *proposal* for FB-D4).
-- Where the exact boundary matters (EU only, EEA, UK, which countries first), list it as a new open question for HUMAN instead of choosing.
-- Keep North America out of MVP scope; it may stay as a later-phase record set.
+- Scope in HUMAN's words: the EU/EEA, the UK and Switzerland, and generally every country that has an API. Treat "has an API" as the inclusion rule for a country, not a fixed list.
+- HUMAN did not say *which* API makes a country eligible (for example public recall/safety data, charge-point status or location data). Do not choose: list it as an open question for HUMAN, and do not name specific APIs or endpoints you cannot source.
+- Which countries launch first, and whether a country without a usable API is excluded or served in a reduced mode, are also open questions for HUMAN.
+- Keep North America out of MVP scope; it may stay as a later-phase record set. A multi-country scope means the spec cannot assume one regulator, one recall source or one legal frame; surface that as a consequence.
 - FB-D4 (legal basis, DPIA, processor agreement) is **not** settled by this decision and still needs legal review.
