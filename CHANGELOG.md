@@ -293,3 +293,11 @@
 **Change:** Recorded HUMAN's decision FB-D2 (safety clearance semantics approved with five amendments: fail closed on unknown restrictions, authorized actor per class, users can raise but not clear, per-scope restrictions with most-restrictive-wins, re-verification prompt instead of expiry) with the restriction-to-behaviour mapping. `spec.md` unchanged until the next consolidation. The re-verification period is left as an open question for HUMAN.
 **Remaining:** FB-D3–FB-D6 open. Round 3 not yet run.
 **Verification:** Document-only edit.
+
+
+## 2026-10-14 — HUMAN decision FB-D3: approved as recommended, simplified
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-diagnostic/decisions.md`, `CHANGELOG.md`
+**Change:** Recorded FB-D3: the app never originates an emergency-stop instruction; hazard handling is driven by what the driver (or an operator feed) reports; add an OEM-sourced stuck-connector playbook; add a hazard screening question at the start of every session. Recorded on HUMAN's "continue" after the recommendation was presented. `spec.md` unchanged until the next consolidation.
+**Remaining:** FB-D4–FB-D6 open. Round 3 not yet run.
+**Verification:** Document-only edit.

@@ -6,6 +6,7 @@ Decisions made by HUMAN. A decision listed here is **settled**: reviewers must n
 | --- | --- | --- | --- |
 | FB-D1 | **The MVP market is Europe.** Clarified the same day: Europe means the EU/EEA **plus the UK and Switzerland**, and generally **all countries that have an API**. | 2026-10-14 | HUMAN |
 | FB-D2 | **Approved with amendments:** the proposed clearance semantics of §5 stand (restrictions are cleared only by evidence and an authorized actor, never by time, a missing warning or a later successful session), amended as in the FB-D2 notes below. | 2026-10-14 | HUMAN |
+| FB-D3 | **Approved as recommended, simplified.** (1) The app never originates a "press the station's emergency stop" instruction. (2) A stuck connector after charging gets an OEM-sourced playbook. (3) Every session screens for hazards. See the FB-D3 notes below. | 2026-10-14 | HUMAN |
 | FB-D7 | **Option A:** ship the documented ordering (ordinary causes first, specificity gated as in §6.2). Calibrated base rates stay deferred to §6.3; ranking is not blocked until calibration. | 2026-10-14 | HUMAN |
 
 ## Notes for the consolidator on FB-D1
@@ -46,3 +47,13 @@ Restriction values map to driver-facing behaviour as follows:
 | `other` or unmapped | Treated as `do_not_charge` (amendment 1) |
 
 Emergency numbers stay reviewed per-country configuration (EU/EEA, UK, Switzerland); do not hard-code them. The wording of this safety policy should get legal review, together with FB-D4; that is not a blocker for the loop.
+
+## Notes for the consolidator on FB-D3
+
+Replace the FB-D3 "Pending HUMAN decision" passage in §4.7 with the settled text and remove FB-D3 from the carried-forward open list.
+
+1. **No emergency-stop instruction from the app.** The app has no sensor on the charger; a hazard reaches it only through what the driver reports (typed or spoken text, an intake answer, a photo hint) or through an operator or station fault feed. When the driver reports smoke, sparks, burning, or melted or burnt parts, the app stops troubleshooting and shows the approved §5 message (move away, keep others clear, contact local emergency services, do not touch the equipment). It does not originate advice to use a physical emergency control. It may display an instruction that the station operator has published and the registry has approved, as operator-originated guidance.
+2. **Stuck connector.** Add a playbook for a connector that will not release after charging. Every action comes from an OEM or standards source with `evidence_ids`, like any other playbook; it never advises forcing the plug or pulling the cable. When the OEM publishes no procedure, the app says so and escalates to the operator or roadside assistance instead of improvising.
+3. **Hazard screening.** Every session begins with a hazard screening question (smoke, sparks, melted or burnt parts, burning smell). A yes goes straight to the emergency message. The same check runs on free-text and voice input. A photo can at most raise a hazard hint that becomes a question to the driver, never a conclusion. Fault codes from a station feed (for example OCPP `GroundFailure`, `OverCurrentFailure`, `HighTemperature`) are not by themselves evidence of fire (§5).
+4. Do not treat the app as a smoke or fire detector anywhere in the spec; check the wording of §5 so its "observation" rows are visibly driver-reported or feed-reported.
+5. The emergency-message wording should get legal review together with FB-D4; that is not a blocker for the loop.
