@@ -12,6 +12,7 @@ Round 1 ran on v0.2 (CLAUDE, CHATGPT, DEEPSEEK; consensus in `reviews/round-1/CO
 |---|---|
 | `spec.md` | The specification. **Current version: v0.4** (14 October 2026). v0.2 was supplied by HUMAN; v0.3 and v0.4 are CLAUDE's round-1 and round-2 consolidations. Only CLAUDE edits it, when consolidating a round. |
 | `reviews/round-N/<AGENT>.md` | One review per AI per round. Each AI writes only its own file. |
+| `decisions.md` | Decisions HUMAN has settled (FB-D ids). Reviewers treat them as fixed; CLAUDE applies them to `spec.md` at the next consolidation. |
 | `reviews/round-N/CONSOLIDATION.md` | CLAUDE's merge of round N: what was accepted, what changed, and the conflicts HUMAN must decide. |
 
 ## How a round works

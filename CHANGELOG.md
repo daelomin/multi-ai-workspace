@@ -261,3 +261,11 @@
 **Change:** Each Codex review now logs requests, input/cached/fresh/output tokens, largest request vs context window, and estimated cost summed per request (standard or Fast tier prices for gpt-6.1-sol, long-context tier reported as an upper bound; usage JSON saved). `CODEX_SERVICE_TIER=fast` and `FAST=1` in the launcher select Codex Fast and Grok 4.7 high-fast. The Grok runner now writes to its log live. The slow first pass of round 2 (CHATGPT and DEEPSEEK, commits 8fb57e5 and c3d2b46) was moved to `reviews/round-2-pass1/` so round 2 can be rerun on fast settings; it stays for comparison and is not read by the loop.
 **Remaining:** Rerun round 2 with FAST=1; compare pass 1 vs pass 2. Whether `service_tier="fast"` actually engages the Fast tier is unverified (Codex accepts it silently, session files do not record the tier).
 **Verification:** `python3 -m unittest discover -s tests`: 21 passed. Cost formula reproduces the 11:09 CHATGPT session ($0.204 standard-tier estimate).
+
+
+## 2026-10-14 — HUMAN decision FB-D1: MVP market is Europe
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-diagnostic/decisions.md`, `projects/fuelbuddy/charging-diagnostic/README.md`, `projects/fuelbuddy/charging-diagnostic/automation/review_loop.py`, `CHANGELOG.md`
+**Change:** Recorded HUMAN's decision FB-D1 ("The MVP market is Europe") in a new `decisions.md`. Review and consolidation prompts now tell reviewers to treat listed decisions as settled and CLAUDE to apply them to `spec.md` at the next consolidation, without inventing precision HUMAN did not give (EU vs EEA/UK stays an open question). `spec.md` is not edited by hand; it still shows FB-D1 as pending until round 3 consolidates.
+**Remaining:** FB-D2–FB-D7 still open; FB-D4 (legal basis) is not settled by this decision. Round 3 not yet run.
+**Verification:** 21 tests pass; both prompts reference `decisions.md`.

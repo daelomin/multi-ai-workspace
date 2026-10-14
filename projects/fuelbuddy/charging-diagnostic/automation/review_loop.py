@@ -86,6 +86,7 @@ Automated loop rules (they override anything in the README about git or pull req
 same format as the existing entries, Agent: {agent}). Do not edit spec.md or any other file.
 - Do not run git, do not create branches, do not open pull requests: the loop commits and \
 pushes your files for you as "{agent}: FuelBuddy spec review round {n}".
+- Read projects/fuelbuddy/charging-diagnostic/decisions.md: decisions listed there are SETTLED by HUMAN. Treat them as fixed; do not re-open them and do not review the spec's remaining 'Pending HUMAN decision' text for them.
 - HUMAN is not answering during the loop. Items already listed as open HUMAN decisions in \
 the previous CONSOLIDATION.md must not be raised again as blocking or major findings; \
 comment on them only if you have new evidence, as a `question` of severity `minor`.
@@ -554,6 +555,9 @@ def consolidation_prompt(n: int, reviewers: list[str], converged: bool, provenan
         f"version (bump the version line and date). Keep open HUMAN decisions in one carried-forward "
         f"list with their FB-D ids; HUMAN is not answering during the automated loop, so do not wait "
         f"for decisions and do not decide them yourself. {final}\n\n"
+        f"Read {REL_PROJECT}/decisions.md: every decision listed there is settled by HUMAN. Apply it to spec.md "
+        "(replace the matching 'Pending HUMAN decision' passage, adjust the affected sections) and remove it from "
+        "the carried-forward open list; follow its notes and do not invent detail HUMAN did not give. "
         "Also add a CHANGELOG.md entry at the top (Agent: CLAUDE). Do not run git: the loop commits "
         "and pushes for you. Only edit spec.md, README.md, CHANGELOG.md and the CONSOLIDATION.md file."
         + prov_lines
