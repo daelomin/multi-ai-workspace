@@ -22,6 +22,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -51,9 +52,13 @@ CURSOR_AGENT_BIN = os.environ.get(
     "CURSOR_AGENT_BIN", shutil.which("cursor-agent") or shutil.which("agent") or "cursor-agent"
 )
 STEP_TIMEOUT = int(os.environ.get("REVIEW_STEP_TIMEOUT", str(90 * 60)))
-CODEX_EXTRA_ARGS = os.environ.get(
-    "CODEX_EXTRA_ARGS", "-c sandbox_workspace_write.network_access=true"
-).split()
+CODEX_EXTRA_ARGS = shlex.split(
+    os.environ.get("CODEX_EXTRA_ARGS", "-c sandbox_workspace_write.network_access=true")
+)
+DEEPSEEK_FALLBACK_MODEL = "deepseek-chat"
+# Without served-model telemetry (empty modelUsage) a DeepSeek review is "unverified";
+# unattended runs must opt in to that explicitly.
+DEEPSEEK_ACCEPT_UNVERIFIED = os.environ.get("DEEPSEEK_ACCEPT_UNVERIFIED") == "1"
 
 KNOWN_REVIEWERS = {"CHATGPT", "DEEPSEEK", "GROK", "CURSOR"}
 SEVERITY_RE = re.compile(r"\*\*Severity:\*\*\s*\**\s*(blocking|major|minor)", re.I)
@@ -82,8 +87,9 @@ def log(msg: str) -> None:
 
 def run(cmd: list[str], cwd: Path | None = None, env: dict | None = None,
         check: bool = True, capture: bool = True, timeout: int | None = None) -> subprocess.CompletedProcess:
+    # stdin=DEVNULL: `codex exec` waits for piped stdin to EOF, which hangs an unattended run.
     res = subprocess.run(cmd, cwd=cwd, env=env, text=True, timeout=timeout,
-                         capture_output=capture)
+                         capture_output=capture, stdin=subprocess.DEVNULL)
     if check and res.returncode != 0:
         raise SystemExit(f"command failed ({res.returncode}): {' '.join(cmd)}\n"
                          f"{res.stdout or ''}\n{res.stderr or ''}")
@@ -196,8 +202,8 @@ def models_used(result: dict) -> list[str]:
     return sorted((result.get("modelUsage") or {}).keys())
 
 
-def run_claude(profile: str, prompt: str, root: Path, logfile: Path, timeout: int) -> dict:
-    """Run Claude Code headless with the DEEPSEEK or ANTHROPIC profile; return its JSON result."""
+def _claude_once(profile: str, prompt: str, root: Path, logfile: Path, timeout: int,
+                 model: str) -> tuple[dict | None, subprocess.CompletedProcess]:
     env = clean_env(keep_api_key=profile != "DEEPSEEK")
     args = ["claude", "-p", prompt, "--output-format", "json",
             "--permission-mode", "acceptEdits",
@@ -208,53 +214,107 @@ def run_claude(profile: str, prompt: str, root: Path, logfile: Path, timeout: in
         key = deepseek_key()
         if not key:
             raise SystemExit("no DeepSeek key: set DEEPSEEK_API_KEY or keep it in ~/.claude/settings.json")
+        small = os.environ.get("DEEPSEEK_SMALL_MODEL", "deepseek-flash")
+        if model == DEEPSEEK_FALLBACK_MODEL:
+            small = DEEPSEEK_FALLBACK_MODEL
         # Flag settings take precedence over ~/.claude/settings.json.
         tmp = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
         json.dump({"env": {
             "ANTHROPIC_BASE_URL": DEEPSEEK_BASE_URL,
             "ANTHROPIC_AUTH_TOKEN": key,
-            "ANTHROPIC_MODEL": DEEPSEEK_MODEL,
-            "ANTHROPIC_DEFAULT_HAIKU_MODEL": os.environ.get("DEEPSEEK_SMALL_MODEL", "deepseek-flash"),
-            "CLAUDE_CODE_SUBAGENT_MODEL": os.environ.get("DEEPSEEK_SMALL_MODEL", "deepseek-flash"),
+            "ANTHROPIC_MODEL": model,
+            "ANTHROPIC_DEFAULT_HAIKU_MODEL": small,
+            "CLAUDE_CODE_SUBAGENT_MODEL": small,
         }}, tmp)
         tmp.close()
         os.chmod(tmp.name, 0o600)
-        args += ["--settings", tmp.name, "--model", DEEPSEEK_MODEL]
+        args += ["--settings", tmp.name, "--model", model]
     else:
-        default_env = claude_settings(Path.home() / ".claude" / "settings.json").get("env", {})
-        if "ANTHROPIC_BASE_URL" in default_env or os.environ.get("ANTHROPIC_CLAUDE_CONFIG_DIR"):
-            env["CLAUDE_CONFIG_DIR"] = str(ANTHROPIC_CONFIG_DIR)
-            alt_env = claude_settings(ANTHROPIC_CONFIG_DIR / "settings.json").get("env", {})
-            if "ANTHROPIC_BASE_URL" in alt_env:
-                raise SystemExit(f"{ANTHROPIC_CONFIG_DIR}/settings.json sets ANTHROPIC_BASE_URL; "
-                                 "the consolidator must talk to Anthropic")
-        args += ["--model", CLAUDE_MODEL]
+        # Always the isolated Anthropic profile: never inherit a default profile that
+        # may point at another provider.
+        env["CLAUDE_CONFIG_DIR"] = str(ANTHROPIC_CONFIG_DIR)
+        alt_env = claude_settings(ANTHROPIC_CONFIG_DIR / "settings.json").get("env", {})
+        if "ANTHROPIC_BASE_URL" in alt_env:
+            raise SystemExit(f"{ANTHROPIC_CONFIG_DIR}/settings.json sets ANTHROPIC_BASE_URL; "
+                             "the consolidator must talk to Anthropic")
+        args += ["--model", model]
     try:
         res = run(args, cwd=root, env=env, check=False, timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        logfile.write_text(f"$ claude ({profile}) {model}\nTIMEOUT after {timeout}s\n--- stdout\n"
+                           f"{exc.stdout or ''}\n--- stderr\n{exc.stderr or ''}\n", encoding="utf-8")
+        raise SystemExit(f"claude ({profile}) timed out after {timeout}s; see {logfile}")
     finally:
         if tmp:
             os.unlink(tmp.name)
-    logfile.write_text(f"$ claude ({profile})\n--- stdout\n{res.stdout}\n--- stderr\n{res.stderr}\n",
-                       encoding="utf-8")
+    with logfile.open("a" if logfile.exists() and model == DEEPSEEK_FALLBACK_MODEL else "w",
+                      encoding="utf-8") as fh:
+        fh.write(f"$ claude ({profile}) requested={model}\n--- stdout\n{res.stdout}\n"
+                 f"--- stderr\n{res.stderr}\n")
     try:
-        result = json.loads(res.stdout)
+        return json.loads(res.stdout), res
     except ValueError:
+        return None, res
+
+
+def run_claude(profile: str, prompt: str, root: Path, logfile: Path, timeout: int) -> dict:
+    """Run Claude Code headless with the DEEPSEEK or ANTHROPIC profile; return its JSON result.
+
+    The result carries `_provenance`: requested model, reported model(s), and whether the
+    served model was verified by provider telemetry.
+    """
+    requested = DEEPSEEK_MODEL if profile == "DEEPSEEK" else CLAUDE_MODEL
+    result, res = _claude_once(profile, prompt, root, logfile, timeout, requested)
+    failed = result is None or result.get("is_error") or res.returncode != 0
+    if (failed and profile == "DEEPSEEK" and requested != DEEPSEEK_FALLBACK_MODEL
+            and "unrecognized_model" in (res.stdout + res.stderr)
+            and "Authentication Fails" not in res.stdout and '"api_error_status":401' not in res.stdout):
+        log(f"DeepSeek rejected model {requested!r}; retrying once with {DEEPSEEK_FALLBACK_MODEL!r}")
+        requested = DEEPSEEK_FALLBACK_MODEL
+        result, res = _claude_once(profile, prompt, root, logfile, timeout, requested)
+        failed = result is None or result.get("is_error") or res.returncode != 0
+    if result is None:
         raise SystemExit(f"claude ({profile}) gave no JSON result (exit {res.returncode}); see {logfile}")
-    if result.get("is_error") or res.returncode != 0:
+    if failed:
         raise SystemExit(f"claude ({profile}) failed: {str(result.get('result'))[:500]}; see {logfile}")
-    expected = DEEPSEEK_MODEL if profile == "DEEPSEEK" else CLAUDE_MODEL
-    used = models_used(result)
-    if not any(expected in m for m in used):
-        raise SystemExit(f"claude ({profile}) ran on {used}, expected {expected}; see {logfile}")
-    log(f"claude ({profile}) ok on {used}, cost ${result.get('total_cost_usd', 0):.2f}")
+    reported = models_used(result)
+    if reported and not any(requested in m for m in reported):
+        raise SystemExit(f"claude ({profile}) ran on {reported}, requested {requested}; see {logfile}")
+    verified = bool(reported)
+    if not verified:
+        if profile == "DEEPSEEK" and not DEEPSEEK_ACCEPT_UNVERIFIED:
+            raise SystemExit(
+                f"claude ({profile}) returned no served-model telemetry (empty modelUsage), so "
+                f"{requested!r} cannot be verified. If the DeepSeek routing is trusted, accept it "
+                f"explicitly with DEEPSEEK_ACCEPT_UNVERIFIED=1; see {logfile}")
+        log(f"WARNING claude ({profile}): served model UNVERIFIED (requested {requested})")
+    result["_provenance"] = {"profile": profile, "requested": requested,
+                             "reported": reported, "verified": verified}
+    log(f"claude ({profile}) ok requested={requested} reported={reported or 'unverified'}, "
+        f"cost ${result.get('total_cost_usd', 0):.2f}")
     return result
 
 
+def codex_args(prompt: str, root: Path, last: Path | None = None) -> list[str]:
+    """One command builder for preflight and review steps."""
+    if os.environ.get("CODEX_DANGEROUS_FULL_ACCESS") == "1":
+        log("WARNING: CODEX_DANGEROUS_FULL_ACCESS=1, Codex runs without sandbox or approvals")
+        mode = ["--dangerously-bypass-approvals-and-sandbox"]
+    else:
+        mode = ["--approve-for-me"]  # selects the workspace-write sandbox itself
+    out = ["--output-last-message", str(last)] if last else []
+    return ["codex", "exec", *mode, "--skip-git-repo-check", "-C", str(root), *out,
+            *CODEX_EXTRA_ARGS, prompt]
+
+
 def run_codex(prompt: str, root: Path, logfile: Path, timeout: int) -> None:
-    last = logfile.with_suffix(".last.md")
-    args = ["codex", "exec", "--full-auto", "--skip-git-repo-check", "-C", str(root),
-            "--output-last-message", str(last), *CODEX_EXTRA_ARGS, prompt]
-    res = run(args, cwd=root, check=False, timeout=timeout)
+    args = codex_args(prompt, root, logfile.with_suffix(".last.md"))
+    try:
+        res = run(args, cwd=root, check=False, timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        logfile.write_text(f"$ codex exec\nTIMEOUT after {timeout}s\n--- stdout\n{exc.stdout or ''}\n"
+                           f"--- stderr\n{exc.stderr or ''}\n", encoding="utf-8")
+        raise SystemExit(f"codex exec timed out after {timeout}s; see {logfile}")
     logfile.write_text(f"$ codex exec\n--- stdout\n{res.stdout}\n--- stderr\n{res.stderr}\n", encoding="utf-8")
     if res.returncode != 0:
         raise SystemExit(f"codex exec failed ({res.returncode}); see {logfile}")
@@ -378,23 +438,23 @@ def do_consolidation(n: int, reviewers: list[str], converged: bool, root: Path) 
     commit_and_push(root, rel, f"CLAUDE: consolidate FuelBuddy round {n} into spec v{spec_version()}")
 
 
-def probe_cursor_write(root: Path, model: str, name: str) -> None:
-    """Prove the Cursor agent can *write* a file headless, not just answer."""
+def probe_write(root: Path, name: str, runner) -> None:
+    """Prove a backend can *write* a file headless, not just answer. The orchestrator checks
+    the content and cleans up; the model never deletes its own evidence."""
     nonce = f"{name}-{int(time.time())}-{os.getpid()}"
     pdir = LOG_DIR / f"probe-{nonce}"
     pdir.mkdir(parents=True)
     target = pdir / "probe.txt"
+    logfile = LOG_DIR / f"preflight-{name.lower()}.log"
     try:
         rel = target.relative_to(root)
-        run_cursor_agent(f"Create the file {rel} containing exactly the text {nonce} and nothing "
-                         f"else. Do not touch any other file. Then stop.",
-                         root, LOG_DIR / f"preflight-{name.lower()}.log", 300, model)
+        runner(f"Create the file {rel} containing exactly the text {nonce} and nothing else. "
+               f"Do not touch any other file. Then stop.", logfile)
         if not target.exists() or target.read_text(encoding="utf-8").strip() != nonce:
-            raise SystemExit(f"{name} probe did not write the expected file; see "
-                             f"automation/logs/preflight-{name.lower()}.log")
+            raise SystemExit(f"{name} probe did not write the expected file; see {logfile}")
     finally:
         shutil.rmtree(pdir, ignore_errors=True)
-    log(f"{name} write probe ok on {model}")
+    log(f"{name} write probe ok")
 
 
 def preflight(root: Path, reviewers: list[str], with_consolidator: bool) -> None:
@@ -421,16 +481,11 @@ def preflight(root: Path, reviewers: list[str], with_consolidator: bool) -> None
     if with_consolidator:
         run_claude("ANTHROPIC", probe, root, LOG_DIR / "preflight-claude.log", 300)
     if "CHATGPT" in reviewers:
-        res = run(["codex", "exec", "--skip-git-repo-check", "-C", str(root), *CODEX_EXTRA_ARGS, probe],
-                  check=False, timeout=300)
-        (LOG_DIR / "preflight-codex.log").write_text(res.stdout + "\n" + res.stderr, encoding="utf-8")
-        if res.returncode != 0:
-            raise SystemExit("codex exec probe failed; see automation/logs/preflight-codex.log")
-        log("codex ok")
+        probe_write(root, "CHATGPT", lambda p, lf: run_codex(p, root, lf, 300))
     if "GROK" in reviewers:
-        probe_cursor_write(root, GROK_MODEL, "GROK")
+        probe_write(root, "GROK", lambda p, lf: run_cursor_agent(p, root, lf, 300, GROK_MODEL))
     if "CURSOR" in reviewers:
-        probe_cursor_write(root, CURSOR_REVIEW_MODEL, "CURSOR")
+        probe_write(root, "CURSOR", lambda p, lf: run_cursor_agent(p, root, lf, 300, CURSOR_REVIEW_MODEL))
     log("preflight passed")
 
 

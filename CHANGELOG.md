@@ -195,3 +195,11 @@
 **Change:** Added `run_cursor_agent` and a runner map (fixes the dispatcher that sent every non-CHATGPT reviewer to DeepSeek), reviewer-name validation, GROK/CURSOR identity prompts, default reviewers `CHATGPT,DEEPSEEK,GROK`, selected-backend preflight with a write probe, `agents/GROK.md`, README update, and the `run_review_loop.sh` launcher. Proposal D6/D11 (partial).
 **Remaining:** Codex `--full-auto` fix, DeepSeek model/identity hardening, resume safety, git worktree isolation, mocked tests.
 **Verification:** Live preflight `--reviewers GROK --skip-consolidator` passed on `grok-4.7-high` (nonce file written and verified). Reviewer validation checked with unknown and duplicate names. Codex and DeepSeek paths not exercised.
+
+
+## 2026-10-14 — Codex and DeepSeek fixes in the FuelBuddy review loop
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-diagnostic/automation/review_loop.py`, `CHANGELOG.md`
+**Change:** Codex: one shared `codex_args` builder (`--approve-for-me`, opt-in `CODEX_DANGEROUS_FULL_ACCESS`), timeout logging, `shlex` args. All subprocesses now run with `stdin=DEVNULL` (`codex exec` otherwise hangs waiting for piped stdin). DeepSeek: requested vs reported model recorded in `_provenance`, contradictory model fails, empty `modelUsage` needs `DEEPSEEK_ACCEPT_UNVERIFIED=1`, one retry with `deepseek-chat` on `unrecognized_model` (not on 401), Anthropic consolidator always uses `~/.claude-anthropic`. Write probes for all backends (nonce, orchestrator-verified). Proposal D1, D2, D4, D10.
+**Remaining:** DeepSeek preflight still fails with 401 using the key in `~/.claude/settings.json`; HUMAN must export a valid `DEEPSEEK_API_KEY`. Resume safety, git worktree, mocked tests, provenance in CONSOLIDATION.
+**Verification:** Live preflight passed for CHATGPT (write probe) and GROK; DeepSeek live probe returned 401 (invalid key), so the model/telemetry path is untested.
