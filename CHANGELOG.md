@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-14
+**Agent:** CLAUDE  
+**Files:** `projects/fuelbuddy/charging-diagnostic/spec.md`, `projects/fuelbuddy/charging-diagnostic/reviews/round-2/CONSOLIDATION.md`, `projects/fuelbuddy/charging-diagnostic/README.md`, `CHANGELOG.md`  
+**Change:** Consolidated FuelBuddy review round 2 (CHATGPT, DEEPSEEK, GROK; 18 raw findings → 17 items: 16 accepted, 1 partial, 0 rejected) and updated the spec v0.3 → v0.4. Three majors fixed: typed measurement identity (`measurement_kind`, location, aggregation, window), Plug & Charge stage order with a `communication_profile` and PWM-only AC path, and OCPP 2.0.1 `component`/`variable`/`tech_code` in the mapping key. Also added the post-matching safety pass, supersession direction, `incident_id`, ranking-policy contract, AFIR citations via Implementing Regulation (EU) 2025/655, control-pilot state E/F correction, and several consistency fixes. README now points to Round 3 on v0.4 with reviews in `reviews/round-3/`.  
+**Remaining:** Stop rule not met (three majors this round); round 3 reviews v0.4. FB-D1–FB-D7 stay open and are carried forward in the consolidation; none were decided. GROK served model is unverified (noted in the consolidation).  
+**Verification:** Edited text checked against the three round-2 reviews and the v0.3 spec; external claims (ISO 15118-2 sequence, OCPP 2.0.1, IEC 61851, Implementing Regulation 2025/655) are the GROK reviewer's, not re-fetched. No git commands.
+
+## 2026-10-14
 **Agent:** GROK  
 **Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-2/GROK.md`, `CHANGELOG.md`  
 **Change:** Reviewed local FuelBuddy spec v0.3 for round 2 after reading the round-1 reviews and consolidation. Recorded 3 major findings (Plug & Charge stage order reversed relative to the ISO 15118-2 sequence, and no PWM-only AC path; OCPP 2.0.1 mapping key still lacks component, variable, and tech code; measurement observations cannot carry the quantity and qualifier distinctions §5 and §6.4 require) and 2 minor findings (AFIR dates now confirmed in Implementing Regulation (EU) 2025/655, including a one-minute dynamic-update duty rather than "about a minute"; IEC 61851-1 state E, not state F, is the error state in a vendor summary). Did not re-raise FB-D1–FB-D7.  

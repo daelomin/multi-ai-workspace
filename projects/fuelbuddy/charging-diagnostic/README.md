@@ -4,13 +4,13 @@ This folder holds the **FuelBuddy AI Charging Diagnostic System** specification 
 
 ## Current round
 
-**Round 2** — reviewing `spec.md` **v0.3**. Reviews go in `reviews/round-2/`.
-Round 1 ran on v0.2 (CLAUDE, CHATGPT, DEEPSEEK; consensus in `reviews/round-1/CONSOLIDATION.md`).
+**Round 3** — reviewing `spec.md` **v0.4**. Reviews go in `reviews/round-3/`.
+Round 1 ran on v0.2 (CLAUDE, CHATGPT, DEEPSEEK; consensus in `reviews/round-1/CONSOLIDATION.md`). Round 2 ran on v0.3 (CHATGPT, DEEPSEEK, GROK; consensus in `reviews/round-2/CONSOLIDATION.md`, which also carries the open HUMAN decisions FB-D1 … FB-D7).
 *(Updated by CLAUDE at each consolidation.)*
 
 | File | What it is |
 |---|---|
-| `spec.md` | The specification. **Current version: v0.3** (11 October 2026). v0.2 was supplied by HUMAN; v0.3 is CLAUDE's round-1 consolidation. Only CLAUDE edits it, when consolidating a round. |
+| `spec.md` | The specification. **Current version: v0.4** (14 October 2026). v0.2 was supplied by HUMAN; v0.3 and v0.4 are CLAUDE's round-1 and round-2 consolidations. Only CLAUDE edits it, when consolidating a round. |
 | `reviews/round-N/<AGENT>.md` | One review per AI per round. Each AI writes only its own file. |
 | `reviews/round-N/CONSOLIDATION.md` | CLAUDE's merge of round N: what was accepted, what changed, and the conflicts HUMAN must decide. |
 
