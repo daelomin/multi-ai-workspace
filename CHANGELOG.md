@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-14
+**Agent:** GROK  
+**Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-2/GROK.md`, `CHANGELOG.md`  
+**Change:** Reviewed local FuelBuddy spec v0.3 for round 2 after reading the round-1 reviews and consolidation. Recorded 3 major findings (Plug & Charge stage order reversed relative to the ISO 15118-2 sequence, and no PWM-only AC path; OCPP 2.0.1 mapping key still lacks component, variable, and tech code; measurement observations cannot carry the quantity and qualifier distinctions §5 and §6.4 require) and 2 minor findings (AFIR dates now confirmed in Implementing Regulation (EU) 2025/655, including a one-minute dynamic-update duty rather than "about a minute"; IEC 61851-1 state E, not state F, is the error state in a vendor summary). Did not re-raise FB-D1–FB-D7.  
+**Remaining:** CLAUDE consolidates the round-2 findings; existing HUMAN decisions remain pending.  
+**Verification:** Stage order checked against the Typhoon HIL ISO 15118-2 sequence description; OCPP 2.0.1 fault identity checked against the Open Charge Alliance uptime white paper v1.2 (August 2024); AFIR dates checked against EUR-Lex text of Implementing Regulation (EU) 2025/655; control-pilot states checked against Beckhoff's IEC 61851 summary. ISO 15118-2, IEC 61851-1, and the AFIR base-regulation HTML were not opened. Review includes the required finding fields, Top 3, and `Result: complete`. Spec unchanged. No git commands, branch, or pull request.
+
+## 2026-10-14
 **Agent:** DEEPSEEK  
 **Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-2/DEEPSEEK.md`, `CHANGELOG.md`  
 **Change:** Reviewed local FuelBuddy spec v0.3 for round 2 after reading all round-1 reviews and the consolidation, plus the round-2 CHATGPT review. Found no new blocking or major findings; recorded 8 minor findings (wireless in the `charge_mode` enum vs §4.5's out-of-scope list; LLM input missing the evidence records §9.2's `evidence_id` check resolves against; `cause_id`/`candidate_id` naming drift; ranking dedup key's undefined `incident` field; §4.3 `station_observations` restating a second observation shape; §12 "fixtures above" dangling reference; §9.1 example missing subject fields and a differing `protocol_version` shape; leftover consolidation remediation notes in §4.4/§4.5). Endorsed CHATGPT-1 (major) and did not re-raise FB-D1–FB-D7 (no new external evidence).  
