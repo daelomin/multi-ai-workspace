@@ -163,12 +163,15 @@ class Provenance(unittest.TestCase):
         self.assertEqual(len(calls), 1)
 
 
+BRANCH = "agent/loop/fuelbuddy-review"
+
+
 class GitFlow(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         t = Path(self.tmp.name)
         self.origin, self.root = t / "origin.git", t / "work"
-        git(t, "init", "-q", "--bare", "-b", rl.BRANCH, str(self.origin))
+        git(t, "init", "-q", "--bare", "-b", BRANCH, str(self.origin))
         git(t, "clone", "-q", str(self.origin), str(self.root))
         git(self.root, "config", "user.email", "t@t")
         git(self.root, "config", "user.name", "t")
@@ -179,13 +182,9 @@ class GitFlow(unittest.TestCase):
         (self.root / "CHANGELOG.md").write_text("# c\n")
         git(self.root, "add", "-A")
         git(self.root, "commit", "-qm", "base")
-        git(self.root, "push", "-q", "-u", "origin", rl.BRANCH)
-        self.patches = [
-            mock.patch.object(rl, "PROJECT", self.proj),
-            mock.patch.object(rl, "SPEC", self.proj / "spec.md"),
-            mock.patch.object(rl, "LOG_DIR", self.proj / "automation/logs"),
-            mock.patch("time.sleep"),
-        ]
+        git(self.root, "push", "-q", "-u", "origin", BRANCH)
+        rl.configure(self.proj, name="FuelBuddy")
+        self.patches = [mock.patch("time.sleep")]
         for p in self.patches:
             p.start()
         self.rel = "projects/fuelbuddy/charging-diagnostic/reviews/round-2/GROK.md"
@@ -194,6 +193,28 @@ class GitFlow(unittest.TestCase):
         for p in self.patches:
             p.stop()
         self.tmp.cleanup()
+
+    def test_configure_defaults(self):
+        self.assertEqual(rl.BRANCH, BRANCH)
+        self.assertEqual(rl.REL_PROJECT, "projects/fuelbuddy/charging-diagnostic")
+        self.assertEqual(rl.LOG_DIR, (self.proj / "automation/logs").resolve())
+        rl.configure(self.proj)
+        self.assertEqual((rl.NAME, rl.BRANCH), ("fuelbuddy", BRANCH))
+        other = self.root / "specs" / "My Thing"
+        other.mkdir(parents=True)
+        rl.configure(other, branch="agent/loop/custom")
+        self.assertEqual((rl.NAME, rl.BRANCH, rl.REL_PROJECT), ("My Thing", "agent/loop/custom", "specs/My Thing"))
+        rl.configure(other)
+        self.assertEqual(rl.BRANCH, "agent/loop/my-thing-review")
+        with self.assertRaises(SystemExit):
+            rl.configure(self.root / "missing")
+
+    def test_decisions_rule_only_when_file_exists(self):
+        self.assertNotIn("decisions.md", rl.review_prompt("GROK", 2))
+        self.assertIn("FuelBuddy spec review round 2", rl.review_prompt("GROK", 2))
+        (self.proj / "decisions.md").write_text("# d\n")
+        self.assertIn("charging-diagnostic/decisions.md", rl.review_prompt("GROK", 2))
+        self.assertIn("decisions.md", rl.consolidation_prompt(2, ["GROK"], False))
 
     def test_pre_staged_unrelated_change_is_refused(self):
         (self.root / "other.txt").write_text("x")
@@ -237,9 +258,9 @@ class GitFlow(unittest.TestCase):
         with mock.patch.object(rl, "run", side_effect=flaky):
             with self.assertRaises(SystemExit):
                 rl.commit_and_push(self.root, [self.rel, "CHANGELOG.md"], "m")
-        self.assertEqual(git(self.root, "rev-list", "--count", f"origin/{rl.BRANCH}..HEAD").strip(), "1")
+        self.assertEqual(git(self.root, "rev-list", "--count", f"origin/{BRANCH}..HEAD").strip(), "1")
         rl.ensure_branch(self.root)  # pushes pending commits
-        self.assertEqual(git(self.root, "rev-list", "--count", f"origin/{rl.BRANCH}..HEAD").strip(), "0")
+        self.assertEqual(git(self.root, "rev-list", "--count", f"origin/{BRANCH}..HEAD").strip(), "0")
 
 
 if __name__ == "__main__":

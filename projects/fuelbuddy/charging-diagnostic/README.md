@@ -79,9 +79,11 @@ The script commits each file as `<AGENT>: …` on the branch `agent/loop/fuelbud
 
 ```bash
 cd ~/GIT/multi-ai-workspace
-python3 generic/specs_review_loop.py --preflight   # probe the backends; add --reviewers GROK --skip-consolidator to test Grok alone
-python3 generic/specs_review_loop.py
+python3 generic/specs_review_loop.py --project projects/fuelbuddy/charging-diagnostic --name FuelBuddy --preflight   # probe the backends; add --reviewers GROK --skip-consolidator to test Grok alone
+python3 generic/specs_review_loop.py --project projects/fuelbuddy/charging-diagnostic --name FuelBuddy
 ```
+
+The loop is generic: `--project` points it at any folder with `spec.md` and a README holding a `**Round N**` line (`decisions.md` is optional), `--name` labels commits and prompts, and `--branch` defaults to `agent/loop/<name>-review`. `automation/run_review_loop.sh` passes the FuelBuddy values for you.
 
 Setup: the DeepSeek key is read from `DEEPSEEK_API_KEY` or from `~/.claude/settings.json`. When `~/.claude/settings.json` points Claude Code at DeepSeek, CLAUDE runs from a separate profile, `~/.claude-anthropic` (log in once with `CLAUDE_CONFIG_DIR=~/.claude-anthropic claude`, then `/login`). Logs go to `automation/logs/` (not committed).
 

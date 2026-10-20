@@ -10,6 +10,7 @@ set -euo pipefail
 REPO="${REPO:-$HOME/GIT/multi-ai-workspace}"
 LOOP="$REPO/generic/specs_review_loop.py"
 BRANCH="agent/loop/fuelbuddy-review"
+PROJECT_ARGS=(--project projects/fuelbuddy/charging-diagnostic --name FuelBuddy --branch "$BRANCH")
 
 # FAST=1 -> Codex Fast service tier (about 2x speed, 2x price) and Grok 4.7 high-fast.
 # DeepSeek and the Anthropic consolidator have no fast variant, so they are unchanged.
@@ -60,13 +61,13 @@ cd "$REPO"
 
 case "$mode" in
   preflight)
-    python3 "$LOOP" --preflight ;;
+    python3 "$LOOP" "${PROJECT_ARGS[@]}" --preflight ;;
   one)
-    python3 "$LOOP" --preflight
-    python3 "$LOOP" --reviewers "$REVIEWERS" --max-rounds 1 ;;
+    python3 "$LOOP" "${PROJECT_ARGS[@]}" --preflight
+    python3 "$LOOP" "${PROJECT_ARGS[@]}" --reviewers "$REVIEWERS" --max-rounds 1 ;;
   full)
-    python3 "$LOOP" --preflight
-    python3 "$LOOP" --reviewers "$REVIEWERS" --max-rounds "$REVIEW_MAX_ROUNDS" ;;
+    python3 "$LOOP" "${PROJECT_ARGS[@]}" --preflight
+    python3 "$LOOP" "${PROJECT_ARGS[@]}" --reviewers "$REVIEWERS" --max-rounds "$REVIEW_MAX_ROUNDS" ;;
   *)
     echo "usage: $0 {preflight|one|full}" >&2; exit 2 ;;
 esac

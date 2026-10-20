@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Automated multi-AI review loop for the FuelBuddy charging diagnostic spec.
+"""Automated multi-AI review loop for a project spec (spec.md + README.md).
 
 One round = CHATGPT review (Codex CLI) -> DEEPSEEK review (Claude Code on the
 DeepSeek API) -> GROK review (Cursor agent, Grok 4.7) -> CLAUDE consolidation
@@ -11,9 +11,14 @@ until a round has no `blocking` or `major` finding (README stop rule) or
 State is the files in reviews/round-N/, as in the README: a step whose file
 already exists is skipped, so the loop can be stopped and restarted at any time.
 
+The project folder must hold spec.md and a README.md with a '**Round N**' line;
+an optional decisions.md lists decisions HUMAN has settled.
+
 Run from anywhere:
-    python3 generic/specs_review_loop.py --preflight
-    python3 generic/specs_review_loop.py
+    python3 generic/specs_review_loop.py --project projects/fuelbuddy/charging-diagnostic \
+        --name FuelBuddy --preflight
+    python3 generic/specs_review_loop.py --project projects/fuelbuddy/charging-diagnostic --name FuelBuddy
+The branch defaults to agent/loop/<name>-review; override it with --branch.
 """
 
 from __future__ import annotations
@@ -32,13 +37,17 @@ import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-PROJECT = HERE.parent / "projects" / "fuelbuddy" / "charging-diagnostic"
-REL_PROJECT = "projects/fuelbuddy/charging-diagnostic"
-README = PROJECT / "README.md"
-SPEC = PROJECT / "spec.md"
-LOG_DIR = PROJECT / "automation" / "logs"  # gitignored; stays with the project
+WORKSPACE = HERE.parent
 
-BRANCH = "agent/loop/fuelbuddy-review"
+# Project settings, filled in by configure() from --project / --name / --branch.
+PROJECT: Path = Path()
+REL_PROJECT = ""
+README: Path = Path()
+SPEC: Path = Path()
+DECISIONS: Path = Path()
+LOG_DIR: Path = Path()
+NAME = ""
+BRANCH = ""
 DEEPSEEK_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-pro")
 DEEPSEEK_BASE_URL = "https://api.deepseek.com/anthropic"
 CLAUDE_MODEL = os.environ.get("CLAUDE_CONSOLIDATOR_MODEL", "claude-sonnet-5-5")
@@ -85,9 +94,8 @@ Automated loop rules (they override anything in the README about git or pull req
 - Write ONLY {review_path} and a new entry at the top of CHANGELOG.md (repository root, \
 same format as the existing entries, Agent: {agent}). Do not edit spec.md or any other file.
 - Do not run git, do not create branches, do not open pull requests: the loop commits and \
-pushes your files for you as "{agent}: FuelBuddy spec review round {n}".
-- Read projects/fuelbuddy/charging-diagnostic/decisions.md: decisions listed there are SETTLED by HUMAN. Treat them as fixed; do not re-open them and do not review the spec's remaining 'Pending HUMAN decision' text for them.
-- HUMAN is not answering during the loop. Items already listed as open HUMAN decisions in \
+pushes your files for you as "{agent}: {name} spec review round {n}".
+{decisions_rule}- HUMAN is not answering during the loop. Items already listed as open HUMAN decisions in \
 the previous CONSOLIDATION.md must not be raised again as blocking or major findings; \
 comment on them only if you have new evidence, as a `question` of severity `minor`.
 - Severity discipline: `blocking` and `major` keep the loop running, so use them only for \
@@ -97,6 +105,36 @@ unless the merged text is still wrong.
 - End the review file with a line `Result: complete`. If you have no findings, write a line \
 `Findings: none` before it. A file without `Result: complete` is treated as unfinished.
 - When the file is written, stop."""
+
+
+def slug(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+
+
+def configure(project: str | Path, name: str | None = None, branch: str | None = None) -> None:
+    """Point the loop at one project folder. A relative path is taken from the workspace root.
+
+    name labels commits and prompts (default: the folder under projects/, else the folder's own
+    name); branch defaults to agent/loop/<name>-review.
+    """
+    global PROJECT, REL_PROJECT, README, SPEC, DECISIONS, LOG_DIR, NAME, BRANCH
+    path = Path(project).expanduser()
+    PROJECT = (path if path.is_absolute() else WORKSPACE / path).resolve()
+    if not PROJECT.is_dir():
+        raise SystemExit(f"project folder not found: {PROJECT}")
+    top = Path(run(["git", "rev-parse", "--show-toplevel"], cwd=PROJECT).stdout.strip()).resolve()
+    REL_PROJECT = PROJECT.relative_to(top).as_posix()
+    README = PROJECT / "README.md"
+    SPEC = PROJECT / "spec.md"
+    DECISIONS = PROJECT / "decisions.md"
+    LOG_DIR = PROJECT / "automation" / "logs"  # stays with the project; keep it gitignored
+    parts = Path(REL_PROJECT).parts
+    NAME = name or (parts[1] if len(parts) > 1 and parts[0] == "projects" else PROJECT.name)
+    BRANCH = branch or f"agent/loop/{slug(NAME)}-review"
+
+
+def decisions_note(rule: str) -> str:
+    return rule if DECISIONS.is_file() else ""
 
 
 def log(msg: str) -> None:
@@ -525,7 +563,11 @@ def review_prompt(agent: str, n: int) -> str:
             f"for round {n}: read spec.md (the local file, current version v{spec_version()}), and from "
             f"round 2 read reviews/round-{n - 1}/ first. Write your review to {review_path}, starting "
             f"with '# {agent} review — round {n}'.\n\n"
-            + REVIEW_RULES.format(review_path=review_path, agent=agent, n=n))
+            + REVIEW_RULES.format(review_path=review_path, agent=agent, n=n, name=NAME,
+                                  decisions_rule=decisions_note(
+                                      f"- Read {REL_PROJECT}/decisions.md: decisions listed there are SETTLED "
+                                      "by HUMAN. Treat them as fixed; do not re-open them and do not review the "
+                                      "spec's remaining 'Pending HUMAN decision' text for them.\n")))
 
 
 def consolidation_prompt(n: int, reviewers: list[str], converged: bool, provenance: dict | None = None) -> str:
@@ -546,7 +588,7 @@ def consolidation_prompt(n: int, reviewers: list[str], converged: bool, provenan
                       f"provider reported no served model): {rows}. Add a short 'Reviewer provenance' "
                       f"section to CONSOLIDATION.md stating which reviewers were unverified.")
     return (
-        f"You are CLAUDE, the consolidator of the FuelBuddy spec review. Read {REL_PROJECT}/README.md, "
+        f"You are CLAUDE, the consolidator of the {NAME} spec review. Read {REL_PROJECT}/README.md, "
         f"spec.md (v{spec_version()}), reviews/round-{n - 1}/CONSOLIDATION.md if it exists, and the "
         f"round-{n} reviews: {files}.\n\n"
         f"Consolidate round {n} the same way as reviews/round-1/CONSOLIDATION.md: write "
@@ -555,10 +597,11 @@ def consolidation_prompt(n: int, reviewers: list[str], converged: bool, provenan
         f"version (bump the version line and date). Keep open HUMAN decisions in one carried-forward "
         f"list with their FB-D ids; HUMAN is not answering during the automated loop, so do not wait "
         f"for decisions and do not decide them yourself. {final}\n\n"
-        f"Read {REL_PROJECT}/decisions.md: every decision listed there is settled by HUMAN. Apply it to spec.md "
-        "(replace the matching 'Pending HUMAN decision' passage, adjust the affected sections) and remove it from "
-        "the carried-forward open list; follow its notes and do not invent detail HUMAN did not give. "
-        "Also add a CHANGELOG.md entry at the top (Agent: CLAUDE). Do not run git: the loop commits "
+        + decisions_note(
+            f"Read {REL_PROJECT}/decisions.md: every decision listed there is settled by HUMAN. Apply it to spec.md "
+            "(replace the matching 'Pending HUMAN decision' passage, adjust the affected sections) and remove it from "
+            "the carried-forward open list; follow its notes and do not invent detail HUMAN did not give. ")
+        + "Also add a CHANGELOG.md entry at the top (Agent: CLAUDE). Do not run git: the loop commits "
         "and pushes for you. Only edit spec.md, README.md, CHANGELOG.md and the CONSOLIDATION.md file."
         + prov_lines
     )
@@ -577,7 +620,7 @@ def do_review(agent: str, n: int, root: Path) -> dict:
             log(f"round {n}: {agent} review complete and pushed, skipping")
         else:
             log(f"round {n}: {agent} review complete but not pushed, resuming at commit/push")
-            commit_and_push(root, [rel, "CHANGELOG.md"], f"{agent}: FuelBuddy spec review round {n}")
+            commit_and_push(root, [rel, "CHANGELOG.md"], f"{agent}: {NAME} spec review round {n}")
         return {"requested": "n/a", "reported": [], "verified": False, "note": "resumed, not rerun"}
     assert_clean(root)
     round_dir(n).mkdir(parents=True, exist_ok=True)
@@ -610,7 +653,7 @@ def do_review(agent: str, n: int, root: Path) -> dict:
     if extra:
         raise SystemExit(f"{agent} changed files outside its review: {extra}")
     (LOG_DIR / f"r{n}-{agent.lower()}.provenance.json").write_text(json.dumps(prov, indent=2), encoding="utf-8")
-    commit_and_push(root, [rel, "CHANGELOG.md"], f"{agent}: FuelBuddy spec review round {n}")
+    commit_and_push(root, [rel, "CHANGELOG.md"], f"{agent}: {NAME} spec review round {n}")
     return prov
 
 
@@ -624,7 +667,7 @@ def do_consolidation(n: int, reviewers: list[str], converged: bool, root: Path,
         else:
             log(f"round {n}: consolidation written but not pushed, resuming at commit/push")
             assert_clean(root, set(rel_all))
-            commit_and_push(root, rel_all, f"CLAUDE: consolidate FuelBuddy round {n} into spec v{spec_version()}")
+            commit_and_push(root, rel_all, f"CLAUDE: consolidate {NAME} round {n} into spec v{spec_version()}")
         return
     assert_clean(root)
     before = spec_version()
@@ -641,7 +684,7 @@ def do_consolidation(n: int, reviewers: list[str], converged: bool, root: Path,
     extra = unexpected_changes(root, set(rel))
     if extra:
         raise SystemExit(f"CLAUDE changed files outside the consolidation: {extra}")
-    commit_and_push(root, rel, f"CLAUDE: consolidate FuelBuddy round {n} into spec v{spec_version()}")
+    commit_and_push(root, rel, f"CLAUDE: consolidate {NAME} round {n} into spec v{spec_version()}")
 
 
 def probe_write(root: Path, name: str, runner) -> None:
@@ -679,7 +722,7 @@ def preflight(root: Path, reviewers: list[str], with_consolidator: bool) -> None
     if not ok:
         raise SystemExit("missing tools")
     log(f"round {current_round()}, spec v{spec_version()}, reviewers {','.join(reviewers)}")
-    LOG_DIR.mkdir(exist_ok=True)
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
     probe = "Reply with the single word OK."
     # Run every probe, so one preflight shows everything that needs fixing.
     probes = []
@@ -720,6 +763,13 @@ def parse_reviewers(raw: str) -> list[str]:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--project", default=os.environ.get("REVIEW_PROJECT"),
+                    help="project folder holding spec.md and README.md, relative to the workspace root "
+                         "or absolute (env REVIEW_PROJECT)")
+    ap.add_argument("--name", default=os.environ.get("REVIEW_NAME"),
+                    help="label for commits and prompts (default: the folder under projects/)")
+    ap.add_argument("--branch", default=os.environ.get("REVIEW_BRANCH"),
+                    help="branch the loop commits to (default: agent/loop/<name>-review)")
     ap.add_argument("--max-rounds", type=int, default=int(os.environ.get("REVIEW_MAX_ROUNDS", "5")),
                     help="stop after this many rounds in this run even without convergence (default 5)")
     ap.add_argument("--preflight", action="store_true",
@@ -730,14 +780,21 @@ def main() -> None:
                     help="comma-separated, from CHATGPT,DEEPSEEK,GROK,CURSOR (default CHATGPT,DEEPSEEK,GROK)")
     opts = ap.parse_args()
 
+    if not opts.project:
+        ap.error("--project is required (or set REVIEW_PROJECT)")
     reviewers = parse_reviewers(opts.reviewers)
+    configure(opts.project, opts.name, opts.branch)
+    missing = [p.name for p in (SPEC, README) if not p.is_file()]
+    if missing:
+        raise SystemExit(f"{REL_PROJECT} has no {' or '.join(missing)}")
     root = repo_root()
-    LOG_DIR.mkdir(exist_ok=True)
+    log(f"project {REL_PROJECT} ({NAME}), branch {BRANCH}")
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
     lock = open(LOG_DIR / ".loop.lock", "w")
     try:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:
-        raise SystemExit("another review loop is already running (automation/logs/.loop.lock)")
+        raise SystemExit(f"another review loop is already running ({LOG_DIR / '.loop.lock'})")
     if opts.preflight:
         preflight(root, reviewers, not opts.skip_consolidator)
         return

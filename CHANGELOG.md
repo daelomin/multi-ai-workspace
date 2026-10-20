@@ -1,6 +1,12 @@
 # Changelog
 
 ## 2026-10-20
+**Agent:** CLAUDE
+**Files:** `generic/specs_review_loop.py`, `projects/fuelbuddy/charging-diagnostic/automation/run_review_loop.sh`, `projects/fuelbuddy/charging-diagnostic/automation/tests/test_review_loop.py`, `projects/fuelbuddy/charging-diagnostic/README.md`, `CHANGELOG.md`
+**Change:** Made the review loop project-agnostic. New arguments `--project` (required, or `REVIEW_PROJECT`), `--name` (commit/prompt label, default the folder under `projects/`) and `--branch` (default `agent/loop/<name>-review`). No FuelBuddy path, branch or name is hard-coded any more; the `decisions.md` rule is added to the prompts only when the project has that file. The launcher passes `--project projects/fuelbuddy/charging-diagnostic --name FuelBuddy --branch agent/loop/fuelbuddy-review`, so FuelBuddy commit messages and branch are unchanged.
+**Verification:** 23 mocked unit tests pass (2 new: configure defaults, conditional decisions rule); CLI error paths checked by hand. No live review run.
+
+## 2026-10-20
 **Agent:** GROK
 **Files:** `generic/specs_review_loop.py` (moved from `projects/fuelbuddy/charging-diagnostic/automation/review_loop.py`), `projects/fuelbuddy/charging-diagnostic/automation/run_review_loop.sh`, `projects/fuelbuddy/charging-diagnostic/automation/tests/test_review_loop.py`, `projects/fuelbuddy/charging-diagnostic/README.md`, `agents/GROK.md`, `CONTRIBUTING.md`, `agents/CHATGPT.md`, `agents/CLAUDE.md`, `agents/CURSOR.md`, `agents/DEEPSEEK.md`, `agents/GEMINI.md`, `CHANGELOG.md`
 **Change:** Moved the review loop to `generic/specs_review_loop.py`. FuelBuddy logs stay in `projects/fuelbuddy/charging-diagnostic/automation/logs/`. Updated the launcher, tests, and run commands. Recorded the project-folder and commit-identity rules in `CONTRIBUTING.md` and `agents/`.
