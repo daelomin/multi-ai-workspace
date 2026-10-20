@@ -12,8 +12,8 @@ State is the files in reviews/round-N/, as in the README: a step whose file
 already exists is skipped, so the loop can be stopped and restarted at any time.
 
 Run from anywhere:
-    python3 projects/fuelbuddy/charging-diagnostic/automation/review_loop.py --preflight
-    python3 projects/fuelbuddy/charging-diagnostic/automation/review_loop.py
+    python3 generic/specs_review_loop.py --preflight
+    python3 generic/specs_review_loop.py
 """
 
 from __future__ import annotations
@@ -32,11 +32,11 @@ import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-PROJECT = HERE.parent  # projects/fuelbuddy/charging-diagnostic
+PROJECT = HERE.parent / "projects" / "fuelbuddy" / "charging-diagnostic"
 REL_PROJECT = "projects/fuelbuddy/charging-diagnostic"
 README = PROJECT / "README.md"
 SPEC = PROJECT / "spec.md"
-LOG_DIR = HERE / "logs"  # gitignored
+LOG_DIR = PROJECT / "automation" / "logs"  # gitignored; stays with the project
 
 BRANCH = "agent/loop/fuelbuddy-review"
 DEEPSEEK_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-pro")

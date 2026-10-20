@@ -8,7 +8,7 @@
 set -euo pipefail
 
 REPO="${REPO:-$HOME/GIT/multi-ai-workspace}"
-LOOP="$REPO/projects/fuelbuddy/charging-diagnostic/automation/review_loop.py"
+LOOP="$REPO/generic/specs_review_loop.py"
 BRANCH="agent/loop/fuelbuddy-review"
 
 # FAST=1 -> Codex Fast service tier (about 2x speed, 2x price) and Grok 4.7 high-fast.
@@ -41,7 +41,7 @@ done
 
 # The loop script must already support the reviewers asked for (roadmap Phase 3 adds GROK).
 if [[ "$REVIEWERS" == *GROK* ]] && ! grep -q "run_cursor_agent" "$LOOP"; then
-  echo "review_loop.py has no GROK runner yet (roadmap Phase 3). Use REVIEWERS=CHATGPT,DEEPSEEK for a labelled diagnostic run only." >&2
+  echo "specs_review_loop.py has no GROK runner yet (roadmap Phase 3). Use REVIEWERS=CHATGPT,DEEPSEEK for a labelled diagnostic run only." >&2
   exit 1
 fi
 

@@ -68,7 +68,7 @@ If you were sent here with the standard prompt, follow these steps.
 
 ## Automated loop (HUMAN's laptop)
 
-From round 2 the rounds run unattended with `automation/review_loop.py`. The reviewers are **CHATGPT**, **DEEPSEEK** and **GROK** (**CURSOR** optional, consistency only); **CLAUDE** consolidates. One round is:
+From round 2 the rounds run unattended with `generic/specs_review_loop.py`. The reviewers are **CHATGPT**, **DEEPSEEK** and **GROK** (**CURSOR** optional, consistency only); **CLAUDE** consolidates. One round is:
 
 1. **CHATGPT** reviews through the Codex CLI (`codex exec`) and writes `reviews/round-N/CHATGPT.md`.
 2. **DEEPSEEK** reviews through Claude Code pointed at the DeepSeek API, model `deepseek-v4-pro` (the script checks the model actually used). Its prompt says explicitly *"You are DEEPSEEK"*, since it runs inside Claude Code.
@@ -79,8 +79,8 @@ The script commits each file as `<AGENT>: …` on the branch `agent/loop/fuelbud
 
 ```bash
 cd ~/GIT/multi-ai-workspace
-python3 projects/fuelbuddy/charging-diagnostic/automation/review_loop.py --preflight   # probe the backends; add --reviewers GROK --skip-consolidator to test Grok alone
-python3 projects/fuelbuddy/charging-diagnostic/automation/review_loop.py
+python3 generic/specs_review_loop.py --preflight   # probe the backends; add --reviewers GROK --skip-consolidator to test Grok alone
+python3 generic/specs_review_loop.py
 ```
 
 Setup: the DeepSeek key is read from `DEEPSEEK_API_KEY` or from `~/.claude/settings.json`. When `~/.claude/settings.json` points Claude Code at DeepSeek, CLAUDE runs from a separate profile, `~/.claude-anthropic` (log in once with `CLAUDE_CONFIG_DIR=~/.claude-anthropic claude`, then `/login`). Logs go to `automation/logs/` (not committed).

@@ -6,6 +6,9 @@ Humans own final decisions. AIs research, draft, review, implement, test and pro
 ## Source of truth
 `MASTER.md` is authoritative for current project state. Detailed material belongs in `docs/`.
 
+## Project folders
+Work in the project subfolder, `projects/<project-name>/`. Project files do not go at the repo root.
+
 ## Before editing
 Every agent MUST:
 1. Read `MASTER.md`.
@@ -17,6 +20,7 @@ Every agent MUST:
 - Make the smallest coherent change.
 - Preserve existing correct work.
 - Do not delete another agent's work merely to replace it with a preferred approach.
+- Do not overwrite another agent's work. Each agent writes only its own files.
 - If two approaches conflict, document the conflict in `DECISIONS.md` and mark it for human review.
 - Never claim a task is completed unless it was actually completed or verified.
 
@@ -64,6 +68,10 @@ Preferred branch naming:
 
 Commit format:
 `<AGENT>: <short description>`
+
+Commit as your own name, subject prefixed with that name. Do not commit under another agent's name.
+
+If your name is generic (not a specific model id), append `MODEL:` and the model id you are actually running. Example: `GROK: <what changed> MODEL: grok-4.7-high`
 
 Examples:
 `CHATGPT: add station data schema`

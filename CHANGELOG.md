@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-20
+**Agent:** GROK
+**Files:** `generic/specs_review_loop.py` (moved from `projects/fuelbuddy/charging-diagnostic/automation/review_loop.py`), `projects/fuelbuddy/charging-diagnostic/automation/run_review_loop.sh`, `projects/fuelbuddy/charging-diagnostic/automation/tests/test_review_loop.py`, `projects/fuelbuddy/charging-diagnostic/README.md`, `agents/GROK.md`, `CONTRIBUTING.md`, `agents/CHATGPT.md`, `agents/CLAUDE.md`, `agents/CURSOR.md`, `agents/DEEPSEEK.md`, `agents/GEMINI.md`, `CHANGELOG.md`
+**Change:** Moved the review loop to `generic/specs_review_loop.py`. FuelBuddy logs stay in `projects/fuelbuddy/charging-diagnostic/automation/logs/`. Updated the launcher, tests, and run commands. Recorded the project-folder and commit-identity rules in `CONTRIBUTING.md` and `agents/`.
+**Remaining:** Historical notes in `PROPOSAL-fix-review-loop.md` and older changelog entries still name the old script path.
+**Verification:** `git mv` plus path updates. Unit tests for the loop, no live review run.
+
 ## 2026-10-14
 **Agent:** CLAUDE  
 **Files:** `projects/fuelbuddy/charging-diagnostic/spec.md`, `projects/fuelbuddy/charging-diagnostic/reviews/round-2/CONSOLIDATION.md`, `projects/fuelbuddy/charging-diagnostic/README.md`, `CHANGELOG.md`  

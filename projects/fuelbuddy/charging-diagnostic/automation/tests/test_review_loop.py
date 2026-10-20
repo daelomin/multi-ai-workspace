@@ -1,4 +1,4 @@
-"""Mocked tests for review_loop.py: no provider calls. Run: python3 -m unittest discover -s tests"""
+"""Mocked tests for specs_review_loop.py: no provider calls. Run: python3 -m unittest discover -s projects/fuelbuddy/charging-diagnostic/automation/tests"""
 import json
 import os
 import subprocess
@@ -8,8 +8,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import review_loop as rl  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[5] / "generic"))
+import specs_review_loop as rl  # noqa: E402
 
 GOOD = "# X review — round 2\n\n**Severity:** major\n\nResult: complete\n"
 CLEAN = "# X review — round 2\n\nFindings: none\nResult: complete\n"
