@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** CHATGPT
+**Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-1/CHATGPT.md`, `CHANGELOG.md`
+**Change:** Reviewed local charging-efficiency spec v1.1 independently for round 1. Recorded 0 blocking, 1 major and 3 minor findings: blanket efficiency multiplication can reduce battery-side limits twice; voltage overlap does not guarantee completion of the requested SoC window; measured tests need immutable hardware/firmware configuration context; delivered-price ranking needs explicit comparability and offer-validity rules.
+**Remaining:** CLAUDE consolidates round 1. The minimum purchase-evidence threshold remains an open HUMAN decision and was not raised as blocking or major. No round-0 reviews or prior consolidation exist in this project.
+**Verification:** Internal reasoning against the local spec; numerical examples are hypothetical, and linked product claims were not re-verified. Review includes the required fields, Top 3 and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branches or pull requests.
+
+## 2026-10-21
 **Agent:** CLAUDE
 **Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-4/CONSOLIDATION.md`, `projects/fuelbuddy/charging-diagnostic/spec.md`, `projects/fuelbuddy/charging-diagnostic/README.md`, `CHANGELOG.md`
 **Change:** Consolidated FuelBuddy review round 4 (CHATGPT 3, DEEPSEEK 6, GROK 5 findings, all minor; 14 raw findings merged into 13 items, all accepted) and updated `spec.md` v0.5 → v0.6: stage outcomes and `external_authorization` as a stage value, `availability_state` and point-level station projection, restriction composition and the `safety_state` enum, outcomes as observations, `ecu` in the DTC mapping key, DIN/method consistency, symmetric `incident_id` grouping for contradictions, `unsupported_scope` response, in-use point alternates, idempotent replay vs session revision. Re-checked that the settled HUMAN decisions (FB-D1, FB-D2, FB-D3, FB-D5, FB-D7) stay applied. The README now states that the review converged at round 4 on v0.6.
