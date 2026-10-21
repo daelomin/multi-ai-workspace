@@ -27,7 +27,7 @@ label{font-size:.9rem;color:var(--muted)}
 .step.ok{border-left-color:var(--green)}.step.bad{border-left-color:var(--red)}.step.busy{border-left-color:var(--green)}
 .step h3{margin:0 0 6px;font-size:1rem}
 pre{background:var(--code);color:var(--codefg);border-radius:8px;padding:10px 12px;overflow:auto;max-height:260px;margin:8px 0 0;font-size:.82rem;white-space:pre-wrap;word-break:break-word}
-.note{color:var(--muted);font-size:.9rem;margin:0 0 8px}
+.note{color:var(--muted);font-size:.9rem;margin:0 0 8px;word-break:break-word}
 .err{color:var(--red);font-size:.9rem}
 .badge{color:#fff;border-radius:4px;padding:1px 8px;font-size:.8rem;margin-left:6px}
 .chip{display:inline-block;color:#fff;border-radius:4px;padding:1px 8px;margin:4px 4px 0 0;font-size:.8rem}
@@ -47,7 +47,7 @@ a{color:var(--blue)}
 
 <script>
 const TOKEN = '__TOKEN__';
-const COLORS = {running: 'var(--green)', complete: 'var(--blue)', failed: 'var(--red)', pending: 'var(--grey)'};
+const COLORS = {preflight: '#eab308', running: 'var(--green)', complete: 'var(--blue)', failed: 'var(--red)', pending: 'var(--grey)'};
 const chat = document.getElementById('chat'), dash = document.getElementById('dash');
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
@@ -72,13 +72,37 @@ async function refresh() {
       <span class="note" style="margin:0">${s.monitor ? 'chaining active' : 'start it below to chain loops'}</span></div></div>` +
       s.loops.map(l => `<div class="loopcard" style="border-left:8px solid ${COLORS[l.status]}">
         <b>${esc(l.name)}</b><span class="badge" style="background:${COLORS[l.status]}">${l.status}</span>
-        <span class="note"> ${l.round ? 'round ' + l.round : ''} ${l.after ? '· after ' + esc(l.after) : ''}</span><br>
-        ${l.steps.map(x => `<span class="chip" style="background:${COLORS[x.status]}">${esc(x.name)}</span>`).join('')}
+        <span class="note"> ${l.round ? 'round ' + l.round : ''} ${l.after ? '· after ' + esc(l.after) : ''}</span>
+        <a style="float:right" target="_blank" href="http://127.0.0.1:8777/?run_id=review-loop-${esc(l.id)}">Open in Jarvis ↗</a><br>
+        ${(l.preflight ? [{name: 'PREFLIGHT', status: l.preflight.status}] : []).concat(l.steps).map(x => `<span class="chip" style="background:${COLORS[x.status]}">${esc(x.name)}</span>`).join('')}
         ${l.detail ? `<div class="err">${esc(l.detail)}</div>` : ''}
-        ${l.status === 'failed' ? `<button class="danger" onclick="retry('${l.id}')">Allow relaunch</button>` : ''}</div>`).join('');
+        ${l.status === 'failed' ? (l.preflight && l.preflight.status === 'failed'
+          ? `<button class="danger" onclick="rerunPreflight('${l.id}')">Re-run preflight</button> <span class="note">fix the key/login first, then re-run</span>`
+          : `<button class="danger" onclick="retry('${l.id}')">Allow relaunch</button>`) : ''}
+        <div class="note" id="act_${l.id}">${esc(notes[l.id] || '')}</div></div>`).join('');
   } catch (e) { dash.innerHTML = `<div class="err">Server unreachable: ${esc(e.message)}</div>`; }
 }
-async function retry(id) { await api('retry', {id}); refresh(); }
+const notes = {};
+function actNote(id, msg) { notes[id] = msg; const e = document.getElementById('act_' + id); if (e) e.textContent = msg; }
+async function retry(id) {
+  try { const r = await api('retry', {id}); actNote(id, r.output || 'cleared'); } catch (e) { actNote(id, e.message); }
+  refresh();
+}
+async function rerunPreflight(id) {
+  try {
+    const {job} = await api('job', {id, mode: 'preflight'});
+    actNote(id, 'preflight started (a minute or two); the PREFLIGHT chip turns amber while it runs…');
+    for (;;) {
+      await new Promise(r => setTimeout(r, 2000));
+      const j = await (await fetch('/api/job/' + job, {headers: {'X-Token': TOKEN}})).json();
+      if (j.running) continue;
+      const tail = (j.output || '').trim().split('\n').slice(-6).join(' | ');
+      actNote(id, (j.exit === 0 ? 'preflight passed. ' : `preflight ended (exit ${j.exit}): `) + tail);
+      break;
+    }
+  } catch (e) { actNote(id, e.message); }
+  refresh();
+}
 setInterval(refresh, 3000); refresh();
 
 // ---------- chat helpers ----------

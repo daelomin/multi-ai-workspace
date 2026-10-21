@@ -3,6 +3,7 @@ import fcntl
 import json
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -49,10 +50,64 @@ class State(Base):
         s = lm.evaluate(self.loop("a"))
         self.assertEqual(s["status"], "failed")
         self.assertEqual([x["status"] for x in s["steps"]], ["complete", "failed", "pending"])
-        with mock.patch.object(lm, "lock_held", return_value=True):
+        with mock.patch.object(lm, "lock_holder", return_value=1), mock.patch.object(lm, "is_preflight", return_value=False):
             s = lm.evaluate(self.loop("a"))
         self.assertEqual(s["status"], "running")
         self.assertEqual([x["status"] for x in s["steps"]], ["complete", "running", "pending"])
+
+    def test_preflight_lock_is_not_a_running_round(self):
+        self.project("a")
+        with mock.patch.object(lm, "lock_holder", return_value=123), mock.patch.object(lm, "is_preflight", return_value=True):
+            s = lm.evaluate(self.loop("a"))
+        self.assertEqual(s["status"], "preflight")
+        self.assertTrue(all(x["status"] == "pending" for x in s["steps"]))
+        with mock.patch.object(lm, "lock_holder", return_value=123), mock.patch.object(lm, "is_preflight", return_value=False):
+            self.assertEqual(lm.evaluate(self.loop("a"))["status"], "running")
+
+    def test_failed_preflight_marks_backend_step(self):
+        p = self.project("a")
+        (p / "automation" / "logs" / "preflight.json").write_text(json.dumps(
+            {"passed": False, "failed": {"GROK": "Authentication required", "ANTHROPIC": "boom"}}))
+        s = lm.evaluate(self.loop("a", reviewers="CHATGPT,GROK"))
+        self.assertEqual(s["status"], "failed")
+        self.assertEqual([x["status"] for x in s["steps"]], ["pending", "failed", "failed"])
+        self.assertIn("Authentication required", s["steps"][1]["detail"])
+        (p / "automation" / "logs" / "preflight.json").write_text(json.dumps({"passed": True, "failed": {}}))
+        self.assertEqual(lm.evaluate(self.loop("a", reviewers="CHATGPT,GROK"))["status"], "pending")
+
+    def test_preflight_node_in_jarvis_graph(self):
+        p = self.project("a")
+        logs = p / "automation" / "logs"
+        def graph():
+            s = lm.evaluate(self.loop("a", reviewers="CHATGPT,GROK"))
+            with mock.patch.object(lm, "JARVIS_DIR", self.root / "j"):
+                lm.write_jarvis([s])
+            return json.loads((self.root / "j/memory/graph_review-loop-a.json").read_text())["nodes"]
+        n = graph()
+        self.assertEqual(n["r2-PREFLIGHT"]["status"], "pending")
+        self.assertEqual(n["r2-CHATGPT"]["depends_on"], ["r2-PREFLIGHT"])
+        self.assertEqual(n["r2-PREFLIGHT"]["depends_on"], ["r1-CLAUDE"])
+        with mock.patch.object(lm, "lock_holder", return_value=9), mock.patch.object(lm, "is_preflight", return_value=True):
+            self.assertEqual(graph()["r2-PREFLIGHT"]["status"], "in_progress")
+        (logs / "preflight.json").write_text(json.dumps({"round": 2, "passed": False, "failed": {"GROK": "auth"}}))
+        self.assertEqual(graph()["r2-PREFLIGHT"]["status"], "failed")
+        (logs / "preflight.json").write_text(json.dumps({"round": 2, "passed": True, "failed": {}}))
+        self.assertEqual(graph()["r2-PREFLIGHT"]["status"], "completed")
+        (logs / "preflight.json").write_text(json.dumps({"round": 1, "passed": True, "failed": {}}))
+        self.assertEqual(graph()["r2-PREFLIGHT"]["status"], "pending")  # a pass for another round does not count
+
+    def test_is_preflight_reads_cmdline(self):
+        import subprocess
+        p = subprocess.Popen([sys.executable, "-c", "import time;time.sleep(5)", "--preflight"])
+        self.addCleanup(p.kill)
+        for _ in range(40):  # /proc/<pid>/cmdline can read empty for a moment right after the exec
+            if lm.is_preflight(p.pid):
+                break
+            time.sleep(0.05)
+        self.assertTrue(lm.is_preflight(p.pid))
+        q = subprocess.Popen([sys.executable, "-c", "import time;time.sleep(5)"])
+        self.addCleanup(q.kill)
+        self.assertFalse(lm.is_preflight(q.pid))
 
     def test_complete_when_converged(self):
         self.project("a", readme="Review has converged at round 2.\n", rounds=("round-1", "round-2"))
@@ -99,7 +154,7 @@ class Chaining(Base):
         self.loops[1]["autostart"] = False
         self.assertIsNone(lm.due(self.loops, self.states()))
         self.loops[1]["autostart"] = True
-        with mock.patch.object(lm, "lock_held", side_effect=lambda p: "projects/b" in str(p)):
+        with mock.patch.object(lm, "lock_holder", side_effect=lambda p: 1 if "projects/b" in str(p) else None), mock.patch.object(lm, "is_preflight", return_value=False):
             self.assertIsNone(lm.due(self.loops, self.states()))
         (self.root / "projects/b/automation/logs/.monitor.json").write_text(json.dumps({"pid": 1, "exit": 1}))
         self.assertIsNone(lm.due(self.loops, self.states()))

@@ -738,12 +738,17 @@ def preflight(root: Path, reviewers: list[str], with_consolidator: bool) -> None
     if "CURSOR" in reviewers:
         probes.append(("CURSOR", lambda: probe_write(root, "CURSOR", lambda p, lf: run_cursor_agent(p, root, lf, 300, CURSOR_REVIEW_MODEL))))
     failures = []
+    reasons = {}
     for name, fn in probes:
         try:
             fn()
         except SystemExit as exc:
             failures.append(name)
+            reasons[name] = str(exc).splitlines()[0][:300] if str(exc) else "failed"
             log(f"FAILED {name}: {exc}")
+    # Machine-readable result for generic/loop_monitor.py; a later passing preflight overwrites it.
+    (LOG_DIR / "preflight.json").write_text(json.dumps(
+        {"time": time.strftime("%FT%T"), "round": current_round(), "passed": not failures, "failed": reasons}, indent=2), encoding="utf-8")
     if failures:
         raise SystemExit(f"preflight failed ({len(failures)} of {len(probes)} probes): {', '.join(failures)}")
     log("preflight passed")

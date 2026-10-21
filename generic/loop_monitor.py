@@ -3,6 +3,7 @@
 
 State is read from the files the loop already writes; nothing in the loop changes:
   running   (green)  the loop holds automation/logs/.loop.lock
+  preflight (amber)  the lock holder is a --preflight probe run, not a review round
   complete  (blue)   README has no '**Round N**' line and says "converged"
   failed    (red)    a step has a log but no complete review, the lock is free, or the last launch exited non-zero
   pending   (grey)   nothing started, or waiting for the loop it comes `after`
@@ -43,8 +44,8 @@ OUT_DIR = HERE / ".monitor"
 JARVIS_DIR = WORKSPACE / ".jarvis" / "tracker"
 LAUNCHER = HERE / "run_review_loop.sh"
 DEFAULT_REVIEWERS = "CHATGPT,DEEPSEEK,GROK"
-COLORS = {"running": "#22c55e", "failed": "#ef4444", "complete": "#3b82f6", "pending": "#94a3b8"}
-JARVIS_STATUS = {"running": "in_progress", "failed": "failed", "complete": "completed", "pending": "pending"}
+COLORS = {"preflight": "#eab308", "running": "#22c55e", "failed": "#ef4444", "complete": "#3b82f6", "pending": "#94a3b8"}
+JARVIS_STATUS = {"preflight": "pending", "running": "in_progress", "failed": "failed", "complete": "completed", "pending": "pending"}
 
 
 def load_config(path: Path = CONFIG) -> list[dict]:
@@ -64,19 +65,31 @@ def load_config(path: Path = CONFIG) -> list[dict]:
     return loops
 
 
-def lock_held(lock: Path) -> bool:
-    """True when some process holds a flock on `lock`. Read from /proc/locks so the monitor
+def lock_holder(lock: Path) -> int | None:
+    """PID of the process holding a flock on `lock`, or None. Read from /proc/locks so the monitor
     never takes the lock itself (that could make a starting loop think another one runs)."""
     try:
         ino = lock.stat().st_ino
         table = Path("/proc/locks").read_text()
     except OSError:
-        return False
+        return None
     for line in table.splitlines():
         f = line.split()  # "1: FLOCK ADVISORY WRITE <pid> <maj>:<min>:<inode> <start> <end>"
         if len(f) > 5 and f[1] == "FLOCK" and f[5].rsplit(":", 1)[-1] == str(ino):
-            return True
-    return False
+            return int(f[4])
+    return None
+
+
+def lock_held(lock: Path) -> bool:
+    return lock_holder(lock) is not None
+
+
+def is_preflight(pid: int | None) -> bool:
+    """The engine takes the same lock for --preflight; that is a probe, not a review round."""
+    try:
+        return pid is not None and "--preflight" in Path(f"/proc/{pid}/cmdline").read_bytes().decode(errors="replace").split("\0")
+    except OSError:
+        return False
 
 
 def read_json(path: Path) -> dict:
@@ -118,19 +131,33 @@ def past_steps(rdir: Path) -> list[dict]:
     return steps
 
 
+def preflight_state(logdir: Path, n: int, running: bool) -> dict:
+    """Status of the preflight of round n: running, complete, failed or pending (never run for this round)."""
+    if running:
+        return {"status": "running", "detail": "probing the backends"}
+    pf = read_json(logdir / "preflight.json")
+    if not pf or pf.get("round", n) != n:
+        return {"status": "pending", "detail": ""}
+    if pf.get("passed"):
+        return {"status": "complete", "detail": pf.get("time", "")}
+    return {"status": "failed", "detail": "; ".join(f"{k}: {v}" for k, v in pf.get("failed", {}).items())}
+
+
 def evaluate(loop: dict) -> dict:
     """Current state of one loop, from its files."""
     project = WORKSPACE / loop["project"]
     readme = project / "README.md"
     logdir = project / "automation" / "logs"
     out = {"id": loop["id"], "name": loop["name"], "after": loop.get("after"), "round": None,
-           "steps": [], "rounds": [], "status": "pending", "detail": "", "spec": ""}
+           "steps": [], "rounds": [], "preflight": None, "status": "pending", "detail": "", "spec": ""}
     if not (project / "spec.md").is_file() or not readme.is_file():
         out.update(status="failed", detail=f"{loop['project']} has no spec.md/README.md")
         return out
     text = readme.read_text(encoding="utf-8")
     m = rl.ROUND_RE.search(text)
-    running = lock_held(logdir / ".loop.lock")
+    holder = lock_holder(logdir / ".loop.lock")
+    pre_running = holder is not None and is_preflight(holder)
+    running = holder is not None and not pre_running  # a review round, as opposed to a preflight probe
     launch = read_json(logdir / ".monitor.json")
     out["spec"] = rl.VERSION_RE.search((project / "spec.md").read_text(encoding="utf-8")[:500]).group(1) \
         if rl.VERSION_RE.search((project / "spec.md").read_text(encoding="utf-8")[:500]) else "?"
@@ -150,9 +177,18 @@ def evaluate(loop: dict) -> dict:
         if state != "complete" and first_open is None:
             first_open = step
         out["steps"].append({"name": step, "status": state, "detail": detail})
-    out["rounds"].append({"n": n, "steps": out["steps"]})
+    pf = preflight_state(logdir, n, pre_running)
+    out["preflight"] = pf
+    out["rounds"].append({"n": n, "steps": out["steps"], "preflight": pf})
+    if not running:  # a failed preflight marks the still-pending steps of the backends that did not answer
+        for name, why in read_json(logdir / "preflight.json").get("failed", {}).items():
+            for x in out["steps"]:
+                if x["name"] == ("CLAUDE" if name == "ANTHROPIC" else name) and x["status"] == "pending":
+                    x.update(status="failed", detail=f"preflight: {why}")
     failed = [s for s in out["steps"] if s["status"] == "failed"]
-    if running:
+    if pre_running:
+        out.update(status="preflight", detail="preflight probes running (no review round started)")
+    elif running:
         out["status"] = "running"
     elif failed:
         out.update(status="failed", detail=failed[0]["detail"])
@@ -168,7 +204,7 @@ def git_clean() -> bool:
 
 def due(loops: list[dict], states: dict[str, dict]) -> dict | None:
     """The next loop to launch, or None. One launch at a time: the loops share one checkout."""
-    if any(s["status"] == "running" for s in states.values()):
+    if any(s["status"] in ("running", "preflight") for s in states.values()):
         return None
     for l in loops:
         s = states[l["id"]]
@@ -220,7 +256,8 @@ def write_html(states: list[dict]) -> Path:
     OUT_DIR.mkdir(exist_ok=True)
     cards = []
     for s in states:
-        chips = "".join(f'<span class="chip" style="background:{COLORS[x["status"]]}" title="{html.escape(x["detail"])}">'
+        pf = s.get("preflight")
+        chips = (f'<span class="chip" style="background:{COLORS[pf["status"]]}" title="{html.escape(pf["detail"])}">PREFLIGHT</span>' if pf else "") + "".join(f'<span class="chip" style="background:{COLORS[x["status"]]}" title="{html.escape(x["detail"])}">'
                         f'{html.escape(x["name"])}</span>' for x in s["steps"]) or '<span class="muted">no steps</span>'
         after = f'<div class="muted">after {html.escape(s["after"])}</div>' if s["after"] else ""
         rnd = f'round {s["round"]}' if s["round"] else "—"
@@ -228,7 +265,8 @@ def write_html(states: list[dict]) -> Path:
             f'<section style="border-left:8px solid {COLORS[s["status"]]}"><h2>{html.escape(s["name"])} '
             f'<span class="badge" style="background:{COLORS[s["status"]]}">{s["status"]}</span></h2>'
             f'<div class="muted">{rnd} · spec v{html.escape(s["spec"])}</div>{after}<div>{chips}</div>'
-            f'<div class="err">{html.escape(s["detail"])}</div></section>')
+            f'<div class="err">{html.escape(s["detail"])}</div>'
+            f'<a href="http://127.0.0.1:8777/?run_id=review-loop-{html.escape(s["id"])}" target="_blank">Open in Jarvis ↗</a></section>')
     page = f"""<!doctype html><meta charset=utf-8><meta http-equiv=refresh content=10><title>Review loops</title>
 <style>body{{font:15px system-ui;background:#0f172a;color:#e2e8f0;margin:2rem}}section{{background:#1e293b;padding:1rem 1.2rem;
 margin:0 0 1rem;border-radius:6px}}h2{{margin:0 0 .3rem}}.badge,.chip{{color:#fff;border-radius:4px;padding:.15rem .5rem;font-size:.8rem;
@@ -251,13 +289,20 @@ def write_jarvis(states: list[dict]) -> None:
         nodes, prev = {}, None
         for r in s["rounds"]:
             reviewers = [f"r{r['n']}-{x['name']}" for x in r["steps"] if x["name"] != "CLAUDE"]
+            gate = prev
+            if r.get("preflight"):  # only the current round has one
+                gate = f"r{r['n']}-PREFLIGHT"
+                nodes[gate] = {"id": gate, "name": f"{s['name']} · round {r['n']} · PREFLIGHT", "phase": "design",
+                               "description": "backend probes", "status": JARVIS_STATUS[r["preflight"]["status"]],
+                               "depends_on": [prev] if prev else [], "error": r["preflight"]["detail"] or None,
+                               "metadata": {**meta, "round": r["n"]}}
             for x in r["steps"]:
                 nid = f"r{r['n']}-{x['name']}"
                 last = x["name"] == "CLAUDE"
                 nodes[nid] = {"id": nid, "name": f"{s['name']} · round {r['n']} · {x['name']}",
                               "phase": "implement" if last else "validate", "description": nid,
                               "status": JARVIS_STATUS[x["status"]],
-                              "depends_on": reviewers if last else ([prev] if prev else []),
+                              "depends_on": reviewers if last else ([gate] if gate else []),
                               "error": x["detail"] or None, "metadata": {**meta, "round": r["n"]}}
             prev = f"r{r['n']}-CLAUDE"
         (mem / f"graph_{run_id}.json").write_text(json.dumps({"run_id": run_id, "nodes": nodes}, indent=2), encoding="utf-8")

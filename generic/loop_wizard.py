@@ -3,7 +3,7 @@
 
     generic/loop_wizard.py            # prints http://127.0.0.1:8795/?t=<token>
 
-Safety: listens on 127.0.0.1 only; every request needs the per-start token (and a 127.0.0.1 Host
+Safety: listens on 127.0.0.1 only; every request needs the token (kept in generic/.monitor/wizard.token, 0600; the URL is also in generic/.monitor/wizard.url) (and a 127.0.0.1 Host
 header, against DNS rebinding); the page can only trigger the fixed actions below, with validated
 arguments, never an arbitrary shell command. Paid-backend runs (`one`, `full`) are confirmed in the page.
 
@@ -32,8 +32,27 @@ import loop_monitor as lm  # noqa: E402
 import specs_review_loop as rl  # noqa: E402
 
 PORT = int(os.environ.get("LOOP_WIZARD_PORT", "8795"))
-TOKEN = secrets.token_urlsafe(16)
 JOBS = lm.OUT_DIR / "jobs"
+TOKEN_FILE = lm.OUT_DIR / "wizard.token"
+
+
+def load_token() -> str:
+    """Kept in a 0600 file so the URL survives restarts (delete the file to rotate it)."""
+    try:
+        tok = TOKEN_FILE.read_text().strip()
+        if len(tok) >= 16:
+            return tok
+    except OSError:
+        pass
+    lm.OUT_DIR.mkdir(exist_ok=True)
+    tok = secrets.token_urlsafe(16)
+    fd = os.open(TOKEN_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as fh:
+        fh.write(tok)
+    return tok
+
+
+TOKEN = load_token()
 WATCH_PID = lm.OUT_DIR / "watch.pid"
 FOLDER_RE = re.compile(r"^projects/[\w.-]+/[\w.-]+$")
 NAME_RE = re.compile(r"^[\w -]{2,30}$")
@@ -238,6 +257,8 @@ def a_job(a: dict) -> dict:
     if mode not in ("preflight", "one", "full"):
         raise ValueError("mode must be preflight, one or full")
     l = find(a.get("id", ""))
+    if lm.lock_held(WORKSPACE / l["project"] / "automation" / "logs" / ".loop.lock"):
+        raise ValueError(f"{l['name']} already has a loop or preflight running; wait for it to finish (watch the colour card)")
     JOBS.mkdir(parents=True, exist_ok=True)
     jid = uuid.uuid4().hex[:8]
     logf = open(JOBS / f"{jid}.log", "w")
@@ -327,7 +348,9 @@ class Handler(BaseHTTPRequestHandler):
 
 def main() -> None:
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
-    print(f"Review loop assistant: http://127.0.0.1:{PORT}/?t={TOKEN}", flush=True)
+    url = f"http://127.0.0.1:{PORT}/?t={TOKEN}"
+    (lm.OUT_DIR / "wizard.url").write_text(url + "\n")
+    print(f"Review loop assistant: {url}", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

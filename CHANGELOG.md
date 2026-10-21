@@ -2,6 +2,20 @@
 
 ## 2026-10-21
 **Agent:** CLAUDE
+**Files:** `generic/loop_monitor.py`, `generic/specs_review_loop.py`, `generic/loop_wizard.html`, `generic/tests/test_loop_monitor.py`, `CHANGELOG.md`
+**Change:** Added a `PREFLIGHT` node per round. Jarvis graph: `rN-PREFLIGHT` (depends on `r(N-1)-CLAUDE`) gates the round's reviewers; it is in progress while probes run, red if any fail, completed if they pass, pending if none ran for round N. The engine now writes the round into `preflight.json`, so a pass for another round does not count. Same chip on the colour page and the assistant page. Only the current round has a preflight node.
+**Verification:** 36 mocked tests pass (1 new; one flaky cmdline test made robust). Live graph shows `r3-PREFLIGHT` failed with DEEPSEEK/GROK reasons. A passing/running preflight node was only tested with mocks.
+
+## 2026-10-21
+**Agent:** CLAUDE
+**Files:** `generic/loop_monitor.py`, `generic/loop_wizard.html`, `generic/loop_wizard.py`, `generic/tests/test_loop_monitor.py`, `CHANGELOG.md`
+**Change:** The monitor no longer reports a preflight as a running review round: if the process holding `.loop.lock` was started with `--preflight`, the loop shows `preflight` (amber, steps pending, no chain launch) instead of green. The wizard refuses to start a job while the loop is locked.
+**Finding (preflight of 11:32, round 3):** it was not hung, it ended after about 4.7 min with 2 of 4 probes failed. DEEPSEEK: HTTP 401, the key in `~/.credentials` (ends `JgAA`) is invalid; the probe waited about 4m23s before giving up. GROK: `cursor-agent` is not authenticated (`Authentication required`), also from a plain shell, although `cursor-agent status` still says logged in. CHATGPT and the Anthropic consolidator probes passed.
+**Remaining:** HUMAN must set a valid DeepSeek key and run `cursor-agent login` (or set `CURSOR_API_KEY`), then rerun the preflight. The engine could fail fast on a 401 instead of waiting.
+**Verification:** 34 mocked tests pass (2 new).
+
+## 2026-10-21
+**Agent:** CLAUDE
 **Files:** `generic/loop_wizard.py`, `generic/loop_wizard.html`, `generic/REVIEW_LOOP_GUIDELINE.md`, `.gitignore` (`generic/loops.json` is now local-only), `CHANGELOG.md`
 **Change:** The assistant now runs the steps itself. `generic/loop_wizard.py` serves the page on 127.0.0.1:8795 and exposes a fixed set of actions (git status/commit of ticked files, create loop = branch + spec/README skeletons + commit + registration, start/stop monitor, preflight/one/full runs with live output, retry). Every request needs a per-start token and a 127.0.0.1 Host header; no arbitrary shell. The page also shows live loop colours.
 **Verification:** Auth/Host/validation checked with curl; create_loop run end to end in a throwaway clone; existing-loop flow and git check clicked in the browser pane. No paid run, no commit or monitor start from the page yet.
