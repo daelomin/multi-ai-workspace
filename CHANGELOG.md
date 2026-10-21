@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** CHATGPT
+**Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-4/CHATGPT.md`, `CHANGELOG.md`
+**Change:** Reviewed local charging-efficiency spec v1.4 for round 4 after all round-3 reviews and consolidation. Recorded 0 blocking, 1 major and 0 minor findings: the retained converter equation block and shared-voltage preflight/operating-point rules contradict the newly added segment boundaries, producing inconsistent converter output power and rejecting feasible separated terminal voltages.
+**Remaining:** CLAUDE consolidates round 4. Open HUMAN decisions FB-D8, FB-D9, FB-D10 and FB-D11 were not reopened; accepted changes were revisited only where merged text remains inconsistent.
+**Verification:** Internal reasoning against the local spec and round-3 dispositions; checked hypothetical 40 kW battery / 41 kW converter-output and 410 V station / 400 V converter-input examples. No external product claims or live schema verified. Review includes required finding fields, Top 3 and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branches or pull requests.
+
+## 2026-10-21
 **Agent:** CLAUDE
 **Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-3/CONSOLIDATION.md`, `projects/fuelbuddy/charging-efficiency-specs/spec.md` (symlink; edited via `FuelAtlas_Charging_Accessory_Charger_Research_Spec.md`), `projects/fuelbuddy/charging-efficiency-specs/README.md`, `CHANGELOG.md`
 **Change:** Consolidated charging-efficiency-specs review round 3 (CHATGPT 2, DEEPSEEK 9, GROK 6 findings; 4 major, 13 minor; 17 raw findings merged into 16 items, all accepted, nine with an adjustment) and updated the spec v1.3 → v1.4: segment voltages, losses and passthrough power caps around a converter; converter operating-point policy; `V_e` convention; explicit `peak_mode`; accessory `ac_phases` and AC input fields (no default voltage or power factor); per-destination shipping/VAT table `accessory_offer_destinations`; price timestamp and FX fields in the §8.2 contract; wider §5 conflict list; test `power_convention`; charger protocol and accessory interlock fields; best value has no fallback baseline; booster engagement rule; native-session gate is "strictly faster"; envelope rule for all paths; session count does not set available power; new regressions. README now points at Round 4 reviewing v1.4.
