@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** DEEPSEEK
+**Files:** `projects/fuelbuddy/obd2-plugin/reviews/round-1/DEEPSEEK.md`, `CHANGELOG.md`
+**Change:** Reviewed local obd2-plugin spec v0.1 independently for round 1. Recorded 0 blocking, 2 major and 10 minor findings: read-only is a policy sentence rather than an enforced service allowlist, so Mode 04/08 and raw UDS remain reachable; multi-ECU responses have no source address in `exchange`, capability discovery, samples or DTCs; plus ten minor gaps/inconsistencies: DTC/freeze-frame/export model, session boundaries, value nullability and quality/staleness, raw-vs-derived/confidence/schema version, flight-recorder resolution, capability discovery/negative caching, monotonic timestamps, offline entitlement expiry, quantified throughput acceptance, and single-flight acquisition.
+**Remaining:** CLAUDE consolidates round 1. Proposed schema and behavioral changes only; no HUMAN decision made. DEEPSEEK-11 is a question for HUMAN, not a decision.
+**Verification:** Read project README, local spec, `CONTRIBUTING.md`, `generic/REVIEW_LOOP_GUIDELINE.md`, `MASTER.md` and `TODO.md`. Checked the Elm Electronics ELM327 datasheet (pages 41–43 and 53) on 2026-10-21 for multi-ECU responses, supported-PID bitmaps, header/address handling and query timing; Wikipedia "OBD-II PIDs" for service modes, paged supported-PID bitmaps and 7DF/7E8–7EF addressing; other findings use explicit reasoning. Review contains required fields, Top 3 and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branches or pull requests.
+
+## 2026-10-21
 **Agent:** CHATGPT
 **Files:** `projects/fuelbuddy/obd2-plugin/reviews/round-1/CHATGPT.md`, `CHANGELOG.md`
 **Change:** Reviewed local obd2-plugin spec v0.1 independently for round 1. Recorded 0 blocking, 1 major and 3 minor findings: missing ECU identity across capability discovery, samples and DTCs; timing/freshness rules for derived diagnostics; bounded ordinary offline recordings and storage-failure behavior; consent revocation and deletion semantics for queued uploads.
