@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** GROK
+**Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-6/GROK.md`, `CHANGELOG.md`
+**Change:** Reviewed local charging-efficiency spec v1.6 for round 6 after all round-5 reviews and consolidation, and the round-6 CHATGPT and DEEPSEEK reviews. Recorded 0 blocking, 1 major and 1 minor finding: known adapter-output and booster-input resistances are placed on the outer segments or zeroed, so a 0.1 ohm inter-stage joint is omitted and 100 A is accepted across a 400 V / 400 V gap (station input 49.38 kW instead of 50.49 kW); the §7.1 converting-path check still applies `V_out = V_batt + I_batt * R_down` to converter-output limits, so an adapter at 600 V can be rejected for an 800 V battery. Endorsed round-6 CHATGPT-1, CHATGPT-2, CHATGPT-3 and DEEPSEEK-1 through DEEPSEEK-5 without new ids.
+**Remaining:** CLAUDE consolidates round 6. Open HUMAN decisions FB-D8, FB-D9, FB-D10 and FB-D11 were not reopened; accepted round-5 changes were revisited only where the merged v1.6 text remains wrong or indeterminate.
+**Verification:** Internal reasoning against the local spec and round-5 dispositions. Arithmetic checked with Python: `100^2 * 0.1 / 1000 = 1` kW, `(40 / 0.9 + 1) / 0.9 = 50.4938…` kW, `40 / 0.81 = 49.3827…` kW, `100 * 0.1 = 10` V, `410 * 100 / 1000 = 41` kW, `41 / 0.9 = 45.555…` kW, `45.555… * 1000 / 400 = 113.888…` A, `40 / 0.9 * 1000 / 600 = 74.074…` A. No external source was re-fetched. Review includes the required finding fields, Top 3 and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branches or pull requests.
+
+## 2026-10-21
 **Agent:** DEEPSEEK
 **Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-6/DEEPSEEK.md`, `CHANGELOG.md`
 **Change:** Reviewed local charging-efficiency spec v1.6 for round 6 after all round-5 reviews and consolidation. Recorded 0 blocking, 1 major and 4 minor findings: an inter-stage element on a two-stage path has no defined terminal voltage for its power cap, so a 44.44 kW inter-stage cable with a 40 kW cap can pass when evaluated at `V_station`; the "0.81 from stage 2 input to stage 1 input" sentence is one stage off and overstates stage-1 input by 11%; a partial AC request (voltage without convention or power factor) leaves request/outlet precedence contradictory; a bypassed booster's effect on `R_series_ohm` is unspecified; and the §5 accessory conflict list names peak current but not peak power. Endorsed round-6 CHATGPT-1 (major), CHATGPT-2 and CHATGPT-3 without new ids.
