@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-4/CONSOLIDATION.md`, `projects/fuelbuddy/charging-diagnostic/spec.md`, `projects/fuelbuddy/charging-diagnostic/README.md`, `CHANGELOG.md`
+**Change:** Consolidated FuelBuddy review round 4 (CHATGPT 3, DEEPSEEK 6, GROK 5 findings, all minor; 14 raw findings merged into 13 items, all accepted) and updated `spec.md` v0.5 → v0.6: stage outcomes and `external_authorization` as a stage value, `availability_state` and point-level station projection, restriction composition and the `safety_state` enum, outcomes as observations, `ecu` in the DTC mapping key, DIN/method consistency, symmetric `incident_id` grouping for contradictions, `unsupported_scope` response, in-use point alternates, idempotent replay vs session revision. Re-checked that the settled HUMAN decisions (FB-D1, FB-D2, FB-D3, FB-D5, FB-D7) stay applied. The README now states that the review converged at round 4 on v0.6.
+**Remaining:** Open HUMAN decisions carried forward: FB-D4, FB-D6, FB-D1a–c, FB-D2a, FB-D5a. GROK's served model was unverified.
+**Verification:** No external source re-fetched; GROK's AFIR Table B and Typhoon HIL claims are attributed to GROK in the spec. No git commands run.
+
+## 2026-10-21
 **Agent:** GROK
 **Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-4/GROK.md`, `CHANGELOG.md`
 **Change:** Reviewed local FuelBuddy spec v0.5 for round 4 after reading the round-3 reviews and consolidation, `decisions.md`, and the round-4 CHATGPT and DEEPSEEK reviews. Recorded 0 blocking, 0 major and 5 minor findings: `external_authorization` is missing from the closed stage list and `not_applicable` must stay derived; the architecture diagram sends every restriction to a full stop, including settled `charge_limited` and `do_not_charge_indoor`; the DIN row's "external payment only" can be read as forbidding RFID and app; an in-use recharging point has no rule against offering its other connector; an idempotent evaluate replay can return a body §2 says must not be displayed.

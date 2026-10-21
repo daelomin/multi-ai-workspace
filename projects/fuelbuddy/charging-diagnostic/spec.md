@@ -1,8 +1,8 @@
 # FuelBuddy AI Charging Diagnostic System
 
-**Technical specification — version 0.5**
+**Technical specification — version 0.6**
 **Date:** 21 October 2026
-**Status:** Proposed implementation baseline; production knowledge requires source verification. v0.5 consolidates multi-AI review round 3 and applies the decisions HUMAN settled on 2026-10-14 (FB-D1, FB-D2, FB-D3, FB-D5, FB-D7); v0.4 consolidated round 2 and v0.3 round 1. Passages marked **⚠ Pending HUMAN decision** are proposed, not settled.
+**Status:** Proposed implementation baseline; production knowledge requires source verification. v0.6 consolidates multi-AI review round 4 (no blocking or major finding; the review converged at this version); v0.5 consolidated round 3 and applied the decisions HUMAN settled on 2026-10-14 (FB-D1, FB-D2, FB-D3, FB-D5, FB-D7); v0.4 consolidated round 2 and v0.3 round 1. Passages marked **⚠ Pending HUMAN decision** are proposed, not settled.
 **Scope:** Evidence-based diagnosis of EV charging failures and unexpectedly slow charging.
 
 ## 1. Purpose and principles
@@ -55,10 +55,12 @@ flowchart TD
     C -->|Hazard detected| D[Stop and escalate]
     C -->|No blocking hazard observed| E[Compatibility and evidence matching]
     E --> E2{Safety rules linked to matched errors, issues and campaigns}
-    E2 -->|Hazard or restriction| D
+    E2 -->|Hazard, do_not_charge, other or unmapped restriction| D
+    E2 -->|charge_limited or do_not_charge_indoor| E3[Approved restricted-mode actions and warnings only]
     E2 -->|None newly matched| F[Cause ranking and question selection]
     F --> G[Approved playbook and action selection]
     G --> H[LLM explanation]
+    E3 --> H
     H --> I[Deterministic output validation]
     I --> J[Driver guidance and feedback]
     I -->|Rejected| K[Approved template fallback]
@@ -81,7 +83,7 @@ flowchart TD
 | Output validator | Enforce schema, evidence references, action permissions, and safety decisions |
 | Review pipeline | Verify sources, adjudicate reports, version knowledge, and support rollback |
 
-The LLM MUST NOT override safety decisions, invent source references, issue station control commands, or generate electrical repair procedures. If the LLM is unavailable, deterministic guidance remains usable.
+The LLM MUST NOT override safety decisions, invent source references, issue station control commands, or generate electrical repair procedures. If the LLM is unavailable, deterministic guidance remains usable. Only a `do_not_charge` restriction (including `other` and unmapped values) or a hazard stops the flow; `charge_limited` and `do_not_charge_indoor` continue only into the actions and warnings on their §5 rows and never enter ordinary cause ranking or an unrestricted playbook.
 
 **Session revision.** Every accepted observation or context correction increments a session revision. Every evaluation records `evaluation_id`, `input_revision`, `evaluated_at`, the knowledge/rule/ranking versions used, and the validity conditions of the actions it returns. A response whose revision or permissions are no longer current MUST be suppressed and reevaluated before display; hazard handling MUST NOT wait for LLM completion.
 
@@ -109,11 +111,13 @@ There is exactly **one** observation record. Sections 3, 4, 9, and 11 refer to t
 | subject_type / subject_id | Enum / UUID | yes | What the observation is about: `vehicle`, `evse`, `connector`, `recharging_point`, `station_site`, `session`, `operator`, `environment`, `user`. `recharging_point` is the unit of AFIR status data (§14); it may hold several connectors and is not assumed to be an OCPP connector or EVSE. A payload that carries `session_id` once at top level (§9.1) supplies it to every observation it contains |
 | observation_type | Enum | yes | `measurement`, `protocol_error`, `display_text`, `warning_indicator`, `session_stage_event`, `user_statement`, `image_transcription`, `recall_lookup`, `station_status`, `outcome` |
 | stage | Enum, nullable | required when `observation_type = session_stage_event` | The §3.3 stage the event concerns, or `external_authorization` (§3.3). Applicability of a stage to the session's `communication_profile` is derived, not observed |
+| stage_outcome | Enum, nullable | required when `observation_type = session_stage_event` | `entered`, `succeeded`, `failed`, `unknown`; an unspecified outcome is `unknown`. Only an effective event with `succeeded` establishes stage success (§3.3) |
 | namespace | Enum | for protocol errors | See §4.5 |
 | issuer | String, nullable | no | Emitting standard body, vendor, OEM, or operator |
 | protocol_version | String, nullable | no | Bare version or edition; the protocol family is carried by `namespace`. E.g. `1.6` or `2.0.1` under `OCPP`; the edition (`-2`, `-20`) under `ISO_15118` |
 | message_type / field_path | String, nullable | no | Where the value lives, so it can be re-resolved (§4.5) |
 | component / variable / tech_code | String, nullable | no | OCPP 2.x device-model identity: the component and variable a `NotifyEvent` reports on, and the optional free-form `techCode`. `tech_code` refines but never replaces component and variable (§4.5) |
+| ecu | String, nullable | required when `namespace = VEHICLE_DTC` | The control unit that reported the DTC; null for other namespaces. Part of the §4.5 mapping key |
 | product_model / firmware_scope | String, nullable | no | Product and firmware the value is scoped to |
 | raw_code | String, nullable | no | Code or status token exactly as emitted |
 | raw_text | String, nullable | no | Human-readable text, verbatim, untrusted |
@@ -134,7 +138,7 @@ There is exactly **one** observation record. Sections 3, 4, 9, and 11 refer to t
 
 `source_type` enum (used for both evidence and observations): `oem`, `regulator`, `standard`, `vendor_manual`, `operator`, `partner_integration`, `vehicle_telemetry`, `confirmed_service_outcome`, `community_report`, `unknown`.
 
-**Station-status payload.** An observation with `observation_type = station_status` carries typed state values, each from a versioned vocabulary that includes `unknown`: `operational_state` and `power_sharing_state`. The vocabularies and their versions are part of the release manifest (§12); this spec does not list their values. Available station power is not a status value: it is a `measurement` observation whose catalog kind means available station allocation (unit kW, with the subject, location and temporal qualifiers the catalog requires). The §4.3 `available_power_kw` field is an alias resolved from that observation.
+**Station-status payload.** An observation with `observation_type = station_status` carries typed state values, each from a versioned vocabulary that includes `unknown`: `operational_state`, `availability_state` and `power_sharing_state`. `availability_state` is nullable and is kept separate from `operational_state` (§14 maps each AFIR data type to its own member). The vocabularies, their versions and the source-field binding of each member are part of the release manifest (§12); this spec does not list their values. Available station power is not a status value: it is a `measurement` observation whose catalog kind means available station allocation (unit kW, with the subject, location and temporal qualifiers the catalog requires). The §4.3 `available_power_kw` field is an alias resolved from that observation.
 
 **Measurement identity.** `raw_text` is never the authoritative substitute for `measurement_kind` or its qualifiers. An unknown required qualifier stays `unknown` and makes any comparison that needs it `insufficient_evidence` (§6.4). A comparison requires the same kind. Two measurements with the same subject and unit but different kinds, locations, or aggregations MUST NOT be substituted for one another (fixture in §12), except that the catalog may state an explicit rule for comparing the same kind from differing reporters.
 
@@ -144,11 +148,15 @@ Missing values MUST remain null/unknown. Zero MUST NOT represent unavailable pow
 
 A correction does not delete its predecessor: both are kept for audit, and a versioned *effective-observation* view excludes superseded transcription values from active matching.
 
+**Outcome observations.** An `outcome` observation has `subject_type = session`, and so carries every required field above. Its typed payload (§11) adds `cause_id`, the outcome value, supporting and contradicting `observation_ids`, `actor` and `evidence_ids`; its confirmation quality is the `quality` field. There is no second outcome record shape.
+
 ### 3.3 Session stages
 
 Normalize stage to one of:
 
 `discovery`, `connected`, `authorization`, `communication_setup`, `parameter_negotiation`, `safety_checks`, `power_delivery`, `charging`, `stopping`, `unknown`.
+
+`external_authorization` is also a valid `stage` value of a `session_stage_event`; it is an event value, not a step in any profile's order. `not_applicable` is never a `stage` value: it is derived from the profile.
 
 The stages are **not one fixed linear order.** The expected order depends on the communication profile and the authorization method. Two separate things are both called "authorization" and MUST be recorded apart:
 
@@ -160,12 +168,16 @@ The stages are **not one fixed linear order.** The expected order depends on the
 | communication_profile | Applicable stage order (abridged) |
 | --- | --- |
 | `iso15118` | discovery → connected → communication_setup (incl. SLAC, association, session setup) → **authorization** → parameter_negotiation → [`safety_checks`: DC only, cable check then precharge; `not_applicable` on AC] → power_delivery → charging → stopping |
-| `din70121` | DC only. Same order as the DC `iso15118` row, with `safety_checks` always applicable. `plug_and_charge` is not an allowed `authorization_method`: external payment only |
+| `din70121` | DC only. Same order as the DC `iso15118` row, with `safety_checks` always applicable. `plug_and_charge` is rejected. The protocol payment option is external, so the contract exchange is empty; `rfid`, `app`, `ad_hoc_payment` and `free` stay allowed and are recorded as `external_authorization` when an identification event exists. Do not read this row as `ad_hoc_payment` only |
 | `iec61851_pwm_only` (basic AC, control pilot only) | discovery → connected → power_delivery → charging → stopping; `communication_setup`, `authorization`, `parameter_negotiation` and `safety_checks` are `not_applicable` (not failed or skipped); external identification may occur at any point |
 | `chademo` | discovery → connected → communication_setup → parameter_negotiation → `safety_checks` (insulation test before the vehicle battery is connected) → power_delivery → charging → stopping. Protocol `authorization` is `not_applicable`; external identification is an `external_authorization` event. **Provisional:** taken from a vendor application note ([S11]), pending the CHAdeMO text; do not reuse ISO 15118 message names |
 | `unknown` | record the observed order; do not assume |
 
 `authorization_method` (`rfid`, `app`, `plug_and_charge`, `ad_hoc_payment`, `free`, `unknown`) says how the user is identified. For `plug_and_charge` the protocol `authorization` stage carries the contract exchange; for `rfid`, `app` and `ad_hoc_payment` the `external_authorization` event is recorded separately, and an ISO 15118 session still passes through its own `authorization` stage. "Last successful stage" is interpreted only along the stages applicable to the profile; a stage marked `not_applicable` is never a failure point. That cable check and precharge belong to the DC sequence only rests on secondary descriptions of ISO 15118-2 ([S7]) and DIN SPEC 70121 ([S10]) and is to be confirmed against the standards before encoding; the same holds for the CHAdeMO order.
+
+**Stage outcome.** A `session_stage_event` carries a `stage_outcome` (§3.2). Only an effective event with `stage_outcome = succeeded` establishes that a stage succeeded. The last successful stage is derived for the current attempt (`attempt_id`) along the applicable profile order: success is not inferred from the mere presence of a stage event and is not inherited from a previous attempt. Events with different `clock_source` values are not ordered against each other, and `received_at` gives receipt order, not occurrence order. If attempt membership or ordering cannot be resolved, uncertainty is preserved and the last successful stage stays `unknown`.
+
+**Profile and method consistency.** `plug_and_charge` is allowed only with `iso15118`; it is rejected for `iec61851_pwm_only`, `chademo` and `din70121`. When the profile is `unknown`, the combination is preserved as unknown, not assumed. For `free`, no `external_authorization` event is required; for `unknown`, none is inferred.
 
 Record also the failure timestamp, raw error text, repeat count, and whether another connector, station, network, or charging mode was tested.
 
@@ -233,7 +245,7 @@ VIN decoding is an identification aid. Battery trim, converter fitment, software
 | station_sites | site_id, operator_id, network_brand, country, location, support_contact |
 | evses | evse_id, site_id, manufacturer, hardware_model, hardware_revision, firmware_version, firmware_observed_at, management_protocol/version |
 | connectors | connector_id, evse_id, connector_type, charge_mode, voltage_min/max_v, current_max_a, power_max_kw, adapter_policy |
-| station_observations | A projection of the §3.2 record, not a second shape: `observation_id`, `connector_id` (as `subject_id`), `observation_type` ∈ {`station_status`, `measurement`}, `observed_at`, `received_at`, `source_type`, `source_reference`, `quality`, plus `operational_state` and `power_sharing_state` (the §3.2 station-status payload) and `available_power_kw` (an alias resolved from the §3.2 available-allocation `measurement` observation). The projection resolves the underlying observations by `observation_id` and keeps each value's own provenance and timestamp; it never stores an independent, competing state |
+| station_observations | A projection of the §3.2 record, not a second shape: `observation_id`, `subject_type` and `subject_id` (a `connector` or a `recharging_point`), `observation_type` ∈ {`station_status`, `measurement`}, `observed_at`, `received_at`, `source_type`, `source_reference`, `quality`, plus `operational_state`, `availability_state` and `power_sharing_state` (the §3.2 station-status payload) and `available_power_kw` (an alias resolved from the §3.2 available-allocation `measurement` observation). The projection resolves the underlying observations by `observation_id` and keeps each value's own provenance and timestamp; it never stores an independent, competing state. A `recharging_point` observation keeps its point subject; it resolves to a connector only through a documented identity relation and is never copied onto connectors |
 
 Rated power and currently available power are separate fields. Unknown hardware or firmware MUST NOT be filled from network-wide assumptions. A station listing identifies a site; connector-level identity is needed for diagnosis.
 
@@ -268,9 +280,9 @@ Recall campaigns are separate records: `campaign_id`, `authority`, `market`, `OE
 
 Mapping key:
 
-`namespace + issuer + protocol_version + message_type + field_path + component + variable + tech_code + product_model + firmware_scope + raw_code`.
+`namespace + issuer + ecu + protocol_version + message_type + field_path + component + variable + tech_code + product_model + firmware_scope + raw_code`.
 
-`message_type` and `field_path` are required because the same value means different things in different messages (e.g. OCPP 1.6 `StatusNotification.errorCode` versus OCPP 2.0.1 `NotifyEvent` on a device-model component). In OCPP 2.0.1 there is no `StatusNotification.errorCode`: a fault is a `NotifyEvent` report for a specific device-model component and variable, with optional free-form `techCode` and `techInfo`, and the station's device model decides what is reported ([S3]). Therefore an OCPP 2.x device-model mapping requires `message_type = NotifyEvent` plus `component` and `variable`; `tech_code` distinguishes vendor detail when present and is not a substitute for component and variable; a mapping that lacks component and variable MUST NOT match a 2.x device-model event. For other namespaces `component`, `variable` and `tech_code` are null. No fixed cross-version map from OCPP 1.6 `ChargePointErrorCode` values onto 2.0.1 events is assumed. Fields include raw text, normalized category, session stage, possible causes, safety semantics, evidence references, and approved playbook links.
+`message_type` and `field_path` are required because the same value means different things in different messages (e.g. OCPP 1.6 `StatusNotification.errorCode` versus OCPP 2.0.1 `NotifyEvent` on a device-model component). In OCPP 2.0.1 there is no `StatusNotification.errorCode`: a fault is a `NotifyEvent` report for a specific device-model component and variable, with optional free-form `techCode` and `techInfo`, and the station's device model decides what is reported ([S3]). Therefore an OCPP 2.x device-model mapping requires `message_type = NotifyEvent` plus `component` and `variable`; `tech_code` distinguishes vendor detail when present and is not a substitute for component and variable; a mapping that lacks component and variable MUST NOT match a 2.x device-model event. For other namespaces `component`, `variable` and `tech_code` are null. `ecu` is required when `namespace = VEHICLE_DTC` and null otherwise, so the same numeric DTC reported by two control units on one vehicle does not collide; a mapping without an ECU never matches a `VEHICLE_DTC` observation. No fixed cross-version map from OCPP 1.6 `ChargePointErrorCode` values onto 2.0.1 events is assumed. Fields include raw text, normalized category, session stage, possible causes, safety semantics, evidence references, and approved playbook links.
 
 Keep these namespaces distinct:
 
@@ -327,6 +339,8 @@ Safety is independent of the statistical ranking engine and runs before diagnosi
 
 **Typed safety state.** The safety engine maintains an explicit state object: matched `rule_ids`, affected vehicle/equipment scope, triggering `observation_ids`, and clearance conditions. Restrictions are cleared only by evidence and an actor authorized by the applicable rule — never by the passage of time, a missing warning, or a later successful session.
 
+**Safety-state vocabulary.** The `safety_state` value carried in the LLM payload (§9.1) and output (§9.2) is a closed, versioned enum derived from the typed state object and set only by the safety engine. In order from least to most restrictive: `no_blocking_hazard_observed`; `restricted` (only `charge_limited` or `do_not_charge_indoor` restrictions apply); `stopped` (a reported hazard applies, or a `do_not_charge`, `other` or unmapped restriction applies). The value is never made less restrictive by a later observation, a missing warning, an LLM response or a fallback path; it is lowered only by a clearance under the rules below. The labels are provisional until the `safety_reviewer` approves them, and the enum and its version are bound to the release manifest (§12).
+
 **Clearance semantics (FB-D2, settled by HUMAN on 2026-10-14).**
 
 > Credible reports of damage or a potentially safety-related warning suspend retry and alternate-charging recommendations pending the relevant approved triage playbook; a generic unclassified error alone does not establish a hazard. Missing or contradictory observations do not clear an active restriction. Each restriction can be cleared only by evidence and an actor authorized by its approved rule; a successful charging session does not itself clear it.
@@ -348,6 +362,8 @@ Restriction values map to driver-facing behaviour as follows:
 | `charge_limited` | Only the approved limited-charging instructions as published; nothing else |
 | `do_not_charge_indoor` | Outdoor-only guidance with the approved warning |
 | `other` or unmapped | Treated as `do_not_charge` (amendment 1) |
+
+**Combining restrictions.** When several restrictions apply at once, each is evaluated against its own subject scope (amendment 4), and an action is permitted only if every applicable restriction permits it. `do_not_charge` (including `other` and unmapped values) permits no charging action. Otherwise all applicable limits and approved warnings are retained rather than choosing one enum value, so `charge_limited` and `do_not_charge_indoor` together keep both conditions. If no approved action satisfies the combined conditions, return approved escalation guidance. This composes the settled "most restrictive wins" rule; it changes no approved instruction or clearance rule.
 
 **Hazard screening (FB-D3, settled by HUMAN on 2026-10-14).** The app is not a smoke or fire detector. A hazard reaches it only as a driver report (typed or spoken text, an intake answer, a photo hint the driver confirms) or as an operator or station fault-feed report.
 
@@ -398,7 +414,7 @@ Each term is a defined function over observation and evidence records, and the w
 | Term | Range | Definition |
 | --- | --- | --- |
 | `supporting` | [0, 1] | Sum over **distinct evidence groups** of `reliability_weight × quality_weight`, capped at 1. The identity of an evidence group is its `incident_id` when non-null, independent of source URL and document version; a null `incident_id` makes the record its own incident, identified by `evidence_id` (§4.1). Source and document metadata remain provenance and never split a known shared incident, so copied reports are not counted twice. The ranking policy defines aggregation within each group. |
-| `contradicting` | [0, 1] | The same function over contradicting observations. |
+| `contradicting` | [0, 1] | The same function over contradicting observations, using the same evidence-group identity as `supporting`: each contradicting observation is grouped through the evidence behind it by `incident_id` (null: `evidence_id`), and an observation with no evidence record is its own group, identified by `observation_id`, so a copied contradicting report adds one contribution. `reliability_weight` and `quality_weight` come from the ranking policy tables, keyed by `source_type` and the observation's `quality` (§3.2). `conflict_group_id` groups mutually conflicting observations and is not the dedup key. |
 | `specificity` | [0, 0.5] | Applies **only if `supporting > 0`**. A precisely matching known issue cannot raise a cause that has no supporting observation. |
 | `uncertainty` | [0, 0.5] | Proportional to the number of missing discriminators for that cause. |
 
@@ -420,6 +436,8 @@ Weights require documented rationale and validation; they are never tuned silent
 The ranked list may be **empty**; a top weak candidate MUST NOT be presented as the probable diagnosis. Numeric thresholds are set from pilot evidence (§13), not invented here. `decision_status`, its reasons, and `evidence_strength` are always included in the output.
 
 Display evidence strength as `strong`, `moderate`, `weak`, or `insufficient`, with reasons and missing information.
+
+**`unsupported_scope` response.** A response with `decision_status = unsupported_scope` still runs and displays the §5 safety evaluation and any applicable restriction. It returns the manifest's declared general guidance as approved questions, actions and escalation, and states which manifest entry is missing or unsupported. It MUST NOT be presented as a `supported_hypothesis` or as a cause-specific playbook. This defines the response contract only; which countries and configurations are in scope remains open (FB-D1a–c).
 
 **Documented ordering (FB-D7, settled by HUMAN on 2026-10-14: Option A).** The MVP ships a documented, not yet calibrated, ordering: ordinary causes (station fault, authorization, cable, user setup) first, with specificity gated as above. Calibrated base rates stay deferred to §6.3, and ranking is not blocked until calibration. This spec adds no calibrated numbers; the ordering is versioned in the ranking policy and its fixture.
 
@@ -608,7 +626,7 @@ Machine-checkable invariants (the deterministic validator):
 - schema conformance, and `action_id` ∈ `allowed_action_ids`;
 - every `cause_id` and `evidence_id` resolves to a supplied record;
 - no percentages or probability language;
-- `safety_state` is monotonic and not contradicted (e.g. "safe to retry" is rejected when a hazard is set);
+- `safety_state` is a value of the §5 enum, no less restrictive than the deterministic state of the current evaluation (monotonic), and not contradicted (e.g. "safe to retry" is rejected when a hazard is set);
 - no claim of confirmed repair, recall coverage, or component replacement absent evidence;
 - no number, code, model name, or organisation that is absent from the input in `summary`.
 
@@ -652,31 +670,33 @@ Proposed service endpoints:
 
 **Authentication.** *All* reads and writes require authentication and object-level authorization to the session, vehicle, observations, evidence attachments, and outcomes. Partner events require an authenticated provider identity and an authorized mapping to the relevant subject/session. Confirmation labels distinguish user-reported service statements from authenticated or reviewer-verified operator/dealer evidence; unverified actor text cannot assign independently-confirmed status. Apply least privilege, rate limits, access audit, and explicit attachment access controls.
 
-**Idempotency.** Mutation endpoints accept an `Idempotency-Key` header (or a client-supplied `client_request_id`). A replayed request with the same key returns the stored result and appends nothing; this prevents a retried observation POST from duplicating immutable observations.
+**Idempotency.** Mutation endpoints accept an `Idempotency-Key` header (or a client-supplied `client_request_id`). A replayed request with the same key returns the stored result and appends nothing; this prevents a retried observation POST from duplicating immutable observations. Replaying an evaluation returns the stored body and creates no second evaluation, but that body remains subject to §2 before display: if its `input_revision` or the safety permissions are no longer current, it is suppressed and reevaluated, so a replay never restores actions that a later hazard or restriction has removed.
 
 Each evaluation records input references, `input_revision`, rule version, knowledge version, ranking version, model version when used, and selected actions. External integrations need timeouts, rate limits, freshness policies, and circuit breakers; on failure they fall back to manual inputs and disclose unavailable evidence. Cached public specifications must not be represented as live telemetry.
 
-**Outcome linkage.** An outcome record carries `cause_id`, supporting and contradicting `observation_ids`, `confirmation_quality` (the §3.2 quality enum), `actor`, and `evidence_ids`, so that resolved sessions can feed the confirmation loop. Outcome values: `charged_after_retry`, `charged_at_other_station`, `operator_confirmed_station_fault`, `dealer_confirmed_component_fault`, `unresolved`. A resolved session is not automatically a confirmed root cause.
+**Outcome linkage.** An outcome is an `outcome` observation (§3.2) on the session subject, not a second record shape; `POST .../outcomes` is a typed entry point that validates the payload and appends it. Besides the §3.2 required fields, its payload carries `cause_id`, supporting and contradicting `observation_ids`, `actor`, and `evidence_ids`, and its confirmation quality is the §3.2 `quality` field, so that resolved sessions can feed the confirmation loop. Outcome values: `charged_after_retry`, `charged_at_other_station`, `operator_confirmed_station_fault`, `dealer_confirmed_component_fault`, `unresolved`. A resolved session is not automatically a confirmed root cause.
 
 ## 12. Validation and release gates
 
 | Test group | Required checks |
 | --- | --- |
-| Safety | Blocking hazards suppress retries and ordinary troubleshooting; restrictions persist across LLM and fallback paths; restriction clearing follows §5; a `Critical` issue linked to a `do_not_charge` rule suppresses retries |
-| Restrictions | An `other` or unmapped restriction behaves as `do_not_charge`; free text never yields a milder behaviour; a driver statement cannot clear a restriction; an equipment-scoped restriction does not block the vehicle elsewhere; conflicting restrictions resolve to the most restrictive; an old equipment restriction downgrades to "unverified" but is never cleared by time |
+| Safety | Blocking hazards suppress retries and ordinary troubleshooting; restrictions persist across LLM and fallback paths; restriction clearing follows §5; a `Critical` issue linked to a `do_not_charge` rule suppresses retries; a fallback path that yields a `safety_state` below the deterministic value is a failure |
+| Restrictions | An `other` or unmapped restriction behaves as `do_not_charge`; free text never yields a milder behaviour; a driver statement cannot clear a restriction; an equipment-scoped restriction does not block the vehicle elsewhere; conflicting restrictions resolve to the most restrictive; an old equipment restriction downgrades to "unverified" but is never cleared by time; a `charge_limited` restriction combined with a `do_not_charge_indoor` restriction keeps both conditions, and when no approved action satisfies both, approved escalation guidance is returned; `charge_limited` and `do_not_charge_indoor` reach only their §5 actions and never ordinary ranking, while `do_not_charge`, `other` and unmapped values stop the flow |
 | Hazard screening | Every session starts with the screening question; a yes (typed, spoken or free-text) goes straight to the emergency message; a photo hint only becomes a question; a station-feed `GroundFailure`/`OverCurrentFailure`/`HighTemperature` code alone does not trigger the fire message; no output instructs the driver to use an emergency stop, force a plug, or pull a cable |
 | Safety after matching | A fixture where only knowledge matching (not the initial observations) identifies an applicable approved restriction; both normal and fallback output must honor it |
 | Measurement identity | A fixture with two temperatures sharing subject and unit but of different kinds, and instantaneous and averaged power at different locations; neither pair may be substituted for the other. Charger output power and battery input power are not compared as one quantity; the same kind from differing reporters is compared only where the catalog has a rule, otherwise `insufficient_evidence` |
-| Station status | Station state and available power resolve to canonical observations; the §4.3 projection holds no competing value; AFIR point status is stored on a `recharging_point` subject and is not copied onto each connector (§14) |
-| Stages | Plug & Charge authorization follows communication setup and precedes parameter negotiation; a PWM-only AC session marks `communication_setup`, `authorization`, `parameter_negotiation` and `safety_checks` as `not_applicable`, never failed; a `din70121` session never marks `safety_checks` `not_applicable` and rejects `plug_and_charge`; `iso15118` on AC marks `safety_checks` `not_applicable`; `external_authorization` is stored as a `session_stage_event` with its own `stage` value, distinct from the protocol `authorization` stage |
+| Station status | Station state and available power resolve to canonical observations; the §4.3 projection holds no competing value; AFIR point status is stored on a `recharging_point` subject and is not copied onto each connector (§14); a fixture with one point holding several connectors and independent operational-status and availability observations keeps the point subject and both values' provenance in the projection, and while that point is `in use` or `reserved`, alternate-charging advice names a different point, never a sibling connector |
+| Stages | Plug & Charge authorization follows communication setup and precedes parameter negotiation; a PWM-only AC session derives `communication_setup`, `authorization`, `parameter_negotiation` and `safety_checks` as `not_applicable` from the profile (the word is never stored as a `stage`), never failed; a `din70121` session never derives `safety_checks` as `not_applicable`, rejects `plug_and_charge` and accepts an `rfid`, `app` or `ad_hoc_payment` identification; `iso15118` on AC derives `safety_checks` as `not_applicable`; `plug_and_charge` is rejected for PWM-only, CHAdeMO and DIN profiles and preserved as unknown under an `unknown` profile; a `free` session needs no `external_authorization` event; `external_authorization` is stored as a `session_stage_event` with its own `stage` value, distinct from the protocol `authorization` stage; a successful `authorization` in attempt A and a failed `authorization` in attempt B leave attempt B with no inherited success, a stage event with `stage_outcome` `unknown` establishes no success, and events on different `clock_source` values are not ordered against each other |
 | Supersession | Predecessor A stays active while successor B is under review; B replaces A on activation; self-links and cycles are rejected |
-| Concurrency | Out-of-order and delayed evaluations cannot restore obsolete actions; a hazard observed during an in-flight LLM call suppresses the stale response; reconnecting clients see current permissions |
+| Concurrency | Out-of-order and delayed evaluations cannot restore obsolete actions; a hazard observed during an in-flight LLM call suppresses the stale response; reconnecting clients see current permissions; a replayed `evaluate` with the same `Idempotency-Key` after a new hazard observation is suppressed and reevaluated, never displayed with removed actions |
 | Applicability | Market, variant, build range, software, adapter, and converter conditions are respected; predicates are three-valued; unknown equipment cannot satisfy a positive or negative predicate; software ordering is issuer-defined |
-| Error scope | Identical numeric codes from different issuers cannot collide; OCPP 1.6 `StatusNotification.errorCode` and OCPP 2.0.1 `NotifyEvent` do not collide; unknown firmware does not create a precise (vendor) match; two OCPP 2.0.1 events with the same or no `techCode` on different components do not collide, and a mapping lacking component and variable never matches one |
-| Ranking | Severity is not treated as likelihood; specificity cannot lift a cause with no supporting observation; contradictory evidence lowers support; unknown causes remain possible; `decision_status` and empty ranked lists behave as specified; the documented (uncalibrated) ordering of FB-D7 holds; two documents with different URLs and versions linked to one `incident_id` add one evidence-group contribution, not two |
+| Error scope | Identical numeric codes from different issuers cannot collide; OCPP 1.6 `StatusNotification.errorCode` and OCPP 2.0.1 `NotifyEvent` do not collide; unknown firmware does not create a precise (vendor) match; two OCPP 2.0.1 events with the same or no `techCode` on different components do not collide, and a mapping lacking component and variable never matches one; the same numeric DTC reported by two ECUs on one vehicle does not collide, and a mapping without an ECU never matches a `VEHICLE_DTC` observation |
+| Ranking | Severity is not treated as likelihood; specificity cannot lift a cause with no supporting observation; contradictory evidence lowers support; unknown causes remain possible; `decision_status` and empty ranked lists behave as specified; the documented (uncalibrated) ordering of FB-D7 holds; two documents with different URLs and versions linked to one `incident_id` add one evidence-group contribution, not two, and the same holds for two contradicting documents linked to one `incident_id`, which add one contradiction contribution |
+| Out of scope | An out-of-manifest configuration returns `unsupported_scope` with the §5 safety evaluation, the manifest's general guidance and the missing manifest entry, and is never presented as a `supported_hypothesis` or a cause-specific playbook |
 | Missing data | Null telemetry does not become zero; unknown converter/firmware/recall status produces uncertainty |
 | Slow charging | SoC, AC/DC mode, capability limits, timing, measurement location/averaging, and available temperature data affect expected power correctly; ramp-up, taper, shared allocation, and incompatible measurement boundaries are covered |
-| LLM | Prompt injection; invented sources/probabilities; unauthorized action hidden in `summary`, a question, or an escalation line, including localized outputs; definitive unsupported diagnoses are rejected; executable guidance is rendered from approved text only; valid supplied cause IDs returned in reversed order, or an abstention status changed to `supported_hypothesis`, are rejected and the evaluated response is preserved by the deterministic fallback (§9.2) |
+| LLM | Prompt injection; invented sources/probabilities; unauthorized action hidden in `summary`, a question, or an escalation line, including localized outputs; definitive unsupported diagnoses are rejected; executable guidance is rendered from approved text only; valid supplied cause IDs returned in reversed order, or an abstention status changed to `supported_hypothesis`, are rejected and the evaluated response is preserved by the deterministic fallback (§9.2); a response that lowers `safety_state` is rejected the same way and the deterministic state is preserved |
+| Outcomes | An outcome stores and retrieves as an `outcome` observation with the same required provenance fields as other evidence (§3.2); one lacking `source_reference` or `quality` is rejected |
 | Privacy | Sensitive identifiers and credentials are excluded from LLM payloads, traces, logs, and public contributions; redaction precedes any external model call |
 | Offline/failure | Approved deterministic guidance remains available when providers or the LLM fail; expired or unverifiable cached packages degrade by risk as settled in FB-D5 (§4.1): safety content always available, known restrictions never cleared offline, missing recall status stays `unknown`, stale data never more permissive than fresh data, and no hard block on "cannot verify" |
 
@@ -717,8 +737,9 @@ No automatic retraining or rule promotion follows a single successful retry. Hum
 **AFIR (EU).** Under Regulation (EU) 2023/1804 (AFIR) Article 20, operators of public charging points must publish static and dynamic data — including operational status, availability, and ad hoc price — through national access points [S6]. Commission Implementing Regulation (EU) 2025/655 [S9] states the obligations: recital (1) records that Article 20(2) requires operators to make static and dynamic data available by 14 April 2025 and that Member States make it accessible through national access points (Article 20(4)); Article 1(1)(b) requires the DATEX II model, at least CEN/TS 16157-10:2022, from 14 April 2026; Article 2 requires dynamic data to be updated no later than one minute after a change and static data no later than twenty-four hours. These were read by the GROK reviewer on 2026-10-14; the base-regulation Article 20 text was cited through the implementing regulation and not re-read, and the consolidator did not independently re-fetch either. Annex Table F of that regulation sets operational status and availability at data level **Point**, and Table B separates the recharging-point ID from a "number of connectors" field, so a recharging point may have more than one connector (read by the GROK reviewer on 2026-10-21; not re-fetched by the consolidator). Therefore:
 
 - The feed gives recharging-point operational *status* and availability through EU Member State national access points without an operator contract. The regulation is binding in the Member States; it does not cover the UK or Switzerland, and coverage of EEA non-EU states, the UK and Switzerland is an open question (FB-D1a).
-- Store the point as its own subject (`recharging_point`, §3.2). Do not copy point status onto each connector as an independent observation, and do not assume the point is an OCPP connector or EVSE.
-- Operational status is `operational` or `non-operational`; availability is `in use`, `reserved` or `not in use`. Record them as `station_status` observations with those literals, a field path that keeps the two data types apart, and `source_type` `regulator`. They are not `protocol_error` observations and do not by themselves raise a hazard or a restriction. "Non-operational" means a technical problem or maintenance, not a ground fault or fire.
+- Store the point as its own subject (`recharging_point`, §3.2). Do not copy point status onto each connector as an independent observation, and do not assume the point is an OCPP connector or EVSE. Table B labels the point identifier "Recharging Point ID code (Connector)" while its data level is Point; follow the data level, so a mapper does not relabel the point as a connector (read by the GROK reviewer on 2026-10-21; not re-fetched by the consolidator).
+- A recharging point may have more than one connector, and only one of them can be used at the same time (Table B, "Number of connectors", read by the GROK reviewer on 2026-10-21; not re-fetched by the consolidator). While that point's availability is `in use` or `reserved`, do not recommend another connector on the same point as an alternate charging place; an alternate place is a different recharging point. Do not copy the point observation onto the sibling connectors.
+- Operational status is `operational` or `non-operational`; availability is `in use`, `reserved` or `not in use`. Record them as `station_status` observations with those literals, operational status in the `operational_state` payload member and availability in the separate `availability_state` member (§3.2), a field path that keeps the two data types apart, and `source_type` `regulator`. They are not `protocol_error` observations and do not by themselves raise a hazard or a restriction. "Non-operational" means a technical problem or maintenance, not a ground fault or fire.
 - An AFIR connector-type value of Megawatt Charging System stays `unsupported_scope` (§4.5).
 - It remains operator-reported status, not internal diagnostics, which §3.1's caution covers.
 
@@ -739,12 +760,24 @@ The following primary sources support the narrow corrections in this revision. O
 - **[S7] Typhoon HIL:** ISO 15118-2 protocol description (secondary description of the sequence, not the ISO text; Mode 3 has mandatory PWM signalling and optional high-level communication). https://typhoon-hil.com/documentation/typhoon-hil-software-manual/References/iso15118_protocol.html (checked 2026-10-14 by the GROK reviewer).
 - **[S8] Beckhoff:** IEC 61851 low-level communication, control-pilot state table (vendor summary, not IEC 61851-1). https://infosys.beckhoff.com/content/1033/el6761/18724365579.html (checked 2026-10-14 by the GROK reviewer).
 - **[S9] European Union:** Commission Implementing Regulation (EU) 2025/655 — format, frequency and DATEX II requirements for AFIR data. https://eur-lex.europa.eu/eli/reg_impl/2025/655/oj (checked 2026-10-14 and, including Annex Tables B and F, 2026-10-21 by the GROK reviewer).
-- **[S10] Typhoon HIL:** DIN SPEC 70121 protocol description (secondary description, not the DIN text; DC only, external payment only, no Plug & Charge). https://typhoon-hil.com/documentation/typhoon-hil-software-manual/References/din70121_protocol.html (checked 2026-10-21 by the GROK reviewer).
+- **[S10] Typhoon HIL:** DIN SPEC 70121 protocol description (secondary description, not the DIN text; DC only, external protocol payment option only, no Plug & Charge). https://typhoon-hil.com/documentation/typhoon-hil-software-manual/References/din70121_protocol.html (checked 2026-10-21 by the GROK reviewer).
 - **[S11] Siemens:** TIA library for CHAdeMO, specification V0.9.1 to V2.0, section 3.4 (vendor application note, not the CHAdeMO text). https://cache.industry.siemens.com/dl/files/961/109779961/att_1052261/v1/FB_CHAdeMO_en-US_20210118AB.pdf (checked 2026-10-21 by the GROK reviewer).
 
 Sources were consulted during the review accompanying this revision. Production ingestion must retain exact document editions, source locators, applicability, retrieval dates, and review decisions. Product pages can change; snapshot or version the relied-upon evidence where permitted.
 
 ## 16. Change history
+
+### 16.0.1 From v0.5 to v0.6 (multi-AI review round 4, final round)
+
+Consolidated from the round-4 reviews by CHATGPT, DEEPSEEK and GROK (0 blocking, 0 major, 14 minor findings); see `reviews/round-4/CONSOLIDATION.md`. The review converged at this version. The settled HUMAN decisions (FB-D1, FB-D2, FB-D3, FB-D5, FB-D7) were re-checked and stay applied; FB-D4, FB-D6, FB-D1a–c, FB-D2a and FB-D5a remain open for HUMAN.
+
+- Added `stage_outcome` to stage events, the derivation of the last successful stage per attempt, and the `external_authorization` event value; `not_applicable` stays derived (§3.2, §3.3, §12).
+- Added `availability_state` to the station-status payload and made the station projection keep the `recharging_point` subject; an in-use point's sibling connectors are not offered as alternates (§3.2, §4.3, §14, §12).
+- Added the composition rule for simultaneously applicable restrictions, routed `charge_limited` and `do_not_charge_indoor` to their own actions in the architecture, and defined the closed `safety_state` enum and its ordering (§2, §5, §9.2, §12).
+- Outcomes are `outcome` observations, not a second record shape (§3.2, §11); added `ecu` to the record and the DTC mapping key (§3.2, §4.5).
+- Clarified the DIN SPEC 70121 identification wording, added the profile/method consistency rule and fixtures (§3.3, §12, §15 [S10]).
+- Applied the `incident_id` evidence-group identity to `contradicting`, and specified the `unsupported_scope` response (§6.2, §12).
+- A replayed `evaluate` is still subject to the session-revision check (§11, §12).
 
 ### 16.0 From v0.4 to v0.5 (multi-AI review round 3 and settled HUMAN decisions)
 
