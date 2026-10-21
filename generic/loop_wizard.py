@@ -21,6 +21,7 @@ import subprocess
 import sys
 import time
 import uuid
+from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -301,12 +302,17 @@ class Handler(BaseHTTPRequestHandler):
     def _authorized(self) -> bool:
         host_ok = self.headers.get("Host", "") in (f"127.0.0.1:{PORT}", f"localhost:{PORT}")
         token = self.headers.get("X-Token") or parse_qs(urlparse(self.path).query).get("t", [""])[0]
+        if not token and urlparse(self.path).path == "/":  # the page itself may load with the cookie set by a first visit
+            token = SimpleCookie(self.headers.get("Cookie", "")).get("wizard_token", None)
+            token = token.value if token else ""
         return host_ok and secrets.compare_digest(token, TOKEN)
 
     def _send(self, code: int, body: bytes, ctype: str = "application/json") -> None:
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Cache-Control", "no-store")
+        if ctype.startswith("text/html"):  # Strict: other sites cannot make the browser send it
+            self.send_header("Set-Cookie", f"wizard_token={TOKEN}; HttpOnly; SameSite=Strict; Path=/")
         self.end_headers()
         self.wfile.write(body)
 
@@ -315,7 +321,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if not self._authorized():
-            return self._json(403, {"error": "forbidden (open the URL printed by loop_wizard.py)"})
+            return self._json(403, {"error": "forbidden: open the full link once (cat generic/.monitor/wizard.url); after that plain http://127.0.0.1:8795/ works"})
         path = urlparse(self.path).path
         try:
             if path == "/":

@@ -2,6 +2,13 @@
 
 ## 2026-10-21
 **Agent:** CLAUDE
+**Files:** `generic/specs_review_loop.py`, `generic/tests/test_specs_review_loop.py`, `CHANGELOG.md`
+**Change:** Fixed the DeepSeek 401. The DeepSeek reviewer ran `claude` with the default config dir `~/.claude`, which now holds a claude.ai OAuth login; Claude Code sent that login token (not the DeepSeek key) to api.deepseek.com, which answered "Authentication Fails" (the key echoed as `****JgAA` was the OAuth token, not the DeepSeek key ending `fb42`). The DEEPSEEK profile now sets `CLAUDE_CONFIG_DIR` to its own dir (`~/.claude-deepseek`, override `DEEPSEEK_CLAUDE_CONFIG_DIR`), like the Anthropic consolidator already did.
+**Verification:** The key in `~/.credentials` returns HTTP 200 on both DeepSeek endpoints; a probe through `_claude_once` with the isolated profile returned OK from deepseek-chat. 37 mocked tests pass (1 new). Full preflight not yet rerun.
+**Remaining:** GROK still needs `cursor-agent login`. The OAuth login token was sent to api.deepseek.com on each DeepSeek call since that login; it is a short-lived access token that rotates, but log out and in to rotate it now if concerned.
+
+## 2026-10-21
+**Agent:** CLAUDE
 **Files:** `generic/loop_monitor.py`, `generic/specs_review_loop.py`, `generic/loop_wizard.html`, `generic/tests/test_loop_monitor.py`, `CHANGELOG.md`
 **Change:** Added a `PREFLIGHT` node per round. Jarvis graph: `rN-PREFLIGHT` (depends on `r(N-1)-CLAUDE`) gates the round's reviewers; it is in progress while probes run, red if any fail, completed if they pass, pending if none ran for round N. The engine now writes the round into `preflight.json`, so a pass for another round does not count. Same chip on the colour page and the assistant page. Only the current round has a preflight node.
 **Verification:** 36 mocked tests pass (1 new; one flaky cmdline test made robust). Live graph shows `r3-PREFLIGHT` failed with DEEPSEEK/GROK reasons. A passing/running preflight node was only tested with mocks.

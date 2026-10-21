@@ -56,6 +56,11 @@ CLAUDE_MODEL = os.environ.get("CLAUDE_CONSOLIDATOR_MODEL", "claude-sonnet-5-5")
 ANTHROPIC_CONFIG_DIR = Path(
     os.environ.get("ANTHROPIC_CLAUDE_CONFIG_DIR", str(Path.home() / ".claude-anthropic"))
 ).expanduser()
+# Claude Code profile for the DeepSeek reviewer. It must not be ~/.claude: a claude.ai login there
+# (OAuth) takes precedence and its token would be sent to DeepSeek, which answers 401.
+DEEPSEEK_CONFIG_DIR = Path(
+    os.environ.get("DEEPSEEK_CLAUDE_CONFIG_DIR", str(Path.home() / ".claude-deepseek"))
+).expanduser()
 GROK_MODEL = os.environ.get("GROK_MODEL", "grok-4.7-high")
 CURSOR_REVIEW_MODEL = os.environ.get("CURSOR_REVIEW_MODEL", "auto")
 CURSOR_AGENT_BIN = os.environ.get(
@@ -327,7 +332,9 @@ def _claude_once(profile: str, prompt: str, root: Path, logfile: Path, timeout: 
         small = os.environ.get("DEEPSEEK_SMALL_MODEL", "deepseek-flash")
         if model == DEEPSEEK_FALLBACK_MODEL:
             small = DEEPSEEK_FALLBACK_MODEL
-        # Flag settings take precedence over ~/.claude/settings.json.
+        DEEPSEEK_CONFIG_DIR.mkdir(mode=0o700, exist_ok=True)
+        env["CLAUDE_CONFIG_DIR"] = str(DEEPSEEK_CONFIG_DIR)  # no OAuth login in here, only the DeepSeek key below
+        # Flag settings take precedence over the profile's settings.json.
         tmp = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
         json.dump({"env": {
             "ANTHROPIC_BASE_URL": DEEPSEEK_BASE_URL,
@@ -739,16 +746,30 @@ def preflight(root: Path, reviewers: list[str], with_consolidator: bool) -> None
         probes.append(("CURSOR", lambda: probe_write(root, "CURSOR", lambda p, lf: run_cursor_agent(p, root, lf, 300, CURSOR_REVIEW_MODEL))))
     failures = []
     reasons = {}
+    rnd = current_round()
+    state = {name: {"status": "pending", "detail": ""} for name, _ in probes}
+
+    def record(done: bool = False) -> None:
+        # Machine-readable progress for generic/loop_monitor.py (one Jarvis node per probe);
+        # a later preflight overwrites it.
+        (LOG_DIR / "preflight.json").write_text(json.dumps(
+            {"time": time.strftime("%FT%T"), "round": rnd, "done": done, "passed": done and not failures,
+             "failed": reasons, "probes": state}, indent=2), encoding="utf-8")
+
+    record()
     for name, fn in probes:
+        state[name]["status"] = "running"
+        record()
         try:
             fn()
+            state[name]["status"] = "complete"
         except SystemExit as exc:
             failures.append(name)
             reasons[name] = str(exc).splitlines()[0][:300] if str(exc) else "failed"
+            state[name].update(status="failed", detail=reasons[name])
             log(f"FAILED {name}: {exc}")
-    # Machine-readable result for generic/loop_monitor.py; a later passing preflight overwrites it.
-    (LOG_DIR / "preflight.json").write_text(json.dumps(
-        {"time": time.strftime("%FT%T"), "round": current_round(), "passed": not failures, "failed": reasons}, indent=2), encoding="utf-8")
+        record()
+    record(done=True)
     if failures:
         raise SystemExit(f"preflight failed ({len(failures)} of {len(probes)} probes): {', '.join(failures)}")
     log("preflight passed")

@@ -96,6 +96,28 @@ class State(Base):
         (logs / "preflight.json").write_text(json.dumps({"round": 1, "passed": True, "failed": {}}))
         self.assertEqual(graph()["r2-PREFLIGHT"]["status"], "pending")  # a pass for another round does not count
 
+    def test_probe_nodes_in_jarvis_graph(self):
+        p = self.project("a")
+        logs = p / "automation" / "logs"
+        (logs / "preflight.json").write_text(json.dumps({"round": 2, "done": False, "probes": {
+            "DEEPSEEK": {"status": "complete", "detail": ""}, "GROK": {"status": "running", "detail": ""},
+            "CHATGPT": {"status": "pending", "detail": ""}}}))
+        def nodes(pre_running):
+            with mock.patch.object(lm, "lock_holder", return_value=9 if pre_running else None), \
+                    mock.patch.object(lm, "is_preflight", return_value=True), \
+                    mock.patch.object(lm, "JARVIS_DIR", self.root / "j"):
+                lm.write_jarvis([lm.evaluate(self.loop("a", reviewers="DEEPSEEK,GROK,CHATGPT"))])
+            return json.loads((self.root / "j/memory/graph_review-loop-a.json").read_text())["nodes"]
+        n = nodes(True)
+        self.assertEqual([n[f"r2-PREFLIGHT-{k}"]["status"] for k in ("DEEPSEEK", "GROK", "CHATGPT")],
+                         ["completed", "in_progress", "pending"])
+        self.assertEqual(n["r2-PREFLIGHT"]["status"], "in_progress")
+        self.assertEqual(set(n["r2-PREFLIGHT"]["depends_on"]), {f"r2-PREFLIGHT-{k}" for k in ("DEEPSEEK", "GROK", "CHATGPT")})
+        self.assertEqual(n["r2-DEEPSEEK"]["depends_on"], ["r2-PREFLIGHT"])
+        n = nodes(False)  # engine died mid-probe: the running probe is shown as failed, not running forever
+        self.assertEqual(n["r2-PREFLIGHT-GROK"]["status"], "failed")
+        self.assertEqual(n["r2-PREFLIGHT"]["status"], "failed")
+
     def test_is_preflight_reads_cmdline(self):
         import subprocess
         p = subprocess.Popen([sys.executable, "-c", "import time;time.sleep(5)", "--preflight"])

@@ -74,7 +74,7 @@ async function refresh() {
         <b>${esc(l.name)}</b><span class="badge" style="background:${COLORS[l.status]}">${l.status}</span>
         <span class="note"> ${l.round ? 'round ' + l.round : ''} ${l.after ? '· after ' + esc(l.after) : ''}</span>
         <a style="float:right" target="_blank" href="http://127.0.0.1:8777/?run_id=review-loop-${esc(l.id)}">Open in Jarvis ↗</a><br>
-        ${(l.preflight ? [{name: 'PREFLIGHT', status: l.preflight.status}] : []).concat(l.steps).map(x => `<span class="chip" style="background:${COLORS[x.status]}">${esc(x.name)}</span>`).join('')}
+        ${(l.preflight ? [{name: 'PREFLIGHT', status: l.preflight.status}].concat((l.preflight.probes || []).map(x => ({name: 'probe ' + x.name, status: x.status}))) : []).concat(l.steps).map(x => `<span class="chip" style="background:${COLORS[x.status]}">${esc(x.name)}</span>`).join('')}
         ${l.detail ? `<div class="err">${esc(l.detail)}</div>` : ''}
         ${l.status === 'failed' ? (l.preflight && l.preflight.status === 'failed'
           ? `<button class="danger" onclick="rerunPreflight('${l.id}')">Re-run preflight</button> <span class="note">fix the key/login first, then re-run</span>`

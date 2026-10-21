@@ -30,6 +30,22 @@ class ValidateReview(unittest.TestCase):
         self.assertIn("contradictory", rl.validate_review(GOOD + "Findings: none\n"))
 
 
+class DeepSeekProfile(unittest.TestCase):
+    def test_deepseek_never_uses_the_default_claude_profile(self):
+        seen = {}
+
+        def fake_run(args, cwd=None, env=None, **kw):
+            seen["env"] = env
+            return subprocess.CompletedProcess(args, 0, stdout="{}", stderr="")
+
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(rl, "run", fake_run), \
+                mock.patch.object(rl, "deepseek_key", return_value="k"), \
+                mock.patch.object(rl, "DEEPSEEK_CONFIG_DIR", Path(d) / "ds"), \
+                mock.patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": "/home/x/.claude"}):
+            rl._claude_once("DEEPSEEK", "p", Path(d), Path(d) / "l.log", 5, "deepseek-chat")
+            self.assertEqual(seen["env"]["CLAUDE_CONFIG_DIR"], str(Path(d) / "ds"))
+
+
 class Reviewers(unittest.TestCase):
     def test_valid(self):
         self.assertEqual(rl.parse_reviewers("chatgpt, Deepseek,GROK"), ["CHATGPT", "DEEPSEEK", "GROK"])

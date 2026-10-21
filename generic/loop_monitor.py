@@ -132,15 +132,21 @@ def past_steps(rdir: Path) -> list[dict]:
 
 
 def preflight_state(logdir: Path, n: int, running: bool) -> dict:
-    """Status of the preflight of round n: running, complete, failed or pending (never run for this round)."""
-    if running:
-        return {"status": "running", "detail": "probing the backends"}
+    """Status of the preflight of round n (running, complete, failed or pending) and of each probe."""
     pf = read_json(logdir / "preflight.json")
-    if not pf or pf.get("round", n) != n:
-        return {"status": "pending", "detail": ""}
+    if not running and (not pf or pf.get("round", n) != n):
+        return {"status": "pending", "detail": "", "probes": []}
+    probes = [{"name": k, "status": v.get("status", "pending"), "detail": v.get("detail", "")}
+              for k, v in (pf.get("probes") or {}).items()] if pf and pf.get("round", n) == n else []
+    if running:
+        return {"status": "running", "detail": "probing the backends", "probes": probes}
+    for x in probes:  # the engine died mid-probe (killed, crashed): do not leave a probe running forever
+        if x["status"] == "running":
+            x.update(status="failed", detail="interrupted")
     if pf.get("passed"):
-        return {"status": "complete", "detail": pf.get("time", "")}
-    return {"status": "failed", "detail": "; ".join(f"{k}: {v}" for k, v in pf.get("failed", {}).items())}
+        return {"status": "complete", "detail": pf.get("time", ""), "probes": probes}
+    detail = "; ".join(f"{k}: {v}" for k, v in pf.get("failed", {}).items()) or "interrupted"
+    return {"status": "failed", "detail": detail, "probes": probes}
 
 
 def evaluate(loop: dict) -> dict:
@@ -257,7 +263,10 @@ def write_html(states: list[dict]) -> Path:
     cards = []
     for s in states:
         pf = s.get("preflight")
-        chips = (f'<span class="chip" style="background:{COLORS[pf["status"]]}" title="{html.escape(pf["detail"])}">PREFLIGHT</span>' if pf else "") + "".join(f'<span class="chip" style="background:{COLORS[x["status"]]}" title="{html.escape(x["detail"])}">'
+        pchips = "".join(f'<span class="chip" style="background:{COLORS[x["status"]]}" title="{html.escape(x["detail"])}">'
+                         f'probe {html.escape(x["name"])}</span>' for x in (pf or {}).get("probes", []))
+        chips = (f'<span class="chip" style="background:{COLORS[pf["status"]]}" title="{html.escape(pf["detail"])}">PREFLIGHT</span>'
+                 + pchips if pf else "") + "".join(f'<span class="chip" style="background:{COLORS[x["status"]]}" title="{html.escape(x["detail"])}">'
                         f'{html.escape(x["name"])}</span>' for x in s["steps"]) or '<span class="muted">no steps</span>'
         after = f'<div class="muted">after {html.escape(s["after"])}</div>' if s["after"] else ""
         rnd = f'round {s["round"]}' if s["round"] else "—"
@@ -291,10 +300,19 @@ def write_jarvis(states: list[dict]) -> None:
             reviewers = [f"r{r['n']}-{x['name']}" for x in r["steps"] if x["name"] != "CLAUDE"]
             gate = prev
             if r.get("preflight"):  # only the current round has one
+                pf = r["preflight"]
                 gate = f"r{r['n']}-PREFLIGHT"
+                probe_ids = []
+                for x in pf.get("probes", []):
+                    pid = f"{gate}-{x['name']}"
+                    probe_ids.append(pid)
+                    nodes[pid] = {"id": pid, "name": f"{s['name']} · round {r['n']} · probe {x['name']}", "phase": "design",
+                                  "description": f"{x['name']} backend probe", "status": JARVIS_STATUS[x["status"]],
+                                  "depends_on": [prev] if prev else [], "error": x["detail"] or None,
+                                  "metadata": {**meta, "round": r["n"]}}
                 nodes[gate] = {"id": gate, "name": f"{s['name']} · round {r['n']} · PREFLIGHT", "phase": "design",
-                               "description": "backend probes", "status": JARVIS_STATUS[r["preflight"]["status"]],
-                               "depends_on": [prev] if prev else [], "error": r["preflight"]["detail"] or None,
+                               "description": "backend probes", "status": JARVIS_STATUS[pf["status"]],
+                               "depends_on": probe_ids or ([prev] if prev else []), "error": pf["detail"] or None,
                                "metadata": {**meta, "round": r["n"]}}
             for x in r["steps"]:
                 nid = f"r{r['n']}-{x['name']}"
