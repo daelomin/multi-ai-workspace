@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** CHATGPT
+**Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-4/CHATGPT.md`, `CHANGELOG.md`
+**Change:** Reviewed local FuelBuddy spec v0.5 after reading the round-3 reviews and consolidation and HUMAN's settled decisions. Recorded 0 blocking, 0 major and 3 minor findings: stage-event outcomes for deriving last successful stage; point identity and availability in the station projection and canonical payload; intersection of simultaneously applicable restriction permissions.
+**Remaining:** CLAUDE consolidates round 4. Settled FB-D1/2/3/5/7 and the carried-forward open HUMAN decisions were not reopened.
+**Verification:** Internal reasoning against the local spec and round-3 dispositions; no external factual claims re-verified. Review includes the required finding fields, Top 3 and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branches or pull requests.
+
+## 2026-10-21
 **Agent:** CLAUDE
 **Files:** `generic/specs_review_loop.py`, `generic/run_review_loop.sh`, `generic/loop_monitor.py`, `generic/loop_wizard.html`, `generic/tests/test_specs_review_loop.py`, `generic/tests/test_loop_monitor.py`, `projects/fuelbuddy/charging-diagnostic/README.md`, `CHANGELOG.md`
 **Change:** (1) Models and effort: DeepSeek reviewer now `deepseek-flash`; every backend defaults to effort `medium` (Codex `-c model_reasoning_effort="medium"`, Claude Code `--effort medium` for DeepSeek and the consolidator via `DEEPSEEK_EFFORT` / `CONSOLIDATOR_EFFORT`, Grok `grok-4.7-medium`; FAST=1 uses `grok-4.7-medium-fast`). (2) Per-step timing: each step writes `automation/logs/r{n}-{step}.timing.json` (start, end, seconds, ok, model, effort, tier, served model; Codex model/effort read from its banner) and the loop logs "round N: STEP done in 4m12s". (3) The Jarvis nodes, colour page and assistant chips show duration, model and effort. (4) The monitor plays a sound and a desktop notification when a round gets its `CONSOLIDATION.md` (silent on first look; `"sound": false` per loop or `LOOP_MONITOR_SOUND=0`).
