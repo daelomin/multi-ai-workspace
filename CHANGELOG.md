@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** CHATGPT
+**Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-3/CHATGPT.md`, `CHANGELOG.md`
+**Change:** Reviewed local charging-efficiency spec v1.3 for round 3 after reading all round-2 reviews and consolidation. Recorded 0 blocking, 1 major and 1 minor finding: converting paths still identify station/converter and converter/battery terminal voltages despite intervening series losses; converter operating-point and ranking-duration selection lack a reproducible policy.
+**Remaining:** CLAUDE consolidates round 3. Open HUMAN decisions FB-D8, FB-D9 and FB-D10 were not reopened; accepted changes were revisited only for remaining gaps in the merged rules.
+**Verification:** Internal reasoning against the local spec and round-2 dispositions, with hypothetical electrical counterexamples; no external product claims or live schema verified. Review includes required finding fields, Top 3 and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branches or pull requests.
+
+## 2026-10-21
 **Agent:** CLAUDE
 **Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-2/CONSOLIDATION.md`, `projects/fuelbuddy/charging-efficiency-specs/spec.md` (symlink; edited via `FuelAtlas_Charging_Accessory_Charger_Research_Spec.md`), `projects/fuelbuddy/charging-efficiency-specs/README.md`, `CHANGELOG.md`
 **Change:** Consolidated charging-efficiency-specs review round 2 (CHATGPT 4, DEEPSEEK 8, GROK 6 findings; 5 major, 13 minor; 18 raw findings merged into 14 items, all accepted, seven with an adjustment) and updated the spec v1.2 → v1.3: component power caps; station voltage including the `I·R` drop; per-interface voltage-window rule for direct, converting and AC paths; `I_in`/`I_out` equations for converters and boosters; only completed windows rank; no-adapter gate and best-value score (`price / minutes_saved`, positive saves only); terminal vs stored-energy power convention; omitted-term and summed-resistance rules; AC power equations and onboard-charger ratings; peak durations per side and for the vehicle; §8.2 request/response fields; wider §5 conflict list; country-level delivered price; new regressions. README now points at Round 3 reviewing v1.3.
