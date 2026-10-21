@@ -1,8 +1,8 @@
 # Fuel Atlas — Charging Equipment, Adapter and Battery Research Specification
 
-**Version:** 1.3 (proposal)  
+**Version:** 1.4 (proposal)  
 **Date:** 2026-10-21  
-**Status:** Draft; live database/repository schema not yet inspected. Round-1 and round-2 reviews consolidated (see `reviews/round-1/CONSOLIDATION.md`, `reviews/round-2/CONSOLIDATION.md`); open HUMAN decisions are listed in §11.
+**Status:** Draft; live database/repository schema not yet inspected. Round-1, round-2 and round-3 reviews consolidated (see `reviews/round-1/CONSOLIDATION.md`, `reviews/round-2/CONSOLIDATION.md`, `reviews/round-3/CONSOLIDATION.md`); open HUMAN decisions are listed in §11.
 
 ## 1. Objective
 
@@ -65,22 +65,23 @@ The previously specified FuelBuddy architecture contains `vehicle_profiles`, `ch
 ### 4.3 Cables and adapters
 
 - Canonical manufacturer/model/SKU, OEM/rebrand mapping, input/output connector, **direction**, AC/DC mode, active/passive conversion, **electrical topology** (`passthrough` or `voltage_conversion`), protocol translation (the protocol on each side).
-- Voltage min/max, continuous current, peak current, peak duration, continuous/advertised power, cable length, series resistance/losses, cooling, thermal derating. For `voltage_conversion`, these are stored separately for the input (station) side and the output (vehicle) side (voltage, current, **power**, and peak duration for each side), plus conversion efficiency. Power caps are stored as published; a cap is never derived solely by multiplying independent maximum voltage and current ratings.
-- Firmware/hardware versions, auxiliary power requirements, connector lock/interlock behavior, fault shutdown and certification evidence.
+- Voltage min/max, continuous current, peak current, peak duration, continuous/advertised power, cable length, series resistance/losses, cooling, thermal derating, and for AC accessories the supported phase count (`ac_phases`). For `voltage_conversion`, these are stored separately for the input (station) side and the output (vehicle) side (voltage, current, **power**, and peak duration for each side), plus conversion efficiency. Power caps are stored as published; a cap is never derived solely by multiplying independent maximum voltage and current ratings.
+- **Peak mode:** whether the accessory has a peak/boost rating is stored explicitly (`peak_mode`: `none`, `rated` or `unknown`). `none` means the continuous rating applies at all times and satisfies the §7.1 rating check; `rated` needs the peak values and `peak_duration_s`; `unknown` is an unknown attribute under §7.1. A peak current or power with no stored `peak_duration_s` is not held: the continuous rating is used and the range widened, as for vehicles (§6.1).
+- Firmware/hardware versions, auxiliary power requirements, connector lock/interlock behavior (`interlock_behavior`), fault shutdown (`fault_shutdown`) and certification evidence.
 - Vehicle/charger/firmware compatibility status and evidence; reject unsupported safety-critical combinations.
 
 ### 4.4 Commercial data
 
 - Seller, country, offer URL, SKU, currency, base price, VAT inclusion and VAT amount, shipping and its currency, total delivered price, stock, lead time, warranty, date checked and offer validity end.
 - Maintain price history snapshots rather than overwriting historical prices.
-- **Delivered price** is computed for a stated destination **country** (postcode or region granularity is not supported; FB-D10), all in one currency: `price + shipping_price` when `vat_included` is true, `price + vat_amount + shipping_price` when it is false. Unknown VAT or shipping makes the delivered total **unknown, never zero**. An offer with an unknown total, mixed currencies and no stored conversion, no availability to the destination, or that is expired cannot win cheapest or best value. When conversion is needed, the exchange-rate source and timestamp are reported.
+- **Delivered price** is computed for a stated destination **country** (postcode or region granularity is not supported; FB-D10), all in one currency, from the offer row and its destination row for that country (`accessory_offer_destinations`, §6.3; `country` on the offer is the seller's country): `price + shipping_price` when `vat_included` is true, `price + vat_amount + shipping_price` when it is false. Shipping and VAT amounts are per destination; one destination's figures are never used for another. Unknown VAT or shipping makes the delivered total **unknown, never zero**. An offer with an unknown total, mixed currencies and no stored conversion, no availability to the destination, or that is expired cannot win cheapest or best value. When conversion is needed, the exchange-rate source and timestamp are reported.
 - **Offer freshness:** an offer is expired when `valid_until` is before the ranking time; if `valid_until` is absent, when `observed_at` is older than a configurable maximum age (no fixed period is set here). Expired offers stay in price history.
 
 ## 5. Source-link policy (MANDATORY)
 
 Every **named charger, cable or adapter model** in research output must have a clickable official manufacturer product page or official technical document where available. If neither exists, provide the exact retailer listing and label it accordingly. Each claim about a rating must point to its supporting source; do not use a generic manufacturer homepage as proof of a model-specific value.
 
-Minimum provenance fields: `source_url`, `source_title`, `publisher`, `evidence_type`, `retrieved_at`, `published_at` (nullable), `applicable_model_revision`, `confidence`, `claim_field`. Track conflicting sources explicitly. **Tracking a conflict is not resolving it:** if retained sources disagree on direction, which connector faces the station, connector type, charging mode, electrical topology (`passthrough` or `voltage_conversion`), maximum voltage, continuous or peak current, continuous or advertised power, peak duration, conversion efficiency, or the protocol on either side, the accessory is **not eligible** for any ranking category. Every conflicting value is stored with its source; a value is used for a recommendation only after the rejected alternatives are stored as rejected.
+Minimum provenance fields: `source_url`, `source_title`, `publisher`, `evidence_type`, `retrieved_at`, `published_at` (nullable), `applicable_model_revision`, `confidence`, `claim_field`. Track conflicting sources explicitly. **Tracking a conflict is not resolving it:** if retained sources disagree on direction, which connector faces the station, connector type, charging mode, electrical topology (`passthrough` or `voltage_conversion`), minimum or maximum voltage, series resistance (including per-side resistance of a `voltage_conversion` adapter), continuous or peak current, continuous or advertised power, peak duration, conversion efficiency, or the protocol on either side, the accessory is **not eligible** for any ranking category. Every conflicting value is stored with its source; a value is used for a recommendation only after the rejected alternatives are stored as rejected.
 
 ### Charger-model seed registry (research targets, NOT prevalidated specifications)
 
@@ -115,15 +116,15 @@ Do not assume these are distinct OEM designs. Deduplicate on verified manufactur
 
 ## 6. Minimal schema delta
 
-Prefer nullable columns on existing entities and four new accessory entities. Add `charger_installations` **only if** the existing charger profile cannot already represent physical installations. Preserve existing IDs, endpoint contracts and diagnostic mappings.
+Prefer nullable columns on existing entities and five new accessory entities (accessories, offers, offer destinations, compatibility, test results). Add `charger_installations` **only if** the existing charger profile cannot already represent physical installations. Preserve existing IDs, endpoint contracts and diagnostic mappings.
 
 ### 6.1 Existing `vehicle_profiles` (optional additions)
 
-`battery_variant_id`, `battery_voltage_min_v`, `battery_voltage_max_v`, `battery_voltage_curve`, `dc_charge_current_continuous_a`, `dc_charge_current_peak_a`, `dc_charge_peak_duration_s` (a peak current with no stored duration is not held: the estimate uses the continuous rating and widens the range), `bms_charge_limit_map`, `battery_thermal_limit_map`, `dc_protocol_version`, `software_version`, `dc_booster_capability`, `dc_booster_ratings` (input and output voltage min/max, continuous and peak current, continuous and peak power, peak duration per side, efficiency; required to calculate a boosted path), `ac_phases`, `ac_current_max_a`, `onboard_charger_kw`, `onboard_charger_ratings` (DC output voltage min/max, maximum DC current, efficiency; required to model the AC path as a converter).
+`battery_variant_id`, `battery_voltage_min_v`, `battery_voltage_max_v`, `battery_voltage_curve`, `dc_charge_current_continuous_a`, `dc_charge_current_peak_a`, `dc_charge_peak_duration_s` (a peak current with no stored duration is not held: the estimate uses the continuous rating and widens the range), `bms_charge_limit_map`, `battery_thermal_limit_map`, `dc_protocol_version`, `software_version`, `dc_booster_capability`, `dc_booster_engagement` (`always`, `bypassable` or `unknown`, with the voltage condition under which a bypassable booster is bypassed; §7.1), `dc_booster_ratings` (input and output voltage min/max, continuous and peak current, continuous and peak power, peak duration per side, efficiency; required to calculate a boosted path), `ac_phases`, `ac_current_max_a`, `onboard_charger_kw`, `onboard_charger_ratings` (DC output voltage min/max, maximum DC current, efficiency; required to model the AC path as a converter).
 
 ### 6.2 Existing `charger_profiles` (optional additions)
 
-`product_url`, `datasheet_url`, `hardware_revision`, `firmware_version`, `dc_voltage_min_v`, `dc_voltage_max_v`, `dc_current_continuous_a`, `dc_current_peak_a`, `peak_duration_s`, `voltage_current_envelope`, `connector_configurations`, `power_sharing_policy`, `thermal_derating`, `full_performance_from_v`, `ac_outlet_phases`, `ac_outlet_current_max_a`, `ac_outlet_power_max_kw`, `source_metadata`.
+`product_url`, `datasheet_url`, `hardware_revision`, `firmware_version`, `dc_voltage_min_v`, `dc_voltage_max_v`, `dc_current_continuous_a`, `dc_current_peak_a`, `peak_duration_s`, `voltage_current_envelope`, `connector_configurations`, `power_sharing_policy`, `thermal_derating`, `full_performance_from_v`, `ac_outlet_phases`, `ac_outlet_current_max_a`, `ac_outlet_power_max_kw`, `ac_outlet_voltage_v`, `ac_outlet_voltage_convention` (`line_to_neutral` or `line_to_line`), `ac_outlet_power_factor`, `protocol_support` (e.g. JSONB array of `{protocol, revision}`), `authentication_requirements`, `source_metadata`.
 
 If charger model and site instance are conflated, separate installation attributes into an optional `charger_installations` entity with FK to `charger_profiles`, `station_id`, `network`, `firmware`, `configured_power_kw`, `connector_config`, `site_limits`.
 
@@ -148,6 +149,10 @@ CREATE TABLE charging_accessories (
   hardware_revision TEXT,
   firmware_version TEXT,
   electrical_topology TEXT,  -- passthrough, voltage_conversion
+  ac_phases INTEGER,         -- AC accessories: supported phase count
+  peak_mode TEXT,            -- none, rated, unknown (§4.3)
+  interlock_behavior JSONB,
+  fault_shutdown JSONB,
   -- passthrough: the single envelope below applies on both sides
   min_voltage_v NUMERIC,
   max_voltage_v NUMERIC,
@@ -173,6 +178,8 @@ CREATE TABLE charging_accessories (
   output_power_continuous_kw NUMERIC,
   output_power_peak_kw NUMERIC,
   output_peak_duration_s NUMERIC,
+  input_resistance_ohm NUMERIC,   -- series resistance on each side of the converter
+  output_resistance_ohm NUMERIC,
   conversion_efficiency NUMERIC,
   cable_length_m NUMERIC,
   cooling_type TEXT,
@@ -189,19 +196,25 @@ CREATE TABLE accessory_offers (
   id UUID PRIMARY KEY,
   accessory_id UUID NOT NULL REFERENCES charging_accessories(id),
   merchant TEXT NOT NULL,
-  country TEXT,
+  country TEXT,                 -- seller's country, not the destination
   price NUMERIC,
   currency TEXT,
-  vat_included BOOLEAN,
-  vat_amount NUMERIC,           -- required when vat_included is false
-  shipping_price NUMERIC,
-  shipping_currency TEXT,
-  ships_to TEXT[],              -- destination countries
+  vat_included BOOLEAN,         -- whether the listed price includes VAT
   stock_status TEXT,
   warranty_months INTEGER,
   product_url TEXT NOT NULL,
   observed_at TIMESTAMPTZ NOT NULL,
   valid_until TIMESTAMPTZ
+);
+
+-- one row per (offer, destination country); a country with no row is not shipped to
+CREATE TABLE accessory_offer_destinations (
+  offer_id UUID NOT NULL REFERENCES accessory_offers(id),
+  destination_country TEXT NOT NULL,
+  shipping_price NUMERIC,
+  shipping_currency TEXT,
+  vat_amount NUMERIC,           -- required when the offer's vat_included is false
+  PRIMARY KEY (offer_id, destination_country)
 );
 
 CREATE TABLE accessory_compatibility (
@@ -214,6 +227,8 @@ CREATE TABLE accessory_compatibility (
   vehicle_firmware TEXT,
   charger_firmware TEXT,
   accessory_firmware TEXT,
+  vehicle_protocol_version TEXT,
+  charger_protocol_version TEXT,
   status TEXT NOT NULL, -- confirmed, reported, unverified, incompatible
   limitations JSONB,
   evidence JSONB,
@@ -239,6 +254,8 @@ CREATE TABLE accessory_test_results (
   ambient_temp_c NUMERIC,
   preconditioning_state TEXT,
   station_sharing_state JSONB,  -- concurrent sessions / available power during the test
+  power_convention TEXT,        -- battery_terminal, stored_energy, station_dc, unknown; required when a power is stored
+  measurement_boundary TEXT,
   peak_power_kw NUMERIC,
   average_power_kw NUMERIC,
   duration_minutes NUMERIC,
@@ -250,7 +267,7 @@ CREATE TABLE accessory_test_results (
 );
 ```
 
-**Measured tests and configuration:** a test supports an estimate only when its stored accessory hardware/firmware, vehicle firmware, charger firmware, installation and topology match the candidate being ranked. A test with a null firmware or topology, or applied to a different configuration, is marked as extrapolation: it supports an uncertainty range and does not replace the calculated curve. Updating a current equipment profile must not relabel historical tests.
+**Measured tests and configuration:** a test supports an estimate only when its stored accessory hardware/firmware, vehicle firmware, charger firmware, installation and topology match the candidate being ranked. A test with a null firmware or topology, or applied to a different configuration, is marked as extrapolation: it supports an uncertainty range and does not replace the calculated curve. Updating a current equipment profile must not relabel historical tests. A test supports a calculated estimate only when its `power_convention` equals the estimate's, or the conversion is documented; a test with a null or `unknown` convention supports only an uncertainty range.
 
 Add FKs and indexes only after checking actual PK types, existing table names and data volume. For flexible source provenance, prefer reuse of an existing source/evidence table over duplication.
 
@@ -260,13 +277,17 @@ Add FKs and indexes only after checking actual PK types, existing table names an
 
 Before estimating power, verify adapter direction, physical connector, charging mode, operating voltage, protocol negotiation, safety interlocks and supported firmware/configurations. For a `voltage_conversion` adapter or a vehicle booster, the station↔adapter and adapter↔vehicle interfaces are two separate checks, each against its own envelope. An unsafe or incompatible combination is **not eligible** for recommendations.
 
+**Booster engagement.** A vehicle booster is in the circuit only as `dc_booster_engagement` states (§6.1): `always`, or `bypassable` and the station-side voltage lies outside the condition under which the booster is bypassed. A bypassed booster contributes no input limit or efficiency and the direct path (or the adapter path alone) applies. When a `voltage_conversion` adapter and an engaged booster are both in the path, they are two converter stages, each with its own input/output limits and efficiency, joined at an intermediate voltage equal to the upstream stage's output and the downstream stage's input. If a vehicle has `dc_booster_ratings` but engagement is `unknown`, feasibility is `unknown`.
+
+**Published envelopes.** Inside a published voltage range, use the current-versus-voltage envelope on every path (direct, converting and AC). Do not apply the nameplate current below the voltage from which the source states full performance begins (`full_performance_from_v`); there, use the envelope current, and if no envelope point exists the current is unknown and the result is `unknown`, not the nameplate.
+
 **Fail closed.** A combination is eligible for a ranking category only when every safety-critical attribute needed for it is known from an acceptable source: direction, connector compatibility, charging mode, an operating voltage range covering the requested SoC window (below), continuous and peak current/power ratings, required certification, and required interlock/protocol support. Unknown values are never treated as zero loss, unlimited or compatible. A combination with an unknown attribute, or with unresolved source conflicts (§5), is `unverified`: it may appear in a separate unranked list with its missing fields, but cannot fill fastest, cheapest or best value. (This rule concerns unknown attributes; the minimum evidence level for a purchase recommendation remains a HUMAN decision, §11.)
 
 **Voltage across the window.** Overlap of nameplate voltage ranges is not sufficient. Voltage is checked interface by interface, at every SoC in the requested window, and the modeled net charging power must be positive throughout.
 
 - **Direct path** (no converter, no boost): the voltage at the station connector and at each series element's terminals lies inside that element's limits. With known downstream series resistance the station-side voltage is `V_batt + I_batt * R_series_ohm`, not `V_batt` (§7.2).
 - **Converting path** (`voltage_conversion` adapter or vehicle booster): two interfaces. The station's operating voltage must lie inside the station-connector and converter-input limits, and `V_batt(SoC, T)` inside the converter-output and battery limits. A battery voltage outside the station's range is not a rejection when a converter separates the two sides; a converter whose input range excludes the station's voltage is ineligible even if its output range covers the battery.
-- **AC path:** the same per-interface rule applies to the AC supply, cable, inlet and onboard charger. `V_batt` is never used as an AC-side voltage. If only part of the window is reachable, the result reports the limiting condition, the SoC actually reached and the time to that SoC, flagged `window_completed: false`; it is never presented, or ranked, as completing the requested window. If feasibility cannot be established from the data, the result is an explicit `unknown`, not a finite time. Inside a published voltage range, use the current-versus-voltage envelope; do not apply the nameplate current below the voltage from which the source states full performance begins.
+- **AC path:** the same per-interface rule applies to the AC supply, cable, inlet and onboard charger. `V_batt` is never used as an AC-side voltage. If only part of the window is reachable, the result reports the limiting condition, the SoC actually reached and the time to that SoC, flagged `window_completed: false`; it is never presented, or ranked, as completing the requested window. If feasibility cannot be established from the data, the result is an explicit `unknown`, not a finite time.
 
 ### 7.2 Instantaneous power
 
@@ -292,6 +313,8 @@ require, for every series element e: V_e * I_batt / 1000 <= that element's appli
          continuous or peak power cap (e.g. passthrough continuous_power_kw), at e's declared boundary
 ```
 
+`V_e` is the voltage at element e's station-side terminal: `V_e = V_batt + I_batt * R_battery_to_e`, where `R_battery_to_e` is the sum of `resistance_ohm` of the elements between the battery and that terminal, including e's own. If only the total `R_series_ohm` is known, every element is evaluated at the conservative bound `V_e = V_station` and that is recorded in `assumptions`. A null peak rating is read by `peak_mode` (§4.3), not guessed.
+
 An absent element is an **omitted term**, not 0 A and not an unknown rating. The no-adapter baseline takes the vehicle limit and the station-connector limit only, plus a captive cable only when its rating is separate from the connector limit. `R_series_ohm` is the sum of `resistance_ohm` over the in-path series elements; if any in-path resistance is unknown, the loss stays unknown (omit the loss term and report it as unknown) and voltage feasibility at the station boundary cannot be certified from `V_batt` alone: the result is `unknown` under §7.1.
 
 The current-limited quantities are solved together: reduce `I_batt` until the station current envelope (evaluated at `V_station`), the station voltage range, `P_station_available` and every component power cap all hold. A component power cap is never inferred solely by multiplying independent maximum voltage and current ratings. If no positive feasible current exists (e.g. the battery is already at the station's maximum voltage and `R_series_ohm` is positive), apply the incomplete-window rule of §7.1.
@@ -309,7 +332,18 @@ P_in_kW  = V_in * I_in_used / 1000     (<= input power caps, <= P_station_availa
 require P_out_kW <= P_in_kW * conversion_efficiency
 ```
 
-`V_in` is the declared station-side operating voltage, inside the intersection of the station and converter-input ranges; it is recorded in `assumptions`, and if the result differs across that intersection the performance range covers it. A passthrough adapter upstream of a booster is an `I_in` limit and is never compared with battery current. Reduce `I_in_used` and `I_out` together until all constraints hold. Each side's peak current and power hold only for that side's own peak duration. If a converter efficiency or a side's power cap is unknown, it is not treated as lossless or unlimited (§7.1).
+`V_in` is the voltage at the converter's input terminals, `V_out` at its output terminals. A passthrough adapter upstream of a booster is an `I_in` limit and is never compared with battery current. Reduce `I_in_used` and `I_out` together until all constraints hold. Each side's peak current and power hold only for that side's own peak duration. If a converter efficiency or a side's power cap is unknown, it is not treated as lossless or unlimited (§7.1).
+
+**Segments around a converter.** Each non-converting segment is solved at its own current with its own resistance (`R_up` between station and converter, `R_down` between converter and battery):
+
+```text
+V_station = V_in  + I_in_used * R_up          P_station_dc_kW = P_in_kW  + I_in_used^2 * R_up / 1000
+V_out     = V_batt + I_batt   * R_down        P_out_kW        = P_battery_kW + I_batt^2 * R_down / 1000
+```
+
+Station limits (voltage range, current envelope, `P_station_available`) apply at `V_station`; converter input limits at `V_in`; converter output limits at `V_out`; battery limits at `V_batt`. Conversion efficiency couples `P_out_kW` and `P_in_kW`. Every in-path passthrough cable or adapter on either side is also checked against its own continuous or peak power cap at its own terminal voltage: upstream elements at `V_e * I_in_used / 1000`, downstream elements at `V_e * I_out / 1000`, with `V_e` defined as on the direct path. The converter's "input/output power caps" are its own and do not replace these per-element checks. If an in-path element's power cap or either segment's resistance is unknown, the result is `unknown` (§7.1). If no positive feasible current exists (e.g. station maximum 400 V, converter input minimum 400 V, `R_up` > 0), apply the incomplete-window rule of §7.1.
+
+**Operating-point policy.** The declared station-side operating voltage must lie inside the intersection of the station and converter-input ranges. The implementation uses one versioned operating-point policy (station/converter voltage-control constraints and the rule that selects the feasible point at each time step), identified in `model_configuration` and applied identically to every candidate and to the baseline; the choice must not depend on candidate enumeration order. The duration fed to ranking is the one the policy selects; the performance range reports the spread over the intersection. If no policy point estimate or configured range-comparison rule exists, the result is listed unranked with an insufficient-evidence reason. The policy's content is not fixed here.
 
 **AC path.** Limit AC current by the EVSE, the cable and the vehicle inlet; convert current to power with the supply's phase count and voltage; limit AC power by the onboard-charger rating. Battery-side current comes from the onboard converter through the voltage-converting rule, using `onboard_charger_ratings` (§6.1). AC current is never placed in the direct-DC `I_series` formula.
 
@@ -319,9 +353,11 @@ three-phase, line-to-line:       P_ac_kW = sqrt(3) * U_ll_v * I_ac * power_facto
 three-phase, line-to-neutral:    P_ac_kW = 3 * U_ln_v * I_ac * power_factor / 1000
 ```
 
+**AC inputs.** The phase count used is the minimum of the EVSE outlet (`ac_outlet_phases`), every in-path cable or adapter (`ac_phases`), the vehicle inlet and (consistently) the onboard charger (`ac_phases`), recorded in `assumptions`; a 32 A single-phase cable on a three-phase EVSE yields single-phase power. `P_in_kW` of the onboard converter is `P_ac_kW` from the equations above, never `V_in * I_in` on the AC voltage. The supply voltage, voltage convention and power factor come from the request (`ac_supply_voltage_v`, `ac_voltage_convention`, `power_factor`; §8.2) or the charger outlet (`ac_outlet_voltage_v`, `ac_outlet_voltage_convention`, `ac_outlet_power_factor`). If any is absent, AC power is `unknown`: 230 V, 400 V and power factor 1 are used only in the examples below, never as defaults.
+
 The same 32 A is about 7.4 kW at 230 V single-phase and about 22.2 kW at 400 V line-to-line three-phase, both at power factor 1. Three-phase power is never computed as `n_phases * U_ll * I`. The voltage convention and power factor are recorded in `assumptions`. If the onboard charger's efficiency or DC output envelope is unknown, `onboard_charger_kw` serves only as an upper bound, the loss is reported unknown, the range is widened and the AC result is not ranked.
 
-**Time-varying inputs.** Optional inputs: `ambient_temperature_c`, `preconditioning_state`, a battery-temperature trace, and `station_available_power_kw` or concurrent-session count over time. When absent, the simulation holds battery temperature and full station power constant; that assumption is recorded in `assumptions` and the reported range is widened. Test results record temperatures and sharing state (§6.3).
+**Time-varying inputs.** Optional inputs: `ambient_temperature_c`, `preconditioning_state`, a battery-temperature trace, and `station_available_power_kw` or concurrent-session count over time. When absent, the simulation holds battery temperature and full station power constant; that assumption is recorded in `assumptions` and the reported range is widened. `station_available_power_kw`, when present, is the connector limit after sharing. `concurrent_session_count` does not by itself divide cabinet power: if the count is greater than one, `station_available_power_kw` is absent and `power_sharing_policy` does not evaluate to a connector power, feasibility is `unknown` (§7.1) and the full-power default is not applied. Test results record temperatures and sharing state (§6.3).
 
 Integrate over SoC using battery usable energy and the SoC-dependent effective power, while tracking accessory thermal state and time-limited peak ratings. Derating can depend on temperature, duration, charger power sharing, cable cooling and battery preconditioning. Missing curves should produce uncertainty ranges, not fictitious precision.
 
@@ -345,7 +381,7 @@ Integrate over SoC using battery usable energy and the SoC-dependent effective p
 5. Match vehicle × battery × adapter × charger model × installation/firmware; reject unsafe/incompatible candidates.
 6. Simulate each eligible combination under standardized SoC, temperature and station conditions.
 7. Attach measured tests where available; flag extrapolated or missing evidence.
-8. Rank and return exactly three **categories** when enough eligible candidates exist; the same product may win more than one category. Do not fabricate three distinct winners. The **no-adapter configuration** is a first-class baseline. When a feasible, completed no-adapter session exists, an adapter is ranked only when it improves modeled time or cost over it under the stated conditions. When the no-adapter configuration is known to be incompatible (e.g. a connector mismatch), eligible adapters remain rankable in fastest and cheapest without a native-session improvement test. An unknown native-session result is recorded as unknown, is not assigned an invented duration, and is noted in `assumptions`.
+8. Rank and return exactly three **categories** when enough eligible candidates exist; the same product may win more than one category. Do not fabricate three distinct winners. The **no-adapter configuration** is a first-class baseline. When a completed no-adapter session exists, an adapter is a candidate in fastest, cheapest and best value only when its completed-window duration is strictly shorter than that session; the no-adapter session has no delivered price and is not a cheapest row (there is no cost test). When the no-adapter configuration is known to be incompatible (e.g. a connector mismatch), eligible adapters remain rankable in fastest and cheapest without a native-session improvement test. An unknown native-session result is recorded as unknown, is not assigned an invented duration, and is noted in `assumptions`.
 
 ### 8.1 Ranking definitions
 
@@ -353,7 +389,7 @@ Integrate over SoC using battery usable energy and the SoC-dependent effective p
 
 - **Fastest:** minimum modeled charging duration among eligible candidates under comparable conditions. Evidence quality is an eligibility gate (§7.1), not a duration discount or a weight. Report ties.
 - **Cheapest:** lowest **delivered** price (VAT + shipping) among safe compatible options meeting a stated minimum performance/evidence threshold.
-- **Best value:** the lowest `delivered_price / minutes_saved` among candidates with `minutes_saved > 0` against the **baseline**: the completed no-adapter session for the same vehicle, charger, SoC window and conditions. If no completed no-adapter session exists (it is known incompatible, unknown or partial), the baseline is the eligible candidate with the longest estimated duration. A candidate with `minutes_saved <= 0` cannot win best value; if none remain, the category is empty and the reason says no candidate saves time. There is no comparable-price filter. Ties break by lower delivered price, then longer `warranty_months`; every remaining tie is listed. Evidence quality is an eligibility decision (§7.1), not a second weight in this score. The response reports `ranking_method`, the baseline and the offer used; any thresholds are configurable and not fixed here. Avoid rewarding headline kW the car cannot use.
+- **Best value:** the lowest `delivered_price / minutes_saved` among candidates with `minutes_saved > 0` against the **baseline**: the completed no-adapter session for the same vehicle, charger, SoC window and conditions. If no completed no-adapter session exists (it is known incompatible, unknown or partial), best value has **no baseline**: the category is empty and its reason says there is no completed no-adapter session to save time against. Another candidate's duration is never used as the baseline, so a candidate cannot win by being compared with itself and adding a candidate that cannot win never changes the winner. Fastest and cheapest are unchanged (FB-D11). A candidate with `minutes_saved <= 0` cannot win best value; if none remain, the category is empty and the reason says no candidate saves time. There is no comparable-price filter. Ties break by lower delivered price, then longer `warranty_months`; every remaining tie is listed. Evidence quality is an eligibility decision (§7.1), not a second weight in this score. The response reports `ranking_method`, the baseline and the offer used; any thresholds are configurable and not fixed here. Avoid rewarding headline kW the car cannot use.
 
 Where fastest durations are equal, order by lower delivered price, then longer `warranty_months`; support and reliability are not scored. For a vehicle already limited to 50 kW, a 250 A adapter may offer no benefit over a reliable lower-current model.
 
@@ -376,6 +412,9 @@ Where fastest durations are equal, order by lower delivered price, then longer `
   "battery_temperature_trace_c": null,
   "station_available_power_kw": null,
   "concurrent_session_count": null,
+  "ac_supply_voltage_v": null,
+  "ac_voltage_convention": null,
+  "power_factor": null,
   "delivery_destination": "DE",
   "ranking_method": "price_per_minute_saved_vs_baseline",
   "baseline": null,
@@ -392,6 +431,8 @@ Where fastest durations are equal, order by lower delivered price, then longer `
     "theoretical_max_kw", "expected_peak_kw",
     "expected_average_kw", "estimated_minutes",
     "performance_range", "price_total", "currency",
+    "price_observed_at", "price_valid_until",
+    "fx_rate", "fx_source", "fx_timestamp",
     "merchant", "purchase_url", "warranty_months",
     "window_completed", "reached_soc", "limiting_condition",
     "dominant_bottleneck", "model_configuration", "power_convention",
@@ -402,7 +443,7 @@ Where fastest durations are equal, order by lower delivered price, then longer `
 }
 ```
 
-The above is a contract sketch: actual responses should populate recommendation objects and use `null` when values are unknown. A category's `status` distinguishes "no adapter needed", "no eligible candidate" and "insufficient evidence" from a ranked result; a §7.1 `unknown` feasibility result is returned as `insufficient_evidence` with a reason. The optional inputs `battery_temperature_trace_c`, `station_available_power_kw` and `concurrent_session_count` are scalars or time series as §7.2 permits; when absent, the constant-temperature/full-power assumption is recorded in `assumptions` and the range widened. Prices must be timestamped; model performance must be linked to test conditions and a specific charger model or installation.
+The above is a contract sketch: actual responses should populate recommendation objects and use `null` when values are unknown. A category's `status` distinguishes "no adapter needed", "no eligible candidate" and "insufficient evidence" from a ranked result; a §7.1 `unknown` feasibility result is returned as `insufficient_evidence` with a reason. The optional inputs `battery_temperature_trace_c`, `station_available_power_kw` and `concurrent_session_count` are scalars or time series as §7.2 permits; when absent, the constant-temperature/full-power assumption is recorded in `assumptions` and the range widened. `price_observed_at` is the winning offer's `observed_at`; `price_valid_until` is null when the offer has no `valid_until`; the `fx_*` fields are null unless a conversion was used (§4.4). The optional AC inputs follow §7.2 (absent → AC power `unknown`). Prices must be timestamped; model performance must be linked to test conditions and a specific charger model or installation.
 
 ## 9. Validation and acceptance criteria
 
@@ -444,6 +485,25 @@ Round 2 adds:
 - Conflicting topology or advertised power between sources: not ranked.
 - Request carrying `station_available_power_kw` and `concurrent_session_count` (shared cabinet) through the §8.2 contract.
 
+Round 3 adds:
+
+- 400 V station maximum, 400 V converter input minimum, positive upstream resistance: no positive feasible current, `window_completed: false`; a downstream-resistance case where `V_out` exceeds `V_batt`; unknown segment resistance gives `unknown`.
+- Differing feasible input voltages change duration: changing candidate enumeration order does not change the operating point or the winner; no policy point estimate gives an unranked result with an insufficient-evidence reason.
+- A 400 V / 250 A / 60 kW passthrough adapter upstream of a booster never carries more than 60 kW, and the same for a downstream passthrough element.
+- Two series elements with a power cap that passes at `V_station` but fails at `V_batt` (or the reverse): deterministic result under the `V_e` convention.
+- A 250 A continuous-only adapter (`peak_mode: none`) is eligible and modeled at 250 A; an adapter with a 500 A peak and no duration is modeled at 250 A with a widened range; `peak_mode: unknown` is `unverified`.
+- A 32 A single-phase cable on a three-phase EVSE with an 11 kW onboard charger yields about 7.4 kW, not 11 or 22.2 kW; missing supply voltage, convention or power factor gives `unknown` AC power, not 7.4 or 22.2 kW.
+- A merchant shipping one adapter to DE and FR at different shipping prices gives different delivered totals and possibly a different cheapest winner; a country with no destination row is not shipped to.
+- A converted shipping price returns `fx_rate`, `fx_source` and `fx_timestamp` and `price_observed_at` in the response.
+- Two sources giving different minimum voltages, or different series resistances, for one accessory: not ranked, conflicting field reported.
+- A station-DC test is not attached to a battery-terminal estimate; a stored-energy test is not compared without conversion; a test with a null convention supports a range only.
+- Vehicle supporting only DIN SPEC 70121 at a charger supporting only ISO 15118: `unverified`, not ranked.
+- Best value with candidates 45 min / €20 and 30 min / €80 and no completed no-adapter session: category empty; adding a 60 min / €500 candidate changes nothing; a single eligible adapter is not a best-value winner against itself.
+- Completed native session of 40 min, adapters of 50 min / €30 and 35 min / €200: only the 35 min adapter is a candidate and cheapest is the €200 adapter.
+- Pack 600–800 V, booster input 200–500 V, station 700 V, profile says the booster is bypassed inside the pack window: eligible on the direct path; the same vehicle at a 400 V station keeps the booster input limit; unknown engagement gives `unknown`.
+- DC nameplate current, `full_performance_from_v` above the battery voltage and no envelope point there: `unknown`.
+- `concurrent_session_count` 2, null `station_available_power_kw`, sharing policy not evaluable: `unknown`, not the cabinet nameplate.
+
 ## 10. Rollout strategy
 
 1. Inspect the actual Fuel Atlas schema and identify equivalent existing columns.
@@ -472,3 +532,4 @@ HUMAN is not answering during the automated loop; CLAUDE has not decided these. 
 | FB-D8 | Minimum evidence level for a product to qualify for a purchase recommendation (e.g. manufacturer datasheet only vs. plus a field test) | §7.1, §8.1, §9 | open |
 | FB-D9 | Do the three recommendation categories include AC cables, or only DC adapters? (Interim: AC candidates are evaluated and listed unranked.) | §8.1 | open |
 | FB-D10 | Is delivered price and availability evaluated at country level only, or at postcode/region granularity? (Interim: country level; `delivery_destination` is a country code.) | §4.4, §6.3, §8.2 | open (new, round 2) |
+| FB-D11 | When no completed no-adapter session exists (e.g. connector mismatch), should best value stay empty, or use some other stated baseline such as a reference adapter? (Interim: empty, no baseline.) | §8.1 | open (new, round 3) |

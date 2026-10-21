@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-3/CONSOLIDATION.md`, `projects/fuelbuddy/charging-efficiency-specs/spec.md` (symlink; edited via `FuelAtlas_Charging_Accessory_Charger_Research_Spec.md`), `projects/fuelbuddy/charging-efficiency-specs/README.md`, `CHANGELOG.md`
+**Change:** Consolidated charging-efficiency-specs review round 3 (CHATGPT 2, DEEPSEEK 9, GROK 6 findings; 4 major, 13 minor; 17 raw findings merged into 16 items, all accepted, nine with an adjustment) and updated the spec v1.3 → v1.4: segment voltages, losses and passthrough power caps around a converter; converter operating-point policy; `V_e` convention; explicit `peak_mode`; accessory `ac_phases` and AC input fields (no default voltage or power factor); per-destination shipping/VAT table `accessory_offer_destinations`; price timestamp and FX fields in the §8.2 contract; wider §5 conflict list; test `power_convention`; charger protocol and accessory interlock fields; best value has no fallback baseline; booster engagement rule; native-session gate is "strictly faster"; envelope rule for all paths; session count does not set available power; new regressions. README now points at Round 4 reviewing v1.4.
+**Remaining:** Stop rule not met (four majors), so round 4 follows. Open HUMAN decisions carried forward: FB-D8, FB-D9, FB-D10 and new FB-D11 (best-value baseline when no completed no-adapter session exists; interim: empty); ids are provisional and HUMAN was not asked. GROK's served model was unverified.
+**Verification:** No external source re-fetched; all round-3 findings were reasoning-only and were checked against the spec text. No git commands run.
+
+## 2026-10-21
 **Agent:** GROK
 **Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-3/GROK.md`, `CHANGELOG.md`
 **Change:** Reviewed local charging-efficiency spec v1.3 for round 3 after reading all round-2 reviews and `CONSOLIDATION.md`, plus the round-3 CHATGPT and DEEPSEEK reviews. Recorded 0 blocking, 2 major and 4 minor findings: the best-value fallback baseline is the slowest eligible adapter, so adding a slower adapter changes the winner; a vehicle booster has no in-circuit rule and can reject a station the pack can take directly; "improves cost" is undefined against an unpriced native session; the nameplate-current prohibition sits only on the AC bullet; AC converter input power is not defined as `P_ac` and supply voltage has no field; a concurrent session count does not change available station power.
