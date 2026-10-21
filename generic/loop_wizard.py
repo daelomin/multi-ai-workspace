@@ -97,21 +97,29 @@ def a_state(_: dict) -> dict:
 
 
 def a_loops(_: dict) -> dict:
-    return {"loops": [{"id": l["id"], "name": l["name"], "project": l["project"], "branch": l["branch"]} for l in loops()]}
+    return {"loops": [{"id": l["id"], "name": l["name"], "project": l["project"], "branch": l["branch"],
+                       "worktree": l.get("worktree", "")} for l in loops()]}
 
 
-def a_git_status(_: dict) -> dict:
-    _, branch = sh(["git", "branch", "--show-current"])
-    out = subprocess.run(["git", "status", "--porcelain"], cwd=WORKSPACE, capture_output=True, text=True).stdout
+def root_of(loop_id: str | None) -> Path:
+    """Checkout a loop works in: its own worktree, or the main checkout (no id, or a legacy loop)."""
+    return lm.loop_root(find(loop_id)) if loop_id else WORKSPACE
+
+
+def a_git_status(a: dict) -> dict:
+    root = root_of(a.get("id"))
+    _, branch = sh(["git", "branch", "--show-current"], root)
+    out = subprocess.run(["git", "status", "--porcelain"], cwd=root, capture_output=True, text=True).stdout
     files = []
     for line in out.splitlines():  # "XY path" or "XY old -> new"; no strip: column 0 can be a space
         parts = [x.strip('"') for x in line[3:].split(" -> ")]
         files.append({"status": line[:2].strip() or "?", "path": parts[-1], "old": parts[0] if len(parts) > 1 else None})
-    return {"branch": branch, "clean": not files, "files": files}
+    return {"branch": branch, "root": str(root), "clean": not files, "files": files}
 
 
 def a_commit(a: dict) -> dict:
-    status = a_git_status({})["files"]
+    root = root_of(a.get("id"))
+    status = a_git_status({"id": a.get("id")})["files"]
     allowed = {f["path"] for f in status}
     paths = a.get("paths") or []
     msg = (a.get("message") or "").strip()
@@ -125,9 +133,9 @@ def a_commit(a: dict) -> dict:
     # A rename's old path is already gone from the index, so `git add` rejects it, but `git commit --only`
     # still needs it (it exists in HEAD) to commit the deletion together with the new file.
     olds = [f["old"] for f in status if f["path"] in paths and f["old"]]
-    rc, out = sh(["git", "add", "--", *paths])
+    rc, out = sh(["git", "add", "--", *paths], root)
     if rc == 0:
-        rc, out = sh(["git", "commit", "-m", msg, "--", *paths, *olds])
+        rc, out = sh(["git", "commit", "-m", msg, "--", *paths, *olds], root)
     return {"ok": rc == 0, "output": out}
 
 
@@ -170,6 +178,7 @@ findings or `Findings: none`.
 
 
 def a_create_loop(a: dict) -> dict:
+    """New loop in its own git worktree (own branch, own files), so it can run beside other loops."""
     folder, name = a.get("folder", ""), a.get("name", "").strip()
     if not FOLDER_RE.match(folder) or not NAME_RE.match(name):
         raise ValueError("folder must look like projects/<project>/<spec>; name 2-30 letters/digits/spaces")
@@ -180,9 +189,10 @@ def a_create_loop(a: dict) -> dict:
         raise ValueError("invalid name/branch")
     if any(l["id"] == lid for l in raw_loops()):
         raise ValueError(f"loop id {lid!r} is already registered")
-    proj = WORKSPACE / folder
-    if proj.exists():
-        raise ValueError(f"{folder} already exists")
+    wt = lm.LOOPS_ROOT / lid
+    if wt.exists():
+        raise ValueError(f"{wt} already exists")
+    proj = wt / folder
     log: list[str] = []
 
     def step(label: str, rc_out: tuple[int, str]) -> None:
@@ -190,7 +200,8 @@ def a_create_loop(a: dict) -> dict:
         if rc_out[0] != 0:
             raise RuntimeError("\n".join(log))
 
-    step(f"git checkout -b {branch} {base}", sh(["git", "checkout", "-b", branch, base]))
+    lm.LOOPS_ROOT.mkdir(parents=True, exist_ok=True)
+    step(f"git worktree add -b {branch} {wt} {base}", sh(["git", "worktree", "add", "-b", branch, str(wt), base]))
     (proj / "automation").mkdir(parents=True)
     (proj / "reviews").mkdir()
     (proj / "reviews" / ".gitkeep").write_text("")
@@ -198,16 +209,38 @@ def a_create_loop(a: dict) -> dict:
     (proj / "spec.md").write_text(f"# {name} specification\n\nVersion 0.1\n\n(write the spec here)\n", encoding="utf-8")
     (proj / "README.md").write_text(README_TEMPLATE.format(name=name), encoding="utf-8")
     log.append(f"wrote {folder}/spec.md, README.md, automation/.gitignore")
-    step("git add + commit", sh(["git", "add", "--", folder]))
-    step("git commit", sh(["git", "commit", "-m", f"HUMAN: add {name} spec for the review loop", "--", folder]))
-    entry = {"id": lid, "project": folder, "name": name, "branch": branch}
+    step("git add", sh(["git", "add", "--", folder], wt))
+    step("git commit", sh(["git", "commit", "-m", f"HUMAN: add {name} spec for the review loop", "--", folder], wt))
+    entry = {"id": lid, "project": folder, "name": name, "branch": branch, "worktree": str(wt)}
     for k in ("after", "autostart"):
         if a.get(k):
             entry[k] = a[k]
     save_loops(raw_loops() + [entry])
     log.append(f"registered loop {lid!r} in generic/loops.json")
-    return {"ok": True, "id": lid, "branch": branch, "output": "\n".join(log),
-            "note": "Write the real content into spec.md, commit it, then run the loop."}
+    return {"ok": True, "id": lid, "branch": branch, "worktree": str(wt), "spec": str(proj / "spec.md"),
+            "output": "\n".join(log),
+            "note": "Write the real content into spec.md (in the worktree), commit it there, then run the loop."}
+
+
+def a_make_worktree(a: dict) -> dict:
+    """Give a registered loop that still works in the main checkout its own worktree (needed to run in parallel)."""
+    entries = raw_loops()
+    e = next((x for x in entries if x["id"] == a.get("id")), None)
+    if not e:
+        raise ValueError(f"unknown loop {a.get('id')!r}")
+    if e.get("worktree"):
+        raise ValueError(f"{e['id']} already has a worktree: {e['worktree']}")
+    wt = lm.LOOPS_ROOT / e["id"]
+    branch = e.get("branch") or f"agent/loop/{rl.slug(e['name'])}-review"
+    if wt.exists():
+        raise ValueError(f"{wt} already exists")
+    lm.LOOPS_ROOT.mkdir(parents=True, exist_ok=True)
+    rc, out = sh(["git", "worktree", "add", str(wt), branch])
+    if rc != 0:
+        raise RuntimeError(out + "\n(a branch can only be checked out in one place: switch the main checkout to another branch first)")
+    e["worktree"] = str(wt)
+    save_loops(entries)
+    return {"ok": True, "worktree": str(wt), "output": out}
 
 
 def a_register(a: dict) -> dict:
@@ -258,13 +291,17 @@ def a_job(a: dict) -> dict:
     if mode not in ("preflight", "one", "full"):
         raise ValueError("mode must be preflight, one or full")
     l = find(a.get("id", ""))
-    if lm.lock_held(WORKSPACE / l["project"] / "automation" / "logs" / ".loop.lock"):
-        raise ValueError(f"{l['name']} already has a loop or preflight running; wait for it to finish (watch the colour card)")
+    if lm.lock_held(lm.checkout_lock(l)) or lm.lock_held(lm.logs_dir(l) / ".loop.lock"):
+        raise ValueError(f"{l['name']} already has a loop or preflight running in {lm.loop_root(l)}; wait for it to finish "
+                         "(a second one there would switch its branch)")
+    running = sum(1 for x in loops() if lm.lock_held(lm.checkout_lock(x)))
+    if running >= lm.MAX_PARALLEL:
+        raise ValueError(f"{running} loops are already running (cap {lm.MAX_PARALLEL}; set LOOP_MAX_PARALLEL to change)")
     JOBS.mkdir(parents=True, exist_ok=True)
     jid = uuid.uuid4().hex[:8]
     logf = open(JOBS / f"{jid}.log", "w")
-    p = subprocess.Popen([str(lm.LAUNCHER), l["project"], l["name"], l["branch"], mode], cwd=WORKSPACE,
-                         stdin=subprocess.DEVNULL, stdout=logf, stderr=subprocess.STDOUT, start_new_session=True)
+    p = subprocess.Popen([str(lm.LAUNCHER), l["project"], l["name"], l["branch"], mode], cwd=lm.loop_root(l),
+                         env=lm.launcher_env(l), stdin=subprocess.DEVNULL, stdout=logf, stderr=subprocess.STDOUT, start_new_session=True)
     (JOBS / f"{jid}.json").write_text(json.dumps({"pid": p.pid, "mode": mode, "loop": l["id"], "exit": None}))
     import threading
 
@@ -278,12 +315,12 @@ def a_job(a: dict) -> dict:
 
 def a_retry(a: dict) -> dict:
     l = find(a.get("id", ""))
-    (WORKSPACE / l["project"] / "automation" / "logs" / ".monitor.json").unlink(missing_ok=True)
+    (lm.logs_dir(l) / ".monitor.json").unlink(missing_ok=True)
     return {"ok": True, "output": f"cleared failed launch of {l['id']}"}
 
 
 ACTIONS = {"state": a_state, "loops": a_loops, "git_status": a_git_status, "commit": a_commit,
-           "create_loop": a_create_loop, "register": a_register, "monitor_start": a_monitor_start,
+           "create_loop": a_create_loop, "make_worktree": a_make_worktree, "register": a_register, "monitor_start": a_monitor_start,
            "monitor_stop": a_monitor_stop, "job": a_job, "retry": a_retry}
 
 
@@ -330,7 +367,8 @@ class Handler(BaseHTTPRequestHandler):
             if path.startswith("/api/job/"):
                 return self._json(200, job_info(path.rsplit("/", 1)[1]))
             if path.startswith("/api/") and path[5:] in ("state", "loops", "git_status"):
-                return self._json(200, ACTIONS[path[5:]]({}))
+                q = parse_qs(urlparse(self.path).query)
+                return self._json(200, ACTIONS[path[5:]]({"id": q["id"][0]} if "id" in q else {}))
         except Exception as exc:  # noqa: BLE001
             return self._json(500, {"error": str(exc)})
         self._json(404, {"error": "not found"})

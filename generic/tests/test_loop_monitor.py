@@ -148,6 +148,14 @@ class State(Base):
         self.assertEqual(g["r2-CHATGPT"]["metadata"]["effort"], "medium")
         self.assertEqual(g["r2-CHATGPT"]["metadata"]["duration_seconds"], 91.0)
 
+    def test_round_cost_sums_known_steps_and_flags_unreported_ones(self):
+        steps = [{"name": "CHATGPT", "cost_usd": 0.21, "seconds": 100}, {"name": "GROK", "seconds": 300},
+                 {"name": "CLAUDE", "cost_usd": 0.89, "seconds": 200}, {"name": "DEEPSEEK"}]
+        self.assertEqual(lm.round_cost(steps), {"usd": 1.1, "missing": ["GROK"]})  # DEEPSEEK has not run: not "missing"
+        self.assertEqual(lm.round_cost([{"name": "A"}]), {"usd": None, "missing": []})
+        self.assertIn("$0.21 (subscription)", lm.describe({"model": "m", "cost_usd": 0.21, "cost_basis": "subscription"}))
+        self.assertIn("cost: not reported", lm.describe({"model": "m", "cost_basis": "not reported"}))
+
     def test_is_preflight_reads_cmdline(self):
         import subprocess
         p = subprocess.Popen([sys.executable, "-c", "import time;time.sleep(5)", "--preflight"])
@@ -165,6 +173,13 @@ class State(Base):
         self.project("a", readme="Review has converged at round 2.\n", rounds=("round-1", "round-2"))
         s = lm.evaluate(self.loop("a"))
         self.assertEqual(s["status"], "complete")
+        self.assertEqual([r["n"] for r in s["rounds"]], [1, 2])
+
+    def test_complete_when_readme_keeps_the_round_line_and_says_converged(self):
+        self.project("a", readme="## Current round\n\n**Round 2** — the review converged at round 2 on v0.6.\n",
+                     rounds=("round-1", "round-2"))
+        s = lm.evaluate(self.loop("a"))
+        self.assertEqual((s["status"], s["detail"], s["round"]), ("complete", "converged", 2))
         self.assertEqual([r["n"] for r in s["rounds"]], [1, 2])
 
     def test_rounds_append_as_readme_advances(self):

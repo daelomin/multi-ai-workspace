@@ -1,0 +1,2 @@
+# Parallel loop branches each prepend their own entry to CHANGELOG.md; keep both sides on merge.
+CHANGELOG.md merge=union

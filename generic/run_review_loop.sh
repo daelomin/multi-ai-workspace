@@ -8,6 +8,8 @@
 #   one            one live round (CHATGPT,DEEPSEEK,GROK), max-rounds 1
 #   full           up to 5 rounds
 # Per-project wrappers (projects/<p>/.../automation/run_review_loop.sh) just call this with their values.
+# LOOP_WORKTREE=<dir>  run in that git worktree (its own branch and files) instead of the main checkout, so several
+#                      loops can run at once. The engine code always comes from the main checkout.
 # The DeepSeek key is read from the environment, or prompted (hidden, never written to disk).
 set -euo pipefail
 
@@ -18,7 +20,8 @@ if [ "$#" -lt 3 ] || [ "$#" -gt 4 ]; then
 fi
 PROJECT="$1"; NAME="$2"; shift 2
 if [ "$#" -eq 2 ]; then BRANCH="$1"; shift; else BRANCH="agent/loop/$(printf '%s' "$NAME" | tr '[:upper:]' '[:lower:]')-review"; fi
-PROJECT_ARGS=(--project "$PROJECT" --name "$NAME" --branch "$BRANCH")
+ROOT="${LOOP_WORKTREE:-$REPO}"
+PROJECT_ARGS=(--project "$ROOT/$PROJECT" --name "$NAME" --branch "$BRANCH")
 
 # FAST=1 -> Codex Fast service tier (about 2x speed, 2x price) and Grok 4.7 medium-fast.
 # DeepSeek and the Anthropic consolidator have no fast variant, so they are unchanged.
@@ -65,9 +68,18 @@ if [ -z "${DEEPSEEK_API_KEY:-}" ]; then
   export DEEPSEEK_API_KEY
 fi
 
+# --- one loop per checkout/worktree: the lock is per git-dir, so loops in different worktrees run in parallel ---
+[ -d "$ROOT" ] || { echo "worktree not found: $ROOT" >&2; exit 1; }
+cd "$ROOT"
+exec 9>"$(git rev-parse --absolute-git-dir)/review-loop.lock"
+if ! flock -n 9; then
+  echo "another review loop (or preflight) is already using $ROOT; wait for it to finish. Two in one checkout would switch its branch and commit work to the wrong branch." >&2
+  exit 1
+fi
+# fd 9 stays open in the engine below, so the lock is held until this script ends.
+
 # --- git state: clean tree, on the loop branch ---
-cd "$REPO"
-[ -z "$(git status --porcelain)" ] || { echo "working tree not clean; commit or stash first" >&2; git status --short >&2; exit 1; }
+[ -z "$(git status --porcelain)" ] || { echo "working tree not clean in $ROOT; commit or stash first" >&2; git status --short >&2; exit 1; }
 [ "$(git rev-parse --abbrev-ref HEAD)" = "$BRANCH" ] || git checkout "$BRANCH"
 
 case "$mode" in

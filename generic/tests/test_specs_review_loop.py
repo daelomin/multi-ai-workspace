@@ -30,6 +30,48 @@ class ValidateReview(unittest.TestCase):
         self.assertIn("contradictory", rl.validate_review(GOOD + "Findings: none\n"))
 
 
+class Cost(unittest.TestCase):
+    USAGE = {"modelUsage": {"deepseek-flash": {"inputTokens": 1_000_000, "cacheReadInputTokens": 1_000_000, "outputTokens": 1_000_000}}}
+
+    def test_peak_window_is_beijing_weekday_9_12_and_14_18(self):
+        import calendar
+        wed = lambda h, m=0: calendar.timegm((2026, 10, 21, h - 8, m, 0))  # Wed, Beijing hour h
+        sat = calendar.timegm((2026, 10, 24, 10 - 8, 0, 0))
+        self.assertTrue(rl.deepseek_peak(wed(9)) and rl.deepseek_peak(wed(11, 59)) and rl.deepseek_peak(wed(17, 59)))
+        self.assertFalse(rl.deepseek_peak(wed(12)) or rl.deepseek_peak(wed(13, 59)) or rl.deepseek_peak(wed(18)) or rl.deepseek_peak(sat))
+
+    def test_deepseek_cost_from_tokens_at_list_prices(self):
+        import calendar
+        with mock.patch.object(rl, "CNY_USD", 0.14):
+            peak = rl.deepseek_cost(self.USAGE, calendar.timegm((2026, 10, 21, 2, 0, 0)))   # 10:00 Beijing
+            off = rl.deepseek_cost(self.USAGE, calendar.timegm((2026, 10, 21, 12, 0, 0)))   # 20:00 Beijing
+        self.assertAlmostEqual(peak[0], (0.04 + 2.0 + 8.0) * 0.14, places=3)   # 1M hit + 1M miss + 1M out
+        self.assertAlmostEqual(off[0], (0.02 + 1.0 + 4.0) * 0.14, places=3)
+        self.assertIn("peak", peak[1])
+
+    def test_unknown_model_is_priced_as_flash_and_flagged(self):
+        usd, basis = rl.deepseek_cost({"modelUsage": {"mystery": {"outputTokens": 1_000_000}}}, 0)
+        self.assertGreater(usd, 0)
+        self.assertIn("flash", basis)
+
+    def test_note_keeps_a_zero_cost(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(rl, "LOG_DIR", Path(d)):
+            with rl.timed(1, "GROK") as t:
+                t.note(cost_usd=0.0, cost_basis="x")
+            self.assertEqual(json.loads((Path(d) / "r1-grok.timing.json").read_text())["cost_usd"], 0.0)
+
+
+class VersionLine(unittest.TestCase):
+    def test_common_spellings(self):
+        for head, want in (("# X\n\nVersion 0.4 (draft)", "0.4"), ("**Version:** 1.1 (proposal)  \n**Date:**", "1.1"),
+                           ("version: 2.10", "2.10"), ("Version v3.0", "3.0")):
+            self.assertEqual(rl.VERSION_RE.search(head).group(1), want, head)
+        self.assertIsNone(rl.VERSION_RE.search("Versions of the thing 1.2; conversion 3.4"))
+
+    def test_bump_is_detected_in_bold_style(self):
+        self.assertNotEqual(rl.VERSION_RE.search("**Version:** 1.1").group(1), rl.VERSION_RE.search("**Version:** 1.2").group(1))
+
+
 class Timing(unittest.TestCase):
     def test_fmt_duration(self):
         self.assertEqual([rl.fmt_duration(x) for x in (4, 91, 477, 3725)], ["4s", "1m31s", "7m57s", "1h02m05s"])

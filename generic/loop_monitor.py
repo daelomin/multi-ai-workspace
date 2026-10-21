@@ -39,6 +39,8 @@ WORKSPACE = HERE.parent
 sys.path.insert(0, str(HERE))
 import specs_review_loop as rl  # noqa: E402  (reuses ROUND_RE and validate_review; no globals used)
 
+LOOPS_ROOT = Path(os.environ.get("LOOP_WORKTREES_DIR", str(WORKSPACE.parent / f"{WORKSPACE.name}.loops"))).expanduser()
+MAX_PARALLEL = int(os.environ.get("LOOP_MAX_PARALLEL", "3"))
 CONFIG = Path(os.environ.get("LOOP_MONITOR_CONFIG", HERE / "loops.json"))
 OUT_DIR = HERE / ".monitor"
 JARVIS_DIR = WORKSPACE / ".jarvis" / "tracker"
@@ -63,6 +65,26 @@ def load_config(path: Path = CONFIG) -> list[dict]:
         l.setdefault("reviewers", DEFAULT_REVIEWERS)
         l.setdefault("autostart", False)
     return loops
+
+
+def loop_root(loop: dict) -> Path:
+    """Where the loop's files live: its own git worktree, or (legacy) the main checkout."""
+    return Path(loop["worktree"]).expanduser() if loop.get("worktree") else WORKSPACE
+
+
+def project_dir(loop: dict) -> Path:
+    return loop_root(loop) / loop["project"]
+
+
+def logs_dir(loop: dict) -> Path:
+    return project_dir(loop) / "automation" / "logs"
+
+
+def checkout_lock(loop: dict) -> Path:
+    """Held by generic/run_review_loop.sh while a loop or preflight uses this checkout/worktree (git-dir is per
+    worktree, so loops in different worktrees run in parallel; two in the same one are refused)."""
+    r = subprocess.run(["git", "rev-parse", "--absolute-git-dir"], cwd=loop_root(loop), capture_output=True, text=True)
+    return Path(r.stdout.strip() or loop_root(loop) / ".git") / "review-loop.lock"
 
 
 def lock_holder(lock: Path) -> int | None:
@@ -102,7 +124,7 @@ def read_json(path: Path) -> dict:
 def step_info(logdir: Path, n: int, step: str) -> dict:
     """Model, effort, tier and served model of a step, from the engine's timing file."""
     t = read_json(logdir / f"r{n}-{step.lower()}.timing.json")
-    return {k: t[k] for k in ("model", "effort", "tier", "reported") if t.get(k)}
+    return {k: t[k] for k in ("model", "effort", "tier", "reported", "cost_usd", "cost_basis") if t.get(k) is not None and t.get(k) != ""}
 
 
 def describe(x: dict) -> str:
@@ -114,7 +136,18 @@ def describe(x: dict) -> str:
         bits.append(f"{x['tier']} tier")
     if x.get("reported") and x["reported"] != x["model"]:
         bits.append(f"served: {x['reported']}")
+    if x.get("cost_usd") is not None:
+        bits.append(f"${x['cost_usd']:.2f} ({x.get('cost_basis', '')})")
+    elif x.get("cost_basis"):
+        bits.append(f"cost: {x['cost_basis']}")
     return " · ".join(bits)
+
+
+def round_cost(steps: list[dict]) -> dict:
+    """Sum of the recorded step costs of a round; Grok (unreported) is flagged, not guessed."""
+    known = [x["cost_usd"] for x in steps if x.get("cost_usd") is not None]
+    return {"usd": round(sum(known), 2) if known else None,
+            "missing": [x["name"] for x in steps if x.get("cost_usd") is None and x.get("seconds") is not None]}
 
 
 def step_seconds(logdir: Path, n: int, step: str, state: str) -> float | None:
@@ -186,11 +219,15 @@ def preflight_state(logdir: Path, n: int, running: bool) -> dict:
 
 def evaluate(loop: dict) -> dict:
     """Current state of one loop, from its files."""
-    project = WORKSPACE / loop["project"]
+    project = project_dir(loop)
     readme = project / "README.md"
-    logdir = project / "automation" / "logs"
+    logdir = logs_dir(loop)
     out = {"id": loop["id"], "name": loop["name"], "after": loop.get("after"), "round": None,
-           "steps": [], "rounds": [], "preflight": None, "status": "pending", "detail": "", "spec": ""}
+           "branch": loop.get("branch", ""), "worktree": loop.get("worktree", ""),
+           "steps": [], "rounds": [], "preflight": None, "cost": {"usd": None, "missing": []}, "status": "pending", "detail": "", "spec": ""}
+    if loop.get("worktree") and not loop_root(loop).is_dir():
+        out.update(status="failed", detail=f"worktree {loop['worktree']} is missing")
+        return out
     if not (project / "spec.md").is_file() or not readme.is_file():
         out.update(status="failed", detail=f"{loop['project']} has no spec.md/README.md")
         return out
@@ -202,9 +239,13 @@ def evaluate(loop: dict) -> dict:
     launch = read_json(logdir / ".monitor.json")
     out["spec"] = rl.VERSION_RE.search((project / "spec.md").read_text(encoding="utf-8")[:500]).group(1) \
         if rl.VERSION_RE.search((project / "spec.md").read_text(encoding="utf-8")[:500]) else "?"
+    # The engine leaves "**Round N** — the review converged at round N …" when the stop rule is met.
+    converged = bool(m) and "converged" in text[m.start():m.start() + 200].lower()
     out["rounds"] = [{"n": k, "steps": past_steps(project / "reviews" / f"round-{k}")}
-                     for k in round_numbers(project) if not m or k < int(m.group(1))]
-    if not m:
+                     for k in round_numbers(project) if not m or converged or k < int(m.group(1))]
+    if m:
+        out["round"] = int(m.group(1))
+    if not m or converged:
         out["status"] = "complete" if "converged" in text.lower() else "failed"
         out["detail"] = "converged" if out["status"] == "complete" else "README has no '**Round N**' line"
         return out
@@ -222,6 +263,7 @@ def evaluate(loop: dict) -> dict:
     pf = preflight_state(logdir, n, pre_running)
     out["preflight"] = pf
     out["rounds"].append({"n": n, "steps": out["steps"], "preflight": pf})
+    out["cost"] = round_cost(out["steps"])
     if not running:  # a failed preflight marks the still-pending steps of the backends that did not answer
         for name, why in read_json(logdir / "preflight.json").get("failed", {}).items():
             for x in out["steps"]:
@@ -239,31 +281,44 @@ def evaluate(loop: dict) -> dict:
     return out
 
 
-def git_clean() -> bool:
-    return not subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"], cwd=WORKSPACE,
+def git_clean(loop: dict | None = None) -> bool:
+    return not subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"],
+                              cwd=loop_root(loop) if loop else WORKSPACE,
                               capture_output=True, text=True).stdout.strip()
 
 
 def due(loops: list[dict], states: dict[str, dict]) -> dict | None:
-    """The next loop to launch, or None. One launch at a time: the loops share one checkout."""
-    if any(s["status"] in ("running", "preflight") for s in states.values()):
+    """The next loop to launch, or None. Loops in different worktrees run in parallel up to MAX_PARALLEL;
+    a loop never starts while its own worktree is in use."""
+    busy = sum(1 for s in states.values() if s["status"] in ("running", "preflight"))
+    if busy >= MAX_PARALLEL:
         return None
     for l in loops:
         s = states[l["id"]]
         if l["autostart"] and l.get("after") and s["status"] == "pending" and states[l["after"]]["status"] == "complete":
-            launch = read_json(WORKSPACE / l["project"] / "automation" / "logs" / ".monitor.json")
-            if not launch:  # never launched by the monitor; a failed launch needs `retry`
+            if lock_held(checkout_lock(l)):
+                continue
+            if not read_json(logs_dir(l) / ".monitor.json"):  # never launched by the monitor; a failed launch needs `retry`
                 return l
     return None
 
 
+def launcher_env(loop: dict) -> dict:
+    """Environment for generic/run_review_loop.sh: LOOP_WORKTREE makes it work in the loop's own worktree."""
+    env = dict(os.environ)
+    env.pop("LOOP_WORKTREE", None)
+    if loop.get("worktree"):
+        env["LOOP_WORKTREE"] = str(loop_root(loop))
+    return env
+
+
 def launch(loop: dict) -> None:
-    logdir = WORKSPACE / loop["project"] / "automation" / "logs"
+    logdir = logs_dir(loop)
     logdir.mkdir(parents=True, exist_ok=True)
     mark = logdir / ".monitor.json"
     logf = open(logdir / "monitor-launch.log", "a")
-    proc = subprocess.Popen([str(LAUNCHER), loop["project"], loop["name"], loop["branch"], "full"], cwd=WORKSPACE,
-                            stdin=subprocess.DEVNULL, stdout=logf, stderr=logf, start_new_session=True)
+    proc = subprocess.Popen([str(LAUNCHER), loop["project"], loop["name"], loop["branch"], "full"], cwd=loop_root(loop),
+                            env=launcher_env(loop), stdin=subprocess.DEVNULL, stdout=logf, stderr=logf, start_new_session=True)
     mark.write_text(json.dumps({"pid": proc.pid, "started": time.strftime("%FT%T"), "exit": None}), encoding="utf-8")
     print(f"[{time.strftime('%T')}] launched {loop['id']} (pid {proc.pid})", flush=True)
     _watch_exit(proc, mark)
@@ -285,7 +340,7 @@ def reap_orphans(loops: list[dict]) -> None:
     """A monitor restart loses the exit watcher: a mark whose pid is gone and whose exit is unknown
     is resolved from the loop's own state (complete => 0, otherwise 1)."""
     for l in loops:
-        mark = WORKSPACE / l["project"] / "automation" / "logs" / ".monitor.json"
+        mark = logs_dir(l) / ".monitor.json"
         data = read_json(mark)
         if data and data.get("exit") is None and not Path(f"/proc/{data.get('pid', 0)}").exists():
             data["exit"] = 0 if evaluate(l)["status"] in ("complete", "pending") else 1
@@ -304,8 +359,13 @@ def write_html(states: list[dict]) -> Path:
         chips = (f'<span class="chip" style="background:{COLORS[pf["status"]]}" title="{html.escape(pf["detail"])}">PREFLIGHT</span>'
                  + pchips if pf else "") + "".join(f'<span class="chip" style="background:{COLORS[x["status"]]}" title="{html.escape(x["detail"] or describe(x))}">'
                         f'{html.escape(label(x["name"], x.get("seconds")))}</span>' for x in s["steps"]) or '<span class="muted">no steps</span>'
-        after = f'<div class="muted">after {html.escape(s["after"])}</div>' if s["after"] else ""
+        after = (f'<div class="muted">after {html.escape(s["after"])}</div>' if s["after"] else "") + \
+            (f'<div class="muted">branch {html.escape(s["branch"])}' + (f' · {html.escape(s["worktree"])}' if s.get("worktree") else " · main checkout") + "</div>"
+             if s.get("branch") else "")
         rnd = f'round {s["round"]}' if s["round"] else "—"
+        c = s.get("cost") or {}
+        if c.get("usd") is not None:
+            rnd += f' · round cost ≈ ${c["usd"]:.2f}' + (f' (+ {", ".join(c["missing"])} not reported)' if c.get("missing") else "")
         cards.append(
             f'<section style="border-left:8px solid {COLORS[s["status"]]}"><h2>{html.escape(s["name"])} '
             f'<span class="badge" style="background:{COLORS[s["status"]]}">{s["status"]}</span></h2>'
@@ -330,7 +390,8 @@ def write_jarvis(states: list[dict]) -> None:
     now = time.strftime("%FT%T")
     for s in states:
         run_id = f"review-loop-{s['id']}"
-        meta = {"project": "spec-review-loop", "kind": "review", "node_type": "phase", "round": s["round"]}
+        meta = {"project": "spec-review-loop", "kind": "review", "node_type": "phase", "round": s["round"],
+                "branch": s.get("branch", ""), "worktree": s.get("worktree", "")}
         nodes, prev = {}, None
         for r in s["rounds"]:
             reviewers = [f"r{r['n']}-{x['name']}" for x in r["steps"] if x["name"] != "CLAUDE"]
@@ -359,7 +420,8 @@ def write_jarvis(states: list[dict]) -> None:
                               "depends_on": reviewers if last else ([gate] if gate else []),
                               "error": x["detail"] or None,
                               "metadata": {**meta, "round": r["n"], "duration_seconds": x.get("seconds"),
-                                           **{k: x[k] for k in ("model", "effort", "tier", "reported") if x.get(k)}}}
+                                           **{k: x[k] for k in ("model", "effort", "tier", "reported", "cost_usd", "cost_basis")
+                                              if x.get(k) is not None}}}
             prev = f"r{r['n']}-CLAUDE"
         (mem / f"graph_{run_id}.json").write_text(json.dumps({"run_id": run_id, "nodes": nodes}, indent=2), encoding="utf-8")
         entries = [{"timestamp": now, "run_id": run_id, "decision": "run_start", "message": s["name"]}]
@@ -375,8 +437,8 @@ SOUND_FILE = Path(os.environ.get("LOOP_MONITOR_SOUND_FILE", "/usr/share/sounds/f
 
 def consolidated_round(loop: dict) -> int:
     """Highest round whose CONSOLIDATION.md exists (0 when none)."""
-    reviews = WORKSPACE / loop["project"] / "reviews"
-    return max((n for n in round_numbers(WORKSPACE / loop["project"]) if (reviews / f"round-{n}" / "CONSOLIDATION.md").is_file()), default=0)
+    reviews = project_dir(loop) / "reviews"
+    return max((n for n in round_numbers(project_dir(loop)) if (reviews / f"round-{n}" / "CONSOLIDATION.md").is_file()), default=0)
 
 
 def play_sound(message: str) -> None:
@@ -419,7 +481,7 @@ def tick(loops: list[dict], do_launch: bool = True) -> list[dict]:
     states = {l["id"]: evaluate(l) for l in loops}
     nxt = due(loops, states) if do_launch else None
     if nxt:
-        if git_clean():
+        if git_clean(nxt):
             launch(nxt)
             states[nxt["id"]] = evaluate(nxt)
         else:
@@ -455,7 +517,7 @@ def main() -> None:
         known = {l["id"]: l for l in loops}
         if sys.argv[2] not in known:
             raise SystemExit(f"unknown loop {sys.argv[2]!r}")
-        (WORKSPACE / known[sys.argv[2]]["project"] / "automation" / "logs" / ".monitor.json").unlink(missing_ok=True)
+        (logs_dir(known[sys.argv[2]]) / ".monitor.json").unlink(missing_ok=True)
         print("cleared; the next tick may launch it again (if autostart and its predecessor is complete)")
     else:
         raise SystemExit(__doc__)

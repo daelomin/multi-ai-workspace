@@ -95,3 +95,28 @@ generic/loop_monitor.py retry <id>    # clear a failed launch
 - **Colours** (`generic/.monitor/index.html`, open as a file): green running, blue complete, red failed, grey pending.
 - **Jarvis** (http://127.0.0.1:8777/): graph `review-loop-<id>`, one node per round and reviewer; round N+1 appears when the README advances after the consolidation of round N, and depends on `rN-CLAUDE`. Jarvis draws running blue and complete green, and an idle half-done loop orange.
 - **Chaining:** a loop with `after` and `autostart: true` is launched when its predecessor is complete, nothing else runs, and the git tree is clean (loops share one checkout). A failed loop is never relaunched automatically.
+
+## 9. Several loops at once (git worktrees)
+
+Every new loop gets its own **git worktree**: its own folder and branch, in `~/GIT/multi-ai-workspace.loops/<loop-id>/` (override with `LOOP_WORKTREES_DIR`). Loops in different worktrees run in parallel; the engine code always runs from the main checkout, only the loop's files and git operations are in the worktree.
+
+- **Create:** the assistant's "Create a new loop" makes the worktree and branch from your current branch, writes `spec.md` and `README.md` there and commits that folder. It records `branch` and `worktree` in `generic/loops.json`.
+- **Existing loops:** a loop registered before this has no `worktree` and uses the main checkout (only one at a time). The assistant offers "Give this loop its own worktree"; the branch must not be checked out in the main checkout.
+- **Your spec goes in the worktree:** edit `<worktree>/projects/<project>/<spec>/spec.md` and commit it there (the assistant's git step does it for the selected loop). The launcher refuses to run on a dirty worktree.
+- **Replies go to the right branch:** the engine commits and pushes inside its own worktree, so each review lands on that loop's branch. Git refuses the same branch in two worktrees, and the launcher lock is per worktree.
+- **Limit:** at most 3 loops at once (`LOOP_MAX_PARALLEL`); they share your OpenAI, DeepSeek, Cursor and Anthropic accounts and run up the bill in parallel.
+- **Merging branches:** `.gitattributes` sets `CHANGELOG.md merge=union`, so parallel loops that each add a changelog entry merge without conflicts.
+- **Cleanup:** worktrees are never removed automatically. When a loop is merged: `git worktree remove <path>` (HUMAN decision).
+
+## 10. Cost per step
+
+Every step records its cost in `automation/logs/r{n}-{step}.timing.json` (`cost_usd`, `cost_basis`), shown on the Jarvis nodes, the chips and as a round total on the cards:
+
+| Step | Cost | Basis |
+|---|---|---|
+| DEEPSEEK | token counts x DeepSeek list prices (peak / off-peak, Beijing time), converted at `CNY_USD` (default 0.14, an assumption: set today's rate) | the only per-token API key |
+| CHATGPT | Codex's estimate from its session file | subscription-equivalent (ChatGPT login) |
+| CLAUDE | Claude Code's `total_cost_usd` | subscription-equivalent (claude.ai login) |
+| GROK | not reported by Cursor, flagged as missing in the round total | Cursor plan |
+
+Claude Code's own cost figure for DeepSeek runs is not used: it prices the tokens with another table. DeepSeek prices live in `DEEPSEEK_PRICES` (override with `DEEPSEEK_PRICES_JSON`); they were read on 2026-10-21 and may change.

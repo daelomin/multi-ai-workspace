@@ -93,7 +93,8 @@ DEEPSEEK_ACCEPT_UNVERIFIED = os.environ.get("DEEPSEEK_ACCEPT_UNVERIFIED") == "1"
 KNOWN_REVIEWERS = {"CHATGPT", "DEEPSEEK", "GROK", "CURSOR"}
 SEVERITY_RE = re.compile(r"\*\*Severity:\*\*\s*\**\s*(blocking|major|minor)", re.I)
 ROUND_RE = re.compile(r"\*\*Round (\d+)\*\*")
-VERSION_RE = re.compile(r"version (\d+\.\d+)", re.I)
+# "Version 0.4", "version: 1.1", "**Version:** 1.1 (proposal)", "Version v2.0"
+VERSION_RE = re.compile(r"\bversion\b\W{0,6}v?(\d+\.\d+)", re.I)
 
 REVIEW_RULES = """\
 Automated loop rules (they override anything in the README about git or pull requests):
@@ -216,6 +217,39 @@ def step_config(agent: str) -> dict:
     return {"model": CLAUDE_MODEL, "effort": CONSOLIDATOR_EFFORT or "default", "tier": ""}  # CLAUDE
 
 
+# DeepSeek list prices, CNY per 1M tokens: (cache-hit input, cache-miss input, output), peak and off-peak.
+# Source: https://api-docs.deepseek.com/zh-cn/quick_start/pricing (read 2026-10-21; prices may change).
+# Peak = Beijing time Mon-Fri 9-12 and 14-18, ignoring Chinese holidays; off-peak is half. Override with
+# DEEPSEEK_PRICES_JSON='{"model": {"peak": [hit, miss, out], "off": [hit, miss, out]}}'.
+DEEPSEEK_PRICES = {
+    "deepseek-flash": {"peak": (0.04, 2.0, 8.0), "off": (0.02, 1.0, 4.0)},
+    "deepseek-v4-pro": {"peak": (0.30, 9.0, 27.0), "off": (0.15, 4.5, 13.5)},
+}
+if os.environ.get("DEEPSEEK_PRICES_JSON"):
+    DEEPSEEK_PRICES.update({k: {p: tuple(v) for p, v in d.items()} for k, d in json.loads(os.environ["DEEPSEEK_PRICES_JSON"]).items()})
+CNY_USD = float(os.environ.get("CNY_USD", "0.14"))  # assumption, not a live rate: set it to today's
+
+
+def deepseek_peak(epoch: float) -> bool:
+    bj = time.gmtime(epoch + 8 * 3600)  # Beijing time = UTC+8
+    return bj.tm_wday < 5 and (9 <= bj.tm_hour < 12 or 14 <= bj.tm_hour < 18)
+
+
+def deepseek_cost(result: dict, epoch: float) -> tuple[float, str]:
+    """USD from the token counts of a Claude Code result at DeepSeek's price list (Claude Code's own
+    total_cost_usd uses another price table and is wrong for DeepSeek models)."""
+    period = "peak" if deepseek_peak(epoch) else "off"
+    cny, unknown = 0.0, False
+    for model, u in (result.get("modelUsage") or {}).items():
+        prices = DEEPSEEK_PRICES.get(model)
+        if prices is None:
+            unknown, prices = True, DEEPSEEK_PRICES["deepseek-flash"]
+        hit, miss, out = prices[period]
+        cny += (u.get("cacheReadInputTokens", 0) * hit + (u.get("inputTokens", 0) + u.get("cacheCreationInputTokens", 0)) * miss
+                + u.get("outputTokens", 0) * out) / 1e6
+    return round(cny * CNY_USD, 4), "api-billed" + (" (some model priced as flash)" if unknown else "") + (", peak rate" if period == "peak" else ", off-peak rate")
+
+
 def codex_banner(logfile: Path) -> dict:
     """What Codex says it actually ran with (its startup banner)."""
     try:
@@ -240,7 +274,7 @@ class timed:
         self.info = step_config(step)  # configured model/effort/tier; note() adds what the backend reported
 
     def note(self, **kw) -> None:
-        self.info.update({k: v for k, v in kw.items() if v})
+        self.info.update({k: v for k, v in kw.items() if v or v == 0})
 
     def _write(self, **extra) -> None:
         self.path.write_text(json.dumps({"start": self.start_iso, **self.info, **extra}), encoding="utf-8")
@@ -724,12 +758,16 @@ def do_review(agent: str, n: int, root: Path) -> dict:
             usage = run_codex(prompt, root, logfile, STEP_TIMEOUT)
             t.note(**codex_banner(logfile))
             if usage:
+                t.note(cost_usd=usage.get("cost_usd"), cost_basis="subscription-equivalent estimate (ChatGPT login)")
                 prov = {"requested": usage["model"], "reported": [usage["model"]] if usage["model"] else [],
                         "verified": False, "note": "model from the Codex banner", "usage": usage}
         elif agent == "DEEPSEEK":
-            prov = run_claude("DEEPSEEK", prompt, root, logfile, STEP_TIMEOUT)["_provenance"]
-            t.note(reported=", ".join(prov.get("reported") or []))
+            res = run_claude("DEEPSEEK", prompt, root, logfile, STEP_TIMEOUT)
+            prov = res["_provenance"]
+            usd, basis = deepseek_cost(res, t.t0)
+            t.note(reported=", ".join(prov.get("reported") or []), cost_usd=usd, cost_basis=basis)
         elif agent == "GROK":
+            t.note(cost_basis="not reported by Cursor (counts against the Cursor plan)")
             run_cursor_agent(prompt, root, logfile, STEP_TIMEOUT, GROK_MODEL)
             prov["requested"] = GROK_MODEL
         elif agent == "CURSOR":
@@ -768,7 +806,8 @@ def do_consolidation(n: int, reviewers: list[str], converged: bool, root: Path,
     logfile = LOG_DIR / f"r{n}-claude.log"
     with timed(n, "claude") as t:
         res = run_claude("ANTHROPIC", consolidation_prompt(n, reviewers, converged, provenance), root, logfile, STEP_TIMEOUT)
-        t.note(reported=", ".join(res.get("_provenance", {}).get("reported") or []))
+        t.note(reported=", ".join(res.get("_provenance", {}).get("reported") or []),
+               cost_usd=round(res.get("total_cost_usd", 0), 4), cost_basis="subscription-equivalent (claude.ai login)")
     if not path.exists():
         raise SystemExit(f"CLAUDE did not write {path}; see {logfile}")
     if spec_version() == before:
