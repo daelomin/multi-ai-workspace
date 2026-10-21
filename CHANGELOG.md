@@ -1,5 +1,176 @@
 # Changelog
 
+## 2026-10-21
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-4/CONSOLIDATION.md`, `projects/fuelbuddy/charging-diagnostic/spec.md`, `projects/fuelbuddy/charging-diagnostic/README.md`, `CHANGELOG.md`
+**Change:** Consolidated FuelBuddy review round 4 (CHATGPT 3, DEEPSEEK 6, GROK 5 findings, all minor; 14 raw findings merged into 13 items, all accepted) and updated `spec.md` v0.5 → v0.6: stage outcomes and `external_authorization` as a stage value, `availability_state` and point-level station projection, restriction composition and the `safety_state` enum, outcomes as observations, `ecu` in the DTC mapping key, DIN/method consistency, symmetric `incident_id` grouping for contradictions, `unsupported_scope` response, in-use point alternates, idempotent replay vs session revision. Re-checked that the settled HUMAN decisions (FB-D1, FB-D2, FB-D3, FB-D5, FB-D7) stay applied. The README now states that the review converged at round 4 on v0.6.
+**Remaining:** Open HUMAN decisions carried forward: FB-D4, FB-D6, FB-D1a–c, FB-D2a, FB-D5a. GROK's served model was unverified.
+**Verification:** No external source re-fetched; GROK's AFIR Table B and Typhoon HIL claims are attributed to GROK in the spec. No git commands run.
+
+## 2026-10-21
+**Agent:** GROK
+**Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-4/GROK.md`, `CHANGELOG.md`
+**Change:** Reviewed local FuelBuddy spec v0.5 for round 4 after reading the round-3 reviews and consolidation, `decisions.md`, and the round-4 CHATGPT and DEEPSEEK reviews. Recorded 0 blocking, 0 major and 5 minor findings: `external_authorization` is missing from the closed stage list and `not_applicable` must stay derived; the architecture diagram sends every restriction to a full stop, including settled `charge_limited` and `do_not_charge_indoor`; the DIN row's "external payment only" can be read as forbidding RFID and app; an in-use recharging point has no rule against offering its other connector; an idempotent evaluate replay can return a body §2 says must not be displayed.
+**Remaining:** CLAUDE consolidates round 4. Settled FB-D1/2/3/5/7 were not reopened; open FB-D4, FB-D6, FB-D1a–c, FB-D2a and FB-D5a were not re-raised. Endorsed round-4 CHATGPT-1/2/3 and DEEPSEEK-1 through DEEPSEEK-6.
+**Verification:** Official Journal PDF of Commission Implementing Regulation (EU) 2025/655 (Articles 1 and 2, Annex Tables B and F) and the Typhoon HIL DIN SPEC 70121 page were read on 2026-10-21. The Siemens CHAdeMO note was not re-fetched. ISO, DIN, IEC and CHAdeMO standard texts were not opened. Review uses the required finding fields, Top 3 and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branches or pull requests.
+
+## 2026-10-21
+**Agent:** DEEPSEEK
+**Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-4/DEEPSEEK.md`, `CHANGELOG.md`
+**Change:** Reviewed local FuelBuddy spec v0.5 for round 4 after reading the round-3 reviews and consolidation, `decisions.md` and the round-4 CHATGPT review. Recorded 0 blocking, 0 major and 6 minor findings: no defined safety-state vocabulary or ordering behind the `safety_state`/monotonicity check; the §11 outcome record contradicts §3.2's single observation record and its `outcome` type; no ECU field for `VEHICLE_DTC` observations although §4.4/§4.5 require one; `plug_and_charge` not rejected for PWM-only/CHAdeMO and `free`/`unknown` authorization methods left unaddressed; the `contradicting` ranking term cannot use the `incident_id` evidence-group identity; no specified response behaviour for `unsupported_scope`.
+**Remaining:** CLAUDE consolidates round 4. Settled FB-D1/2/3/5/7 were not reopened; open FB-D4, FB-D6, FB-D1a–c, FB-D2a and FB-D5a were not re-raised. Endorsed round-4 CHATGPT-1/2/3.
+**Verification:** Internal reasoning only against the local spec and round-3 dispositions; no external factual claims re-verified. Review uses the required finding fields, Top 3 and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branches or pull requests.
+
+## 2026-10-21
+**Agent:** CHATGPT
+**Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-4/CHATGPT.md`, `CHANGELOG.md`
+**Change:** Reviewed local FuelBuddy spec v0.5 after reading the round-3 reviews and consolidation and HUMAN's settled decisions. Recorded 0 blocking, 0 major and 3 minor findings: stage-event outcomes for deriving last successful stage; point identity and availability in the station projection and canonical payload; intersection of simultaneously applicable restriction permissions.
+**Remaining:** CLAUDE consolidates round 4. Settled FB-D1/2/3/5/7 and the carried-forward open HUMAN decisions were not reopened.
+**Verification:** Internal reasoning against the local spec and round-3 dispositions; no external factual claims re-verified. Review includes the required finding fields, Top 3 and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branches or pull requests.
+
+## 2026-10-21
+**Agent:** CLAUDE
+**Files:** `generic/specs_review_loop.py`, `generic/run_review_loop.sh`, `generic/loop_monitor.py`, `generic/loop_wizard.html`, `generic/tests/test_specs_review_loop.py`, `generic/tests/test_loop_monitor.py`, `projects/fuelbuddy/charging-diagnostic/README.md`, `CHANGELOG.md`
+**Change:** (1) Models and effort: DeepSeek reviewer now `deepseek-flash`; every backend defaults to effort `medium` (Codex `-c model_reasoning_effort="medium"`, Claude Code `--effort medium` for DeepSeek and the consolidator via `DEEPSEEK_EFFORT` / `CONSOLIDATOR_EFFORT`, Grok `grok-4.7-medium`; FAST=1 uses `grok-4.7-medium-fast`). (2) Per-step timing: each step writes `automation/logs/r{n}-{step}.timing.json` (start, end, seconds, ok, model, effort, tier, served model; Codex model/effort read from its banner) and the loop logs "round N: STEP done in 4m12s". (3) The Jarvis nodes, colour page and assistant chips show duration, model and effort. (4) The monitor plays a sound and a desktop notification when a round gets its `CONSOLIDATION.md` (silent on first look; `"sound": false` per loop or `LOOP_MONITOR_SOUND=0`).
+**Round state:** the loop was started with `full` and ran straight on into round 4; stopped by HUMAN request after round 4 CHATGPT was committed (DeepSeek cancelled before writing). Rerun to continue; the loop resumes at round 4 DEEPSEEK.
+**Verification:** 48 mocked tests pass; real probes with medium accepted by Codex, DeepSeek, Claude and Grok. Not yet run live in a full round.
+
+## 2026-10-21
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-diagnostic/spec.md`, `projects/fuelbuddy/charging-diagnostic/reviews/round-3/CONSOLIDATION.md`, `projects/fuelbuddy/charging-diagnostic/README.md`, `CHANGELOG.md`
+**Change:** Consolidated FuelBuddy review round 3 (9 findings from CHATGPT, DEEPSEEK, GROK; 8 distinct items, all accepted) into spec v0.5. Fixes: AFIR status is recharging-point level (new `recharging_point` subject), DIN SPEC 70121 split into its own DC-only profile with `safety_checks` marked `not_applicable` on AC and PWM-only sessions and a provisional CHAdeMO order, `measurement_kind` (quantity) vs `measurement_location` (reporter) with a defined measurement-kind catalog, authoritative evaluation fields through LLM validation, shared `incident_id` dedup, typed station-status payload, `stage` field and minimal session record. Applied HUMAN's settled FB-D1 (Europe), FB-D2, FB-D3, FB-D5 and FB-D7 from `decisions.md`. README now points at **Round 4** on v0.5, reviews in `reviews/round-4/`.
+**Remaining:** Open HUMAN list carried forward in the consolidation: FB-D4, FB-D6, FB-D1a–c (API eligibility, launch countries, reduced mode), FB-D2a (re-verification period), FB-D5a (cache hard limit). Stop rule not met (one major, GROK-1). GROK is an unverified reviewer (no served model reported); its AFIR, DIN and CHAdeMO source claims were not re-fetched and are attributed in the spec.
+**Verification:** Read-through and grep of the edited spec for leftover pending passages; no external sources re-fetched; no git commands run.
+
+## 2026-10-21
+**Agent:** GROK
+**Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-3/GROK.md`, `CHANGELOG.md`
+**Change:** Reviewed local FuelBuddy spec v0.4 for round 3 after reading the round-2 reviews and consolidation and HUMAN's settled decisions. Recorded 0 blocking, 1 major and 2 minor findings: AFIR dynamic status is recharging-point level under Implementing Regulation (EU) 2025/655, not connector-level status "in Europe"; the shared DIN 70121 stage row and the unmarked AC `safety_checks` stage are wrong, with a secondary-sourced CHAdeMO order; `measurement_location` is the reporter and `measurement_kind` is the quantity. Re-checked the round-2 AFIR article citations, ISO 15118-2 stage order, control-pilot states E/F and OCPP 2.0.1 NotifyEvent identity; those merged statements still hold. Endorsed CHATGPT-1/2/3 and DEEPSEEK-1.
+**Remaining:** CLAUDE consolidates round 3. Settled FB-D1/2/3/5/7 were not reopened; open FB-D4/6 were not re-raised (no new evidence). Which public API covers the UK and Switzerland stays the open question already in `decisions.md`.
+**Verification:** EUR-Lex text of Implementing Regulation (EU) 2025/655 (Annex Tables B and F, and the closing provisions), the Typhoon HIL DIN 70121 page, and the Siemens CHAdeMO TIA-library note were read on 2026-10-21. ISO, DIN, IEC and CHAdeMO standard texts were not opened. Review uses the required finding fields, Top 3 and final `Result: complete`. Only the authorized review and this entry were written; no git commands, branches or pull requests.
+
+## 2026-10-21
+**Agent:** DEEPSEEK
+**Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-3/DEEPSEEK.md`, `CHANGELOG.md`
+**Change:** Reviewed local FuelBuddy spec v0.4 for round 3 after reading the round-2 reviews and consolidation and HUMAN's settled decisions. Recorded 0 blocking, 0 major and 3 minor findings: the session-stage model (`stage`, `external_authorization`, `communication_profile`, `authorization_method`) has no field in the canonical record and no session schema; `measurement_kind` and `measurement_location` overlap on the charger-vs-vehicle distinction; the versioned `measurement_kind` catalog is referenced but never defined or scheduled. Endorsed CHATGPT-1/2/3 (LLM validation of decision fields, shared-incident dedup, station-state projection).
+**Remaining:** CLAUDE consolidates round 3. Settled FB-D1/2/3/5/7 were not reopened; open FB-D4/6 were not re-raised (no new evidence).
+**Verification:** Internal reasoning only against the local spec and round-2 dispositions; no external factual claims were re-verified. Review uses the required finding fields, Top 3 and final `Result: complete`. Only the authorized review and this entry were written; no git commands, branches or pull requests.
+
+## 2026-10-21
+**Agent:** CHATGPT
+**Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-3/CHATGPT.md`, `CHANGELOG.md`
+**Change:** Reviewed local FuelBuddy spec v0.4 after reading the round-2 reviews and consolidation and HUMAN's settled decisions. Recorded 0 blocking, 0 major and 3 minor findings: pin deterministic evaluation fields through LLM validation; deduplicate shared incidents across different source documents; define the canonical representation of station-state fields.
+**Remaining:** CLAUDE consolidates round 3. Settled FB-D1/2/3/5/7 were not reopened; open FB-D4/6 and outstanding HUMAN parameters were not re-raised.
+**Verification:** Internal reasoning against the local spec and round-2 dispositions; no external factual claims were re-verified. Review uses the required finding fields, Top 3 and final `Result: complete`. Only the authorized review and this entry were written; no git commands, branches or pull requests.
+
+## 2026-10-21
+**Agent:** CLAUDE
+**Files:** `generic/specs_review_loop.py`, `generic/tests/test_specs_review_loop.py`, `CHANGELOG.md`
+**Change:** Fixed the DeepSeek 401. The DeepSeek reviewer ran `claude` with the default config dir `~/.claude`, which now holds a claude.ai OAuth login; Claude Code sent that login token (not the DeepSeek key) to api.deepseek.com, which answered "Authentication Fails" (the key echoed as `****JgAA` was the OAuth token, not the DeepSeek key ending `fb42`). The DEEPSEEK profile now sets `CLAUDE_CONFIG_DIR` to its own dir (`~/.claude-deepseek`, override `DEEPSEEK_CLAUDE_CONFIG_DIR`), like the Anthropic consolidator already did.
+**Verification:** The key in `~/.credentials` returns HTTP 200 on both DeepSeek endpoints; a probe through `_claude_once` with the isolated profile returned OK from deepseek-chat. 37 mocked tests pass (1 new). Full preflight not yet rerun.
+**Remaining:** GROK still needs `cursor-agent login`. The OAuth login token was sent to api.deepseek.com on each DeepSeek call since that login; it is a short-lived access token that rotates, but log out and in to rotate it now if concerned.
+
+## 2026-10-21
+**Agent:** CLAUDE
+**Files:** `generic/loop_monitor.py`, `generic/specs_review_loop.py`, `generic/loop_wizard.html`, `generic/tests/test_loop_monitor.py`, `CHANGELOG.md`
+**Change:** Added a `PREFLIGHT` node per round. Jarvis graph: `rN-PREFLIGHT` (depends on `r(N-1)-CLAUDE`) gates the round's reviewers; it is in progress while probes run, red if any fail, completed if they pass, pending if none ran for round N. The engine now writes the round into `preflight.json`, so a pass for another round does not count. Same chip on the colour page and the assistant page. Only the current round has a preflight node.
+**Verification:** 36 mocked tests pass (1 new; one flaky cmdline test made robust). Live graph shows `r3-PREFLIGHT` failed with DEEPSEEK/GROK reasons. A passing/running preflight node was only tested with mocks.
+
+## 2026-10-21
+**Agent:** CLAUDE
+**Files:** `generic/loop_monitor.py`, `generic/loop_wizard.html`, `generic/loop_wizard.py`, `generic/tests/test_loop_monitor.py`, `CHANGELOG.md`
+**Change:** The monitor no longer reports a preflight as a running review round: if the process holding `.loop.lock` was started with `--preflight`, the loop shows `preflight` (amber, steps pending, no chain launch) instead of green. The wizard refuses to start a job while the loop is locked.
+**Finding (preflight of 11:32, round 3):** it was not hung, it ended after about 4.7 min with 2 of 4 probes failed. DEEPSEEK: HTTP 401, the key in `~/.credentials` (ends `JgAA`) is invalid; the probe waited about 4m23s before giving up. GROK: `cursor-agent` is not authenticated (`Authentication required`), also from a plain shell, although `cursor-agent status` still says logged in. CHATGPT and the Anthropic consolidator probes passed.
+**Remaining:** HUMAN must set a valid DeepSeek key and run `cursor-agent login` (or set `CURSOR_API_KEY`), then rerun the preflight. The engine could fail fast on a 401 instead of waiting.
+**Verification:** 34 mocked tests pass (2 new).
+
+## 2026-10-21
+**Agent:** CLAUDE
+**Files:** `generic/loop_wizard.py`, `generic/loop_wizard.html`, `generic/REVIEW_LOOP_GUIDELINE.md`, `.gitignore` (`generic/loops.json` is now local-only), `CHANGELOG.md`
+**Change:** The assistant now runs the steps itself. `generic/loop_wizard.py` serves the page on 127.0.0.1:8795 and exposes a fixed set of actions (git status/commit of ticked files, create loop = branch + spec/README skeletons + commit + registration, start/stop monitor, preflight/one/full runs with live output, retry). Every request needs a per-start token and a 127.0.0.1 Host header; no arbitrary shell. The page also shows live loop colours.
+**Verification:** Auth/Host/validation checked with curl; create_loop run end to end in a throwaway clone; existing-loop flow and git check clicked in the browser pane. No paid run, no commit or monitor start from the page yet.
+
+## 2026-10-21
+**Agent:** CLAUDE
+**Files:** `generic/loop_monitor.py`, `generic/loops.json`, `generic/loops.example.json`, `generic/loop-monitor.service`, `generic/tests/test_loop_monitor.py`, `generic/REVIEW_LOOP_GUIDELINE.md`, `.gitignore`, `~/GIT/jarvis/jarvis-tracker.service` (and the installed copy), `CHANGELOG.md`
+**Change:** Added a monitor for all review loops. State comes from the files and the `.loop.lock` flock (read from `/proc/locks`, so the monitor never takes the lock). Colour page `generic/.monitor/index.html` (green running, blue complete, red failed, grey pending). Jarvis export of one graph per loop in `.jarvis/tracker/`, with rounds appended as the README advances (round N+1 depends on `rN-CLAUDE`). Chaining: `after` + `autostart` launches the next loop when the previous is complete, nothing else runs and the tree is clean; failed loops need `retry`. The two Jarvis tracker unit files got the new memory/log dirs appended and the service was restarted.
+**Remaining:** `loop-monitor.service` is not installed; only FuelBuddy is registered and `autostart` is off, so nothing launches by itself yet. No live chained launch tested (mocked only).
+**Verification:** 32 mocked tests pass (9 new); `status` run against FuelBuddy; the graph shows in Jarvis `/api/runs`.
+
+## 2026-10-21
+**Agent:** CLAUDE
+**Files:** `generic/REVIEW_LOOP_GUIDELINE.md`, `CONTRIBUTING.md`, `CHANGELOG.md`
+**Change:** Added the guideline every agent follows when starting a spec review loop: folder structure, required README/spec content, ownership, setup steps, run commands, rules and checklist. Linked from `CONTRIBUTING.md`.
+**Verification:** Checked against the engine's requirements (`**Round N**` line, version line, `decisions.md` rule, branch default, lock file). No live run.
+
+## 2026-10-21
+**Agent:** CLAUDE
+**Files:** `generic/run_review_loop.sh` (moved from `projects/fuelbuddy/charging-diagnostic/automation/`), `generic/tests/test_specs_review_loop.py` (moved from `projects/fuelbuddy/charging-diagnostic/automation/tests/test_review_loop.py`), `projects/fuelbuddy/charging-diagnostic/automation/run_review_loop.sh`, `projects/fuelbuddy/charging-diagnostic/README.md`, `CHANGELOG.md`
+**Change:** Moved the launcher and the unit tests to `generic/`. The launcher now takes `<project-dir> <name> [branch] {preflight|one|full}` and finds the repo from its own location. The FuelBuddy folder keeps only a thin wrapper that passes its values, plus its gitignored `automation/logs/`.
+**Verification:** 23 mocked tests pass from `generic/tests`; both scripts pass `bash -n`; usage errors checked. No live review run. Not committed.
+
+## 2026-10-20
+**Agent:** CLAUDE
+**Files:** `generic/specs_review_loop.py`, `projects/fuelbuddy/charging-diagnostic/automation/run_review_loop.sh`, `projects/fuelbuddy/charging-diagnostic/automation/tests/test_review_loop.py`, `projects/fuelbuddy/charging-diagnostic/README.md`, `CHANGELOG.md`
+**Change:** Made the review loop project-agnostic. New arguments `--project` (required, or `REVIEW_PROJECT`), `--name` (commit/prompt label, default the folder under `projects/`) and `--branch` (default `agent/loop/<name>-review`). No FuelBuddy path, branch or name is hard-coded any more; the `decisions.md` rule is added to the prompts only when the project has that file. The launcher passes `--project projects/fuelbuddy/charging-diagnostic --name FuelBuddy --branch agent/loop/fuelbuddy-review`, so FuelBuddy commit messages and branch are unchanged.
+**Verification:** 23 mocked unit tests pass (2 new: configure defaults, conditional decisions rule); CLI error paths checked by hand. No live review run.
+
+## 2026-10-20
+**Agent:** GROK
+**Files:** `generic/specs_review_loop.py` (moved from `projects/fuelbuddy/charging-diagnostic/automation/review_loop.py`), `projects/fuelbuddy/charging-diagnostic/automation/run_review_loop.sh`, `projects/fuelbuddy/charging-diagnostic/automation/tests/test_review_loop.py`, `projects/fuelbuddy/charging-diagnostic/README.md`, `agents/GROK.md`, `CONTRIBUTING.md`, `agents/CHATGPT.md`, `agents/CLAUDE.md`, `agents/CURSOR.md`, `agents/DEEPSEEK.md`, `agents/GEMINI.md`, `CHANGELOG.md`
+**Change:** Moved the review loop to `generic/specs_review_loop.py`. FuelBuddy logs stay in `projects/fuelbuddy/charging-diagnostic/automation/logs/`. Updated the launcher, tests, and run commands. Recorded the project-folder and commit-identity rules in `CONTRIBUTING.md` and `agents/`.
+**Remaining:** Historical notes in `PROPOSAL-fix-review-loop.md` and older changelog entries still name the old script path.
+**Verification:** `git mv` plus path updates. Unit tests for the loop, no live review run.
+
+## 2026-10-14
+**Agent:** CLAUDE  
+**Files:** `projects/fuelbuddy/charging-diagnostic/spec.md`, `projects/fuelbuddy/charging-diagnostic/reviews/round-2/CONSOLIDATION.md`, `projects/fuelbuddy/charging-diagnostic/README.md`, `CHANGELOG.md`  
+**Change:** Consolidated FuelBuddy review round 2 (CHATGPT, DEEPSEEK, GROK; 18 raw findings → 17 items: 16 accepted, 1 partial, 0 rejected) and updated the spec v0.3 → v0.4. Three majors fixed: typed measurement identity (`measurement_kind`, location, aggregation, window), Plug & Charge stage order with a `communication_profile` and PWM-only AC path, and OCPP 2.0.1 `component`/`variable`/`tech_code` in the mapping key. Also added the post-matching safety pass, supersession direction, `incident_id`, ranking-policy contract, AFIR citations via Implementing Regulation (EU) 2025/655, control-pilot state E/F correction, and several consistency fixes. README now points to Round 3 on v0.4 with reviews in `reviews/round-3/`.  
+**Remaining:** Stop rule not met (three majors this round); round 3 reviews v0.4. FB-D1–FB-D7 stay open and are carried forward in the consolidation; none were decided. GROK served model is unverified (noted in the consolidation).  
+**Verification:** Edited text checked against the three round-2 reviews and the v0.3 spec; external claims (ISO 15118-2 sequence, OCPP 2.0.1, IEC 61851, Implementing Regulation 2025/655) are the GROK reviewer's, not re-fetched. No git commands.
+
+## 2026-10-14
+**Agent:** GROK  
+**Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-2/GROK.md`, `CHANGELOG.md`  
+**Change:** Reviewed local FuelBuddy spec v0.3 for round 2 after reading the round-1 reviews and consolidation. Recorded 3 major findings (Plug & Charge stage order reversed relative to the ISO 15118-2 sequence, and no PWM-only AC path; OCPP 2.0.1 mapping key still lacks component, variable, and tech code; measurement observations cannot carry the quantity and qualifier distinctions §5 and §6.4 require) and 2 minor findings (AFIR dates now confirmed in Implementing Regulation (EU) 2025/655, including a one-minute dynamic-update duty rather than "about a minute"; IEC 61851-1 state E, not state F, is the error state in a vendor summary). Did not re-raise FB-D1–FB-D7.  
+**Remaining:** CLAUDE consolidates the round-2 findings; existing HUMAN decisions remain pending.  
+**Verification:** Stage order checked against the Typhoon HIL ISO 15118-2 sequence description; OCPP 2.0.1 fault identity checked against the Open Charge Alliance uptime white paper v1.2 (August 2024); AFIR dates checked against EUR-Lex text of Implementing Regulation (EU) 2025/655; control-pilot states checked against Beckhoff's IEC 61851 summary. ISO 15118-2, IEC 61851-1, and the AFIR base-regulation HTML were not opened. Review includes the required finding fields, Top 3, and `Result: complete`. Spec unchanged. No git commands, branch, or pull request.
+
+## 2026-10-14
+**Agent:** DEEPSEEK  
+**Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-2/DEEPSEEK.md`, `CHANGELOG.md`  
+**Change:** Reviewed local FuelBuddy spec v0.3 for round 2 after reading all round-1 reviews and the consolidation, plus the round-2 CHATGPT review. Found no new blocking or major findings; recorded 8 minor findings (wireless in the `charge_mode` enum vs §4.5's out-of-scope list; LLM input missing the evidence records §9.2's `evidence_id` check resolves against; `cause_id`/`candidate_id` naming drift; ranking dedup key's undefined `incident` field; §4.3 `station_observations` restating a second observation shape; §12 "fixtures above" dangling reference; §9.1 example missing subject fields and a differing `protocol_version` shape; leftover consolidation remediation notes in §4.4/§4.5). Endorsed CHATGPT-1 (major) and did not re-raise FB-D1–FB-D7 (no new external evidence).  
+**Remaining:** CLAUDE consolidates the round-2 findings; existing HUMAN decisions remain pending.  
+**Verification:** Internal reasoning against local spec sections, the round-1 dispositions and the round-2 CHATGPT review; external sources were not re-verified. Review includes the required finding fields, Top 3 and a final `Result: complete`; spec unchanged. No git commands, branch, or pull request.
+
+## 2026-10-14
+**Agent:** CHATGPT  
+**Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-2/CHATGPT.md`, `CHANGELOG.md`  
+**Change:** Reviewed local FuelBuddy spec v0.3 after reading all round-1 reviews and consolidation. Recorded 1 major finding (measurement quantity identity and qualifiers) and 4 minor findings (post-matching safety pass, supersession direction/activation, ranking-policy completeness, campaign applicability wording). Retained accepted round-1 changes and did not reopen FB-D1–FB-D7.  
+**Remaining:** CLAUDE consolidates round 2; existing HUMAN decisions remain pending.  
+**Verification:** Internal reasoning against local spec and round-1 dispositions; external sources were not re-verified. Review includes the required finding fields, Top 3 and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branch or pull request.
+
+## 2026-10-14
+**Agent:** DEEPSEEK  
+**Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-2/DEEPSEEK.md`, `CHANGELOG.md`  
+**Change:** Reviewed the local FuelBuddy charging diagnostic spec v0.3 for round 2 after reading all round-1 reviews and the consolidation, and the round-2 CHATGPT review. Found no new blocking or major findings; recorded 6 minor findings (tie-handling sort key uses the session-level `decision_status`; `protocol_version` has two incompatible shapes; §3.3 session fields with no home in §3.2; `source_type` overloaded across event and document provenance; §4.3 `station_observations` restates an observation shape; deterministic `decision_status`/cause order not pinned through the LLM validator). Agreed with CHATGPT's two major findings and did not re-raise FB-D1–FB-D7 (no new external evidence).  
+**Remaining:** CLAUDE consolidates the round-2 findings; existing HUMAN decisions remain pending.  
+**Verification:** Internal reasoning only; checked against local spec sections, the round-1 dispositions, and the round-2 CHATGPT review; external sources were not re-verified. Review ends with `Result: complete`; spec unchanged. No git commands, branch, or pull request.
+
+## 2026-10-14
+**Agent:** CHATGPT  
+**Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-2/CHATGPT.md`, `CHANGELOG.md`  
+**Change:** Reviewed the local FuelBuddy charging diagnostic spec v0.3 for round 2 after reading all round-1 reviews and consolidation. Recorded 2 major findings (safety reevaluation after knowledge matching; typed measurement identity and qualifiers) and 3 minor findings (ranking-policy completeness, idempotency scope, campaign applicability wording). Retained the accepted round-1 direction and did not reopen FB-D1–FB-D7.  
+**Remaining:** CLAUDE consolidates the round-2 findings; existing HUMAN decisions remain pending.  
+**Verification:** Checked findings against local spec sections and the round-1 dispositions. Internal reasoning only; external sources were not re-verified. Review ends with `Result: complete`; spec unchanged. No git commands, branch, or pull request.
+
+## 2026-10-12
+**Agent:** CLAUDE  
+**Files:** `projects/fuelbuddy/charging-diagnostic/automation/review_loop.py`, `projects/fuelbuddy/charging-diagnostic/automation/.gitignore`, `projects/fuelbuddy/charging-diagnostic/README.md`, `CHANGELOG.md`  
+**Change:** Automated the FuelBuddy multi-AI review loop. `automation/review_loop.py` runs each round as CHATGPT review (Codex CLI) → DEEPSEEK review (Claude Code on the DeepSeek API, `deepseek-v4-pro`, told explicitly "You are DEEPSEEK") → CLAUDE consolidation (Claude Code on Anthropic, `claude-sonnet-5-5`). It commits and pushes after every step on `agent/loop/fuelbuddy-review` and stops at the README stop rule (no blocking/major finding) or after `--max-rounds`. It has a `--preflight` probe mode; logs go to `automation/logs/` (git-ignored). Added an "Automated loop" section to the diagnostic README.  
+**Remaining:** HUMAN runs the loop (`--preflight` first) and merges the branch PR at the end. `~/.claude-anthropic` does not exist yet on the laptop: log in once there for the CLAUDE consolidator profile.  
+**Verification:** Tested against fake `codex`/`claude` stubs in a scratch repo. Laptop environment: codex-cli 0.162.1, Claude Code 2.1.296, DeepSeek `ANTHROPIC_BASE_URL` present in `~/.claude/settings.json`. Preflight not yet run on the laptop.
+
 ## 2026-10-11
 **Agent:** CLAUDE
 **Files:** `projects/fuelbuddy/charging-diagnostic/spec.md`, `projects/fuelbuddy/charging-diagnostic/reviews/round-1/CONSOLIDATION.md`, `projects/fuelbuddy/charging-diagnostic/README.md`, `CHANGELOG.md`
@@ -156,3 +327,107 @@
 **Change:** Workspace initialized.  
 **Remaining:** Define project.  
 **Verification:** Not applicable.
+
+
+## 2026-10-14 — inline proposal review claim
+**Agent:** CHATGPT (GPT-6.1 SOL)
+**Owner:** CHATGPT
+**Started_at:** 2026-10-14T10:27:06+02:00
+**Files:** `projects/fuelbuddy/charging-diagnostic/PROPOSAL-fix-review-loop.md`
+**Change:** Claim the proposal for inline review of the available model feedback, as requested by HUMAN. Preserve existing author text and add attributed comments only.
+
+
+## 2026-10-14 — inline proposal review handoff
+**Agent:** CHATGPT (GPT-6.1 SOL)
+**Files:** `projects/fuelbuddy/charging-diagnostic/PROPOSAL-fix-review-loop.md`, `CHANGELOG.md`
+**Change:** Added attributed inline replies to DEEPSEEK-1 through DEEPSEEK-6 and remaining SOL findings on resume, zero-finding reviews, Git isolation and live testing. Existing proposal and model comments preserved.
+**Remaining:** Incorporate the corrections and validate the runners before a live unattended loop. Architecture accepted in principle, proposal not approved as written.
+**Verification:** Compared feedback with the current runner code; document-only edit, no model calls or implementation. Proposal file released for the next contributor.
+
+
+## 2026-10-14 — moderator decision on review-loop proposal
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-diagnostic/PROPOSAL-fix-review-loop.md`, `CHANGELOG.md`
+**Change:** Consolidated DEEPSEEK and CHATGPT comments, decided all open points (D1–D12) and appended a phased roadmap. Noted that my earlier counterproposal had been lost from the file and folded it into the decisions.
+**Remaining:** HUMAN Phase 0 (credentials); then implement from Phase 1.
+**Verification:** Document-only; checked Codex/Cursor CLI flags earlier. No model calls.
+
+
+## 2026-10-14 — GROK added to the FuelBuddy review loop
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-diagnostic/automation/review_loop.py`, `projects/fuelbuddy/charging-diagnostic/automation/run_review_loop.sh`, `projects/fuelbuddy/charging-diagnostic/README.md`, `agents/GROK.md`, `CHANGELOG.md`
+**Change:** Added `run_cursor_agent` and a runner map (fixes the dispatcher that sent every non-CHATGPT reviewer to DeepSeek), reviewer-name validation, GROK/CURSOR identity prompts, default reviewers `CHATGPT,DEEPSEEK,GROK`, selected-backend preflight with a write probe, `agents/GROK.md`, README update, and the `run_review_loop.sh` launcher. Proposal D6/D11 (partial).
+**Remaining:** Codex `--full-auto` fix, DeepSeek model/identity hardening, resume safety, git worktree isolation, mocked tests.
+**Verification:** Live preflight `--reviewers GROK --skip-consolidator` passed on `grok-4.7-high` (nonce file written and verified). Reviewer validation checked with unknown and duplicate names. Codex and DeepSeek paths not exercised.
+
+
+## 2026-10-14 — Codex and DeepSeek fixes in the FuelBuddy review loop
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-diagnostic/automation/review_loop.py`, `CHANGELOG.md`
+**Change:** Codex: one shared `codex_args` builder (`--approve-for-me`, opt-in `CODEX_DANGEROUS_FULL_ACCESS`), timeout logging, `shlex` args. All subprocesses now run with `stdin=DEVNULL` (`codex exec` otherwise hangs waiting for piped stdin). DeepSeek: requested vs reported model recorded in `_provenance`, contradictory model fails, empty `modelUsage` needs `DEEPSEEK_ACCEPT_UNVERIFIED=1`, one retry with `deepseek-chat` on `unrecognized_model` (not on 401), Anthropic consolidator always uses `~/.claude-anthropic`. Write probes for all backends (nonce, orchestrator-verified). Proposal D1, D2, D4, D10.
+**Remaining:** DeepSeek preflight still fails with 401 using the key in `~/.claude/settings.json`; HUMAN must export a valid `DEEPSEEK_API_KEY`. Resume safety, git worktree, mocked tests, provenance in CONSOLIDATION.
+**Verification:** Live preflight passed for CHATGPT (write probe) and GROK; DeepSeek live probe returned 401 (invalid key), so the model/telemetry path is untested.
+
+
+## 2026-10-14 — resume safety, git guards and tests for the FuelBuddy review loop
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-diagnostic/automation/review_loop.py`, `projects/fuelbuddy/charging-diagnostic/automation/tests/test_review_loop.py`, `projects/fuelbuddy/charging-diagnostic/README.md`, `CHANGELOG.md`
+**Change:** Reviews must end with `Result: complete` and carry findings or `Findings: none` (clean reviews accepted, partial ones rejected). A step is skipped only when complete and pushed; complete-but-unpushed resumes at push; unfinished files stop the loop. Clean tree/index checked before each step, unrelated staged paths refused, local branch never reset, pending local commits pushed on start, lockfile against overlapping loops. Reviewer provenance (requested vs served model) is passed to the consolidator. 17 mocked tests. Proposal D7–D9 (partial), D12.
+**Remaining:** Dedicated git worktree (D9) deferred: the lockfile plus clean-tree checks cover the concrete failure cases; completion records tied to a spec hash (D7) replaced by git-based "pushed with identical content" check. One-round live integration test (Phase 4).
+**Verification:** `python3 -m unittest discover -s tests`: 17 passed. Live preflight passed for GROK, CHATGPT, DEEPSEEK (served model verified) and the Anthropic consolidator.
+
+
+## 2026-10-14 — Codex cost report, Fast tier, live Grok log; round-2 first pass archived
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-diagnostic/automation/review_loop.py`, `projects/fuelbuddy/charging-diagnostic/automation/run_review_loop.sh`, `projects/fuelbuddy/charging-diagnostic/automation/tests/test_review_loop.py`, `projects/fuelbuddy/charging-diagnostic/reviews/round-2-pass1/`, `CHANGELOG.md`
+**Change:** Each Codex review now logs requests, input/cached/fresh/output tokens, largest request vs context window, and estimated cost summed per request (standard or Fast tier prices for gpt-6.1-sol, long-context tier reported as an upper bound; usage JSON saved). `CODEX_SERVICE_TIER=fast` and `FAST=1` in the launcher select Codex Fast and Grok 4.7 high-fast. The Grok runner now writes to its log live. The slow first pass of round 2 (CHATGPT and DEEPSEEK, commits 8fb57e5 and c3d2b46) was moved to `reviews/round-2-pass1/` so round 2 can be rerun on fast settings; it stays for comparison and is not read by the loop.
+**Remaining:** Rerun round 2 with FAST=1; compare pass 1 vs pass 2. Whether `service_tier="fast"` actually engages the Fast tier is unverified (Codex accepts it silently, session files do not record the tier).
+**Verification:** `python3 -m unittest discover -s tests`: 21 passed. Cost formula reproduces the 11:09 CHATGPT session ($0.204 standard-tier estimate).
+
+
+## 2026-10-14 — HUMAN decision FB-D1: MVP market is Europe
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-diagnostic/decisions.md`, `projects/fuelbuddy/charging-diagnostic/README.md`, `projects/fuelbuddy/charging-diagnostic/automation/review_loop.py`, `CHANGELOG.md`
+**Change:** Recorded HUMAN's decision FB-D1 ("The MVP market is Europe") in a new `decisions.md`. Review and consolidation prompts now tell reviewers to treat listed decisions as settled and CLAUDE to apply them to `spec.md` at the next consolidation, without inventing precision HUMAN did not give (EU vs EEA/UK stays an open question). `spec.md` is not edited by hand; it still shows FB-D1 as pending until round 3 consolidates.
+**Remaining:** FB-D2–FB-D7 still open; FB-D4 (legal basis) is not settled by this decision. Round 3 not yet run.
+**Verification:** 21 tests pass; both prompts reference `decisions.md`.
+
+
+## 2026-10-14 — FB-D1 clarified: UK, Switzerland and every country with an API
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-diagnostic/decisions.md`, `CHANGELOG.md`
+**Change:** HUMAN clarified FB-D1: Europe = EU/EEA plus the UK and Switzerland, and generally all countries that have an API. Recorded in `decisions.md` with consolidator notes: "has an API" is the inclusion rule; which API, launch order and handling of countries without one stay open questions for HUMAN.
+**Remaining:** FB-D2–FB-D7 open. Round 3 not yet run.
+**Verification:** Document-only edit.
+
+
+## 2026-10-14 — HUMAN decision FB-D7: Option A (documented ranking ordering)
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-diagnostic/decisions.md`, `CHANGELOG.md`
+**Change:** Recorded HUMAN's decision FB-D7 = Option A (ship the documented ordering; calibration deferred to §6.3; ranking not blocked) with consolidator notes. `spec.md` unchanged until the next consolidation.
+**Remaining:** FB-D2–FB-D6 open. Round 3 not yet run.
+**Verification:** Document-only edit.
+
+
+## 2026-10-14 — HUMAN decision FB-D2: approved with amendments
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-diagnostic/decisions.md`, `CHANGELOG.md`
+**Change:** Recorded HUMAN's decision FB-D2 (safety clearance semantics approved with five amendments: fail closed on unknown restrictions, authorized actor per class, users can raise but not clear, per-scope restrictions with most-restrictive-wins, re-verification prompt instead of expiry) with the restriction-to-behaviour mapping. `spec.md` unchanged until the next consolidation. The re-verification period is left as an open question for HUMAN.
+**Remaining:** FB-D3–FB-D6 open. Round 3 not yet run.
+**Verification:** Document-only edit.
+
+
+## 2026-10-14 — HUMAN decision FB-D3: approved as recommended, simplified
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-diagnostic/decisions.md`, `CHANGELOG.md`
+**Change:** Recorded FB-D3: the app never originates an emergency-stop instruction; hazard handling is driven by what the driver (or an operator feed) reports; add an OEM-sourced stuck-connector playbook; add a hazard screening question at the start of every session. Recorded on HUMAN's "continue" after the recommendation was presented. `spec.md` unchanged until the next consolidation.
+**Remaining:** FB-D4–FB-D6 open. Round 3 not yet run.
+**Verification:** Document-only edit.
+
+
+## 2026-10-14 — HUMAN decision FB-D5: approved as recommended
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-diagnostic/decisions.md`, `CHANGELOG.md`
+**Change:** Recorded FB-D5: offline/unverifiable-package behaviour degrades by risk (safety content always available, restrictions never cleared offline, playbooks with a staleness notice, withdrawn items shown as unverified, LLM explanations unavailable offline). The hard staleness limit is left as an open question for HUMAN. `spec.md` unchanged until the next consolidation.
+**Remaining:** FB-D4 and FB-D6 (legal) open. Round 3 not yet run.
+**Verification:** Document-only edit.
