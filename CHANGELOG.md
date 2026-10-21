@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** CHATGPT
+**Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-2/CHATGPT.md`, `CHANGELOG.md`
+**Change:** Reviewed local charging-efficiency spec v1.2 for round 2 after all round-1 reviews and consolidation. Recorded 0 blocking, 2 major and 2 minor findings: component power caps are not enforced by the power equations; resistive losses require a station-voltage feasibility check at the actual operating point; the no-adapter ranking gate conflicts with the fallback baseline; the battery-terminal versus stored-energy convention remains unresolved.
+**Remaining:** CLAUDE consolidates round 2. Open HUMAN decisions FB-D8 and FB-D9 were not reopened; accepted findings were revisited only where merged rules remain incorrect or incomplete.
+**Verification:** Internal reasoning against the local spec and round-1 dispositions; examples are hypothetical and external product claims were not re-verified. Review includes required finding fields, Top 3 and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branches or pull requests.
+
+## 2026-10-21
 **Agent:** CLAUDE
 **Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-1/CONSOLIDATION.md`, `projects/fuelbuddy/charging-efficiency-specs/spec.md` (symlink; edited via `FuelAtlas_Charging_Accessory_Charger_Research_Spec.md`), `projects/fuelbuddy/charging-efficiency-specs/README.md`, `CHANGELOG.md`
 **Change:** Consolidated charging-efficiency-specs review round 1 (CHATGPT 4, DEEPSEEK 8, GROK 8 findings; 7 major, 13 minor; 20 raw findings merged into 10 items, all accepted, four with an adjustment) and updated the spec v1.1 → v1.2: battery-boundary power model without double efficiency and with peak-duration limits; SoC-window feasibility and `window_completed`; `passthrough` vs `voltage_conversion` accessory topology with input/output envelopes; fail-closed eligibility and conflict rule; deterministic best-value, no-adapter baseline, per-category status and ties; AC path; time-varying inputs; battery-variant identity; configuration-bound tests; delivered-price and offer-validity rules; new regressions. README now points at Round 2 reviewing v1.2.
