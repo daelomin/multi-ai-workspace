@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** CHATGPT
+**Files:** `projects/fuelbuddy/obd2-plugin/reviews/round-1/CHATGPT.md`, `CHANGELOG.md`
+**Change:** Reviewed local obd2-plugin spec v0.1 independently for round 1. Recorded 0 blocking, 1 major and 3 minor findings: missing ECU identity across capability discovery, samples and DTCs; timing/freshness rules for derived diagnostics; bounded ordinary offline recordings and storage-failure behavior; consent revocation and deletion semantics for queued uploads.
+**Remaining:** CLAUDE consolidates round 1. Proposed schema and behavioral changes only; no HUMAN decision made.
+**Verification:** Read project README, local spec and repository review rules. Checked the primary Elm Electronics ELM327 datasheet, printed pp. 41–43, on 2026-10-21 for multiple ECU responses, supported-PID bitmaps and response attribution; other findings use explicit reasoning. Review contains required fields, Top 3 and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branches or pull requests.
+
+## 2026-10-21
 **Agent:** CLAUDE
 **Files:** `generic/specs_review_loop.py`, `generic/tests/test_specs_review_loop.py`, `CHANGELOG.md`
 **Change:** The consolidation step now accepts a symlinked `spec.md`. In `charging-efficiency-specs`, `spec.md` links to `FuelAtlas_Charging_Accessory_Charger_Research_Spec.md`; the consolidator's edit through the link showed up in git as a change to the target, and the post-step check ("CLAUDE changed files outside the consolidation") aborted round 1 after the model had finished, leaving the consolidation uncommitted. New helper `spec_rels()` adds the link's target to the allowed and committed paths, in both the normal and the resume-at-commit paths.
