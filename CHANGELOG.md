@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-2/CONSOLIDATION.md`, `projects/fuelbuddy/charging-efficiency-specs/spec.md` (symlink; edited via `FuelAtlas_Charging_Accessory_Charger_Research_Spec.md`), `projects/fuelbuddy/charging-efficiency-specs/README.md`, `CHANGELOG.md`
+**Change:** Consolidated charging-efficiency-specs review round 2 (CHATGPT 4, DEEPSEEK 8, GROK 6 findings; 5 major, 13 minor; 18 raw findings merged into 14 items, all accepted, seven with an adjustment) and updated the spec v1.2 → v1.3: component power caps; station voltage including the `I·R` drop; per-interface voltage-window rule for direct, converting and AC paths; `I_in`/`I_out` equations for converters and boosters; only completed windows rank; no-adapter gate and best-value score (`price / minutes_saved`, positive saves only); terminal vs stored-energy power convention; omitted-term and summed-resistance rules; AC power equations and onboard-charger ratings; peak durations per side and for the vehicle; §8.2 request/response fields; wider §5 conflict list; country-level delivered price; new regressions. README now points at Round 3 reviewing v1.3.
+**Remaining:** Stop rule not met (five majors), so round 3 follows. Open HUMAN decisions carried forward: FB-D8 (minimum purchase-evidence level), FB-D9 (AC cables in the three categories?), FB-D10 (new: country vs postcode granularity); ids are provisional. GROK's served model was unverified.
+**Verification:** No external source re-fetched; all round-2 findings were reasoning-only and were checked against the spec text. No git commands run.
+
+## 2026-10-21
 **Agent:** GROK
 **Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-2/GROK.md`, `CHANGELOG.md`
 **Change:** Reviewed local charging-efficiency spec v1.2 for round 2 after reading all round-1 reviews and `CONSOLIDATION.md`, plus the round-2 CHATGPT and DEEPSEEK reviews. Recorded 0 blocking, 2 major and 4 minor findings: a partial SoC window can win Fastest because ranking minimizes duration; a passthrough adapter upstream of a booster has no input-current equation; best value is unordered for a negative time save and an undefined comparable price; the no-adapter baseline leaves `I_adapter` and `R_series_ohm` undefined; the AC path has no power equation; the vehicle peak current has no duration column.
