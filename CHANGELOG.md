@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-10-21
+**Agent:** CLAUDE
+**Files:** `generic/loop_wizard.py`, `generic/loop_wizard.html`, `generic/REVIEW_LOOP_GUIDELINE.md`, `.gitignore` (`generic/loops.json` is now local-only), `CHANGELOG.md`
+**Change:** The assistant now runs the steps itself. `generic/loop_wizard.py` serves the page on 127.0.0.1:8795 and exposes a fixed set of actions (git status/commit of ticked files, create loop = branch + spec/README skeletons + commit + registration, start/stop monitor, preflight/one/full runs with live output, retry). Every request needs a per-start token and a 127.0.0.1 Host header; no arbitrary shell. The page also shows live loop colours.
+**Verification:** Auth/Host/validation checked with curl; create_loop run end to end in a throwaway clone; existing-loop flow and git check clicked in the browser pane. No paid run, no commit or monitor start from the page yet.
+
+## 2026-10-21
+**Agent:** CLAUDE
+**Files:** `generic/loop_monitor.py`, `generic/loops.json`, `generic/loops.example.json`, `generic/loop-monitor.service`, `generic/tests/test_loop_monitor.py`, `generic/REVIEW_LOOP_GUIDELINE.md`, `.gitignore`, `~/GIT/jarvis/jarvis-tracker.service` (and the installed copy), `CHANGELOG.md`
+**Change:** Added a monitor for all review loops. State comes from the files and the `.loop.lock` flock (read from `/proc/locks`, so the monitor never takes the lock). Colour page `generic/.monitor/index.html` (green running, blue complete, red failed, grey pending). Jarvis export of one graph per loop in `.jarvis/tracker/`, with rounds appended as the README advances (round N+1 depends on `rN-CLAUDE`). Chaining: `after` + `autostart` launches the next loop when the previous is complete, nothing else runs and the tree is clean; failed loops need `retry`. The two Jarvis tracker unit files got the new memory/log dirs appended and the service was restarted.
+**Remaining:** `loop-monitor.service` is not installed; only FuelBuddy is registered and `autostart` is off, so nothing launches by itself yet. No live chained launch tested (mocked only).
+**Verification:** 32 mocked tests pass (9 new); `status` run against FuelBuddy; the graph shows in Jarvis `/api/runs`.
+
+## 2026-10-21
+**Agent:** CLAUDE
+**Files:** `generic/REVIEW_LOOP_GUIDELINE.md`, `CONTRIBUTING.md`, `CHANGELOG.md`
+**Change:** Added the guideline every agent follows when starting a spec review loop: folder structure, required README/spec content, ownership, setup steps, run commands, rules and checklist. Linked from `CONTRIBUTING.md`.
+**Verification:** Checked against the engine's requirements (`**Round N**` line, version line, `decisions.md` rule, branch default, lock file). No live run.
+
+## 2026-10-21
+**Agent:** CLAUDE
+**Files:** `generic/run_review_loop.sh` (moved from `projects/fuelbuddy/charging-diagnostic/automation/`), `generic/tests/test_specs_review_loop.py` (moved from `projects/fuelbuddy/charging-diagnostic/automation/tests/test_review_loop.py`), `projects/fuelbuddy/charging-diagnostic/automation/run_review_loop.sh`, `projects/fuelbuddy/charging-diagnostic/README.md`, `CHANGELOG.md`
+**Change:** Moved the launcher and the unit tests to `generic/`. The launcher now takes `<project-dir> <name> [branch] {preflight|one|full}` and finds the repo from its own location. The FuelBuddy folder keeps only a thin wrapper that passes its values, plus its gitignored `automation/logs/`.
+**Verification:** 23 mocked tests pass from `generic/tests`; both scripts pass `bash -n`; usage errors checked. No live review run. Not committed.
+
 ## 2026-10-20
 **Agent:** CLAUDE
 **Files:** `generic/specs_review_loop.py`, `projects/fuelbuddy/charging-diagnostic/automation/run_review_loop.sh`, `projects/fuelbuddy/charging-diagnostic/automation/tests/test_review_loop.py`, `projects/fuelbuddy/charging-diagnostic/README.md`, `CHANGELOG.md`

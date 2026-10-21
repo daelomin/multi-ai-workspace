@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Review loop assistant</title>
+<style>
+:root{--bg:#f8fafc;--fg:#0f172a;--card:#fff;--muted:#64748b;--line:#e2e8f0;--green:#22c55e;--blue:#3b82f6;--red:#ef4444;--grey:#94a3b8;--code:#0f172a;--codefg:#e2e8f0}
+@media(prefers-color-scheme:dark){:root{--bg:#0f172a;--fg:#e2e8f0;--card:#1e293b;--muted:#94a3b8;--line:#334155;--code:#020617}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,sans-serif}
+main{max-width:780px;margin:0 auto;padding:24px 16px 80px}
+h1{font-size:1.4rem;margin:0 0 4px}
+.sub{color:var(--muted);margin:0 0 16px}
+.msg,.step,.loopcard{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:0 0 12px}
+.msg.you{margin-left:48px;background:var(--blue);border-color:var(--blue);color:#fff}
+.who{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.choices{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+button{font:inherit;cursor:pointer;border:1px solid var(--blue);background:transparent;color:var(--blue);border-radius:8px;padding:7px 14px}
+button:hover:not(:disabled){background:var(--blue);color:#fff}
+button:disabled{opacity:.5;cursor:default}
+button.primary{background:var(--blue);color:#fff}
+button.danger{border-color:var(--red);color:var(--red)}
+input,select{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--fg);width:100%;margin:4px 0 10px}
+label{font-size:.9rem;color:var(--muted)}
+.step{border-left:6px solid var(--blue)}
+.step.ok{border-left-color:var(--green)}.step.bad{border-left-color:var(--red)}.step.busy{border-left-color:var(--green)}
+.step h3{margin:0 0 6px;font-size:1rem}
+pre{background:var(--code);color:var(--codefg);border-radius:8px;padding:10px 12px;overflow:auto;max-height:260px;margin:8px 0 0;font-size:.82rem;white-space:pre-wrap;word-break:break-word}
+.note{color:var(--muted);font-size:.9rem;margin:0 0 8px}
+.err{color:var(--red);font-size:.9rem}
+.badge{color:#fff;border-radius:4px;padding:1px 8px;font-size:.8rem;margin-left:6px}
+.chip{display:inline-block;color:#fff;border-radius:4px;padding:1px 8px;margin:4px 4px 0 0;font-size:.8rem}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.files label{display:block;color:var(--fg);margin:2px 0;font-family:ui-monospace,monospace;font-size:.82rem}
+.files input{width:auto;margin:0 6px 0 0}
+a{color:var(--blue)}
+</style>
+</head>
+<body>
+<main>
+  <h1>Review loop assistant</h1>
+  <p class="sub">Live status below. Answer the questions and I run each step for you. <a href="http://127.0.0.1:8777/" target="_blank">Jarvis tracker</a></p>
+  <div id="dash"></div>
+  <div id="chat"></div>
+</main>
+
+<script>
+const TOKEN = '__TOKEN__';
+const COLORS = {running: 'var(--green)', complete: 'var(--blue)', failed: 'var(--red)', pending: 'var(--grey)'};
+const chat = document.getElementById('chat'), dash = document.getElementById('dash');
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function api(name, body) {
+  const r = await fetch('/api/' + name, {
+    method: body === undefined ? 'GET' : 'POST',
+    headers: {'X-Token': TOKEN, 'Content-Type': 'application/json'},
+    body: body === undefined ? undefined : JSON.stringify(body)});
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+
+// ---------- live dashboard ----------
+let lastLoops = [];
+async function refresh() {
+  try {
+    const s = await api('state');
+    lastLoops = s.loops;
+    dash.innerHTML = `<div class="loopcard"><div class="row"><b>Monitor</b>
+      <span class="badge" style="background:${s.monitor ? COLORS.running : COLORS.pending}">${s.monitor ? 'watching' : 'stopped'}</span>
+      <span class="note" style="margin:0">${s.monitor ? 'chaining active' : 'start it below to chain loops'}</span></div></div>` +
+      s.loops.map(l => `<div class="loopcard" style="border-left:8px solid ${COLORS[l.status]}">
+        <b>${esc(l.name)}</b><span class="badge" style="background:${COLORS[l.status]}">${l.status}</span>
+        <span class="note"> ${l.round ? 'round ' + l.round : ''} ${l.after ? '· after ' + esc(l.after) : ''}</span><br>
+        ${l.steps.map(x => `<span class="chip" style="background:${COLORS[x.status]}">${esc(x.name)}</span>`).join('')}
+        ${l.detail ? `<div class="err">${esc(l.detail)}</div>` : ''}
+        ${l.status === 'failed' ? `<button class="danger" onclick="retry('${l.id}')">Allow relaunch</button>` : ''}</div>`).join('');
+  } catch (e) { dash.innerHTML = `<div class="err">Server unreachable: ${esc(e.message)}</div>`; }
+}
+async function retry(id) { await api('retry', {id}); refresh(); }
+setInterval(refresh, 3000); refresh();
+
+// ---------- chat helpers ----------
+function el(html, cls) { const d = document.createElement('div'); d.className = cls || ''; d.innerHTML = html; chat.appendChild(d); d.scrollIntoView({block: 'end', behavior: 'smooth'}); return d; }
+const say = h => el('<div class="who">Assistant</div>' + h, 'msg');
+const you = t => el(esc(t), 'msg you');
+
+function ask(q, options) {
+  say(q);
+  const box = el('', 'choices');
+  options.forEach(([label, fn]) => { const b = document.createElement('button'); b.textContent = label; b.onclick = () => { box.remove(); you(label); fn(); }; box.appendChild(b); });
+}
+function form(q, fields, done) {
+  say(q);
+  const box = el('', 'msg');
+  box.innerHTML = fields.map(f => `<label>${f.label}</label>` + (f.options
+    ? `<select id="f_${f.id}">${f.options.map(o => `<option value="${esc(o[0])}">${esc(o[1])}</option>`).join('')}</select>`
+    : `<input id="f_${f.id}" placeholder="${f.ph || ''}" value="${f.value || ''}">`)).join('') + '<div class="err" id="ferr"></div><button class="primary">Continue</button>';
+  box.querySelector('button').onclick = () => {
+    const v = {};
+    for (const f of fields) { v[f.id] = document.getElementById('f_' + f.id).value.trim(); if (f.re && !f.re.test(v[f.id])) { document.getElementById('ferr').textContent = f.msg; return; } }
+    box.remove(); you(fields.map(f => `${f.short}: ${v[f.id]}`).join(' · ')); done(v);
+  };
+}
+
+// A step with a Run button. run() returns {ok, output} or throws; output is shown in the step.
+function step(title, note, btnLabel, run, opts = {}) {
+  const d = el(`<h3>${title}</h3>${note ? `<p class="note">${note}</p>` : ''}<div class="row"><button class="primary">${btnLabel}</button></div><pre hidden></pre>`, 'step');
+  const btn = d.querySelector('button'), pre = d.querySelector('pre');
+  btn.onclick = async () => {
+    if (opts.confirm && !confirm(opts.confirm)) return;
+    btn.disabled = true; d.className = 'step busy'; pre.hidden = false; pre.textContent = 'running…';
+    try {
+      const r = await run(txt => { pre.textContent = txt; pre.scrollTop = pre.scrollHeight; });
+      if (r && r.output !== undefined) pre.textContent = r.output || '(done)';
+      const ok = !r || r.ok !== false;
+      d.className = 'step ' + (ok ? 'ok' : 'bad');
+      if (ok) { btn.textContent = 'Done ✓'; if (opts.after) opts.after(r); } else btn.disabled = false;
+    } catch (e) { pre.textContent = e.message; d.className = 'step bad'; btn.disabled = false; btn.textContent = 'Retry'; }
+    refresh();
+  };
+  return d;
+}
+
+async function runJob(loopId, mode, show) {
+  const {job} = await api('job', {id: loopId, mode});
+  for (;;) {
+    await new Promise(r => setTimeout(r, 1500));
+    const j = await (await fetch('/api/job/' + job, {headers: {'X-Token': TOKEN}})).json();
+    show(j.output || '(no output yet)');
+    if (!j.running) return {ok: j.exit === 0, output: (j.output || '') + `\n[exit ${j.exit}]`};
+  }
+}
+
+// ---------- shared steps ----------
+function gitStep() {
+  const d = el('<h3>Git must be clean before a loop starts</h3><p class="note">The launcher refuses to run with uncommitted changes. Tick what to commit (only ticked files are touched).</p><div class="row"><button class="primary">Check git</button></div><div class="files"></div>', 'step');
+  d.querySelector('button').onclick = async () => {
+    const g = await api('git_status'), box = d.querySelector('.files');
+    if (g.clean) { d.className = 'step ok'; box.innerHTML = `<p>Clean on <b>${esc(g.branch)}</b> ✓</p>`; return; }
+    const pre = p => /^(generic|projects|docs|agents)\/|^(CHANGELOG|CONTRIBUTING|README|MASTER|TODO)\.md$|^\.gitignore$/.test(p);
+    box.innerHTML = `<p>On <b>${esc(g.branch)}</b>, ${g.files.length} changed file(s):</p>` +
+      g.files.map((f, i) => `<label><input type="checkbox" data-p="${esc(f.path)}" ${pre(f.path) ? 'checked' : ''}>${esc(f.status)} ${esc(f.path)}</label>`).join('') +
+      '<input id="cmsg" placeholder="commit message" value="update review loop tooling"><button class="primary" id="cgo">Commit ticked files</button><pre hidden></pre>';
+    box.querySelector('#cgo').onclick = async () => {
+      const paths = [...box.querySelectorAll('input[type=checkbox]:checked')].map(c => c.dataset.p);
+      const out = box.querySelector('pre'); out.hidden = false;
+      try { const r = await api('commit', {paths, message: box.querySelector('#cmsg').value}); out.textContent = r.output; if (r.ok) { d.className = 'step ok'; } } catch (e) { out.textContent = e.message; }
+    };
+  };
+}
+const monitorStep = () => step('Start the monitor', 'Keeps the colours fresh, and launches chained loops. It keeps running after you close this page.', 'Start monitor', () => api('monitor_start', {}));
+const preflightStep = id => step('Check the backends (preflight)', 'Probes ChatGPT/DeepSeek/Grok/Claude. Takes a minute or two; no spec changes.', 'Run preflight', show => runJob(id, 'preflight', show));
+const runSteps = id => {
+  step('Run one round', 'One review round (all reviewers + consolidation). Uses the paid backends.', 'Run one round', show => runJob(id, 'one', show), {confirm: 'Run one live round? This uses the paid AI backends.'});
+  step('…or run up to 5 rounds', 'Stops by itself when a round has no blocking/major findings.', 'Run full loop', show => runJob(id, 'full', show), {confirm: 'Run the FULL loop (up to 5 rounds)? This uses the paid AI backends.'});
+};
+const again = () => ask('Anything else?', [['Start over', () => { chat.innerHTML = ''; start(); }]]);
+
+// ---------- flows ----------
+function start() {
+  say('Hi. What do you want to do?');
+  ask('Pick one:', [
+    ['Run / watch a loop I already have', existing],
+    ['Create a new loop', () => newLoop(false)],
+    ['Create a new loop that starts after another finishes', () => newLoop(true)],
+  ]);
+}
+
+async function existing() {
+  const {loops} = await api('loops');
+  if (!loops.length) { say('No loops are registered yet. Create one first.'); return again(); }
+  form('Which loop?', [{id: 'id', short: 'Loop', label: 'Loop', options: loops.map(l => [l.id, `${l.name} (${l.project})`])}], v => {
+    say('Do these in order. Each button runs the step for you.');
+    gitStep(); monitorStep(); preflightStep(v.id); runSteps(v.id); again();
+  });
+}
+
+async function newLoop(chain) {
+  const {loops} = await api('loops');
+  const fields = [
+    {id: 'folder', short: 'Folder', label: 'Spec folder (projects/<project>/<spec>)', value: 'projects/', re: /^projects\/[\w.-]+\/[\w.-]+$/, msg: 'Use projects/<project>/<spec>, e.g. projects/acme/billing-spec'},
+    {id: 'name', short: 'Name', label: 'Short name (used in commit messages)', ph: 'MySpec', re: /^[\w -]{2,30}$/, msg: 'Letters, digits and spaces, 2–30 characters'},
+  ];
+  if (chain) {
+    if (!loops.length) { say('There is no loop to chain after yet.'); return again(); }
+    fields.push({id: 'after', short: 'After', label: 'Start after which loop?', options: loops.map(l => [l.id, l.name])},
+                {id: 'auto', short: 'Auto-launch', label: 'Launch it automatically when that loop finishes?', options: [['no', 'No — only show the chain'], ['yes', 'Yes — launch automatically (uses paid backends)']]});
+  }
+  form('Where should the new spec live, and what do you call it?', fields, v => {
+    say(`I'll create a branch, the spec and README skeletons, commit them, and register the loop${chain ? ' (chained)' : ''}.`);
+    step('Create the loop', 'Creates branch <code>agent/loop/&lt;name&gt;-review</code> from your current branch, writes spec.md + README.md, commits only that folder, and adds it to the monitor.', 'Create it',
+      () => api('create_loop', {folder: v.folder, name: v.name, ...(chain ? {after: v.after, autostart: v.auto === 'yes'} : {})}),
+      {after: r => {
+        say(`Created loop <b>${esc(r.id)}</b> on branch <code>${esc(r.branch)}</code>. <b>Edit <code>${esc(v.folder)}/spec.md</code> with the real spec and commit it</b> before the loop runs (it reviews that file).`);
+        gitStep(); monitorStep();
+        if (chain && v.auto === 'yes') say(`When <b>${esc(v.after)}</b> turns blue the monitor will launch <b>${esc(v.name)}</b> by itself. A failed launch stops and shows a red "Allow relaunch" button.`);
+        else { preflightStep(r.id); runSteps(r.id); }
+        again();
+      }});
+  });
+}
+
+start();
+</script>
+</body>
+</html>

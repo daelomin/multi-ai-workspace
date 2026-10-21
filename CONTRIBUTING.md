@@ -8,6 +8,7 @@ Humans own final decisions. AIs research, draft, review, implement, test and pro
 
 ## Project folders
 Work in the project subfolder, `projects/<project-name>/`. Project files do not go at the repo root.
+Any agent starting a spec review loop follows [`generic/REVIEW_LOOP_GUIDELINE.md`](generic/REVIEW_LOOP_GUIDELINE.md).
 
 ## Before editing
 Every agent MUST:
