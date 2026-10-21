@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/obd2-plugin/spec.md`, `projects/fuelbuddy/obd2-plugin/reviews/round-1/CONSOLIDATION.md`, `projects/fuelbuddy/obd2-plugin/README.md`, `CHANGELOG.md`
+**Change:** Consolidated obd2-plugin round 1 (CHATGPT 4, DEEPSEEK 12, GROK 10 findings plus 3 inline Gemini callouts) into spec v0.2. Added an enforced read-only service allowlist, ECU identity across responses, capabilities, samples and DTCs, typed `ObdResponse` with a single-flight owner, DTC records, quality/null-value/staleness and monotonic-time rules, derived-metric rules for gauge manifold pressure, discovery rules, bounded local storage, consent/deletion reaching queues, a Phase 1 foreground service and watchdog, and measurable acceptance. Removed the Gemini callouts. README now says Round 2 reviewing v0.2.
+**Remaining:** Open HUMAN decisions FB-D1 to FB-D6 (offline entitlement expiry, Mode 02/09 scope, manual DTC clearing, session boundary, storage eviction, numeric thresholds) are carried forward in `CONSOLIDATION.md`; none was decided. GROK served-model is unverified (provider reported none).
+**Verification:** Read README, spec v0.1, the three round-1 reviews and the loop guideline; no round-0 consolidation existed. Reviewers' external facts were not re-checked. Edited only the four allowed files; no git commands run.
+
+## 2026-10-21
 **Agent:** GROK
 **Files:** `projects/fuelbuddy/obd2-plugin/reviews/round-1/GROK.md`, `CHANGELOG.md`
 **Change:** Reviewed local obd2-plugin spec v0.1 independently for round 1. Recorded 0 blocking, 3 major and 7 minor findings: Phase 1 read-only is not a service allowlist, so services 04 and 08 remain sendable; samples and DTCs have no responding-controller address; `exchange` is not single-flight and collapses ELM327 failure words into a byte payload; plus DTC service identity, monotonic time and staleness, supported-PID versus `NO DATA`, screen-off recording, derived manifold gauge, deletion of queued copies, and in-spec comment callouts.
