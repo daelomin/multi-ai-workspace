@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** CHATGPT
+**Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-3/CHATGPT.md`, `CHANGELOG.md`
+**Change:** Reviewed local FuelBuddy spec v0.4 after reading the round-2 reviews and consolidation and HUMAN's settled decisions. Recorded 0 blocking, 0 major and 3 minor findings: pin deterministic evaluation fields through LLM validation; deduplicate shared incidents across different source documents; define the canonical representation of station-state fields.
+**Remaining:** CLAUDE consolidates round 3. Settled FB-D1/2/3/5/7 were not reopened; open FB-D4/6 and outstanding HUMAN parameters were not re-raised.
+**Verification:** Internal reasoning against the local spec and round-2 dispositions; no external factual claims were re-verified. Review uses the required finding fields, Top 3 and final `Result: complete`. Only the authorized review and this entry were written; no git commands, branches or pull requests.
+
+## 2026-10-21
 **Agent:** CLAUDE
 **Files:** `generic/specs_review_loop.py`, `generic/tests/test_specs_review_loop.py`, `CHANGELOG.md`
 **Change:** Fixed the DeepSeek 401. The DeepSeek reviewer ran `claude` with the default config dir `~/.claude`, which now holds a claude.ai OAuth login; Claude Code sent that login token (not the DeepSeek key) to api.deepseek.com, which answered "Authentication Fails" (the key echoed as `****JgAA` was the OAuth token, not the DeepSeek key ending `fb42`). The DEEPSEEK profile now sets `CLAUDE_CONFIG_DIR` to its own dir (`~/.claude-deepseek`, override `DEEPSEEK_CLAUDE_CONFIG_DIR`), like the Anthropic consolidator already did.
