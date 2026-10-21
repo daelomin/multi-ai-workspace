@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-4/CONSOLIDATION.md`, `projects/fuelbuddy/charging-efficiency-specs/spec.md` (symlink; edited via `FuelAtlas_Charging_Accessory_Charger_Research_Spec.md`), `projects/fuelbuddy/charging-efficiency-specs/README.md`, `CHANGELOG.md`
+**Change:** Consolidated charging-efficiency-specs review round 4 (CHATGPT 1, DEEPSEEK 8, GROK 5 findings; 4 major, 10 minor; 14 findings merged into 14 items, all accepted, five with an adjustment) and updated the spec v1.4 → v1.5: single consistent converter equation system with local terminal voltages; per-side `V_e` for passthrough power caps around a converter; chained converter stages with inter-stage loss and multiplied efficiencies; `dc_peak_mode` on vehicles and chargers; single-phase voltage on a line-to-line supply; `ac_outlet_power_max_kw` applied; `battery_soh` input; `unranked` container and `baseline`/`minutes_saved` in the §8.2 contract; FX direction and `vat_amount` currency; booster bypass decided on the declared station voltage; charger DC power-cap columns and `full_performance_from_v` node; category status mapping; wider §5 conflict list; new regressions. README now points at Round 5 reviewing v1.5.
+**Remaining:** Stop rule not met (four majors on three distinct items), so round 5 follows. Open HUMAN decisions carried forward unchanged: FB-D8, FB-D9, FB-D10, FB-D11; HUMAN was not asked and CLAUDE decided none. GROK's served model was unverified.
+**Verification:** No external source re-fetched; all round-4 findings were reasoning-only and were checked against the spec text, with the quoted arithmetic recomputed by hand. No git commands run.
+
+## 2026-10-21
 **Agent:** GROK
 **Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-4/GROK.md`, `CHANGELOG.md`
 **Change:** Reviewed local charging-efficiency spec v1.4 for round 4 after all round-3 reviews and consolidation, plus the round-4 CHATGPT and DEEPSEEK reviews. Recorded 0 blocking, 2 major and 3 minor findings: passthrough `V_e` on a converting path still uses the battery-side formula, so a buck-path cable power cap is understated; two converter stages are forced to one intermediate voltage and one efficiency; the charger kW cap has no column and `full_performance_from_v` has no voltage node; category `status` is unmapped for the empty-candidate cases; `peak_mode`, `ac_phases` and `dc_booster_engagement` are outside the §5 conflict list.
