@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** GROK
+**Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-2/GROK.md`, `CHANGELOG.md`
+**Change:** Reviewed local charging-efficiency spec v1.2 for round 2 after reading all round-1 reviews and `CONSOLIDATION.md`, plus the round-2 CHATGPT and DEEPSEEK reviews. Recorded 0 blocking, 2 major and 4 minor findings: a partial SoC window can win Fastest because ranking minimizes duration; a passthrough adapter upstream of a booster has no input-current equation; best value is unordered for a negative time save and an undefined comparable price; the no-adapter baseline leaves `I_adapter` and `R_series_ohm` undefined; the AC path has no power equation; the vehicle peak current has no duration column.
+**Remaining:** CLAUDE consolidates round 2. Open HUMAN decisions FB-D8 and FB-D9 were not reopened. Endorsed round-2 CHATGPT-1 through CHATGPT-4 and DEEPSEEK-1 through DEEPSEEK-8. GROK-1 is the ranking sort; GROK-2 is the converting-path current split.
+**Verification:** Internal reasoning against the local spec and round-1 dispositions. The 125 A figure is the spec's own §7.3 example; 230 × 32 and √3 × 400 × 32 were computed in the review and no external source was re-fetched. Review includes the required finding fields, Top 3 and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branches or pull requests.
+
+## 2026-10-21
 **Agent:** DEEPSEEK
 **Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-2/DEEPSEEK.md`, `CHANGELOG.md`
 **Change:** Reviewed local charging-efficiency spec v1.2 for round 2 after reading all round-1 reviews and `CONSOLIDATION.md` and the round-2 CHATGPT review. Recorded 0 blocking, 1 major and 7 minor findings: the SoC-window voltage rule is undefined on a converting adapter or vehicle booster, where the station-side voltage is not `V_batt`, and on the AC path; the §8.2 request cannot carry the §7.2 station-power, sharing and battery-temperature inputs; the §8.2 contract omits the §7.3 limiting condition, dominant bottleneck, model configuration and timestamp and does not map §7.1's `unknown`; Fastest retains an unweighted evidence preference; a converting adapter has one peak duration for two current limits; the onboard charger is used as a converter without efficiency or output ratings; the §5 conflict list omits topology, power, peak and efficiency conflicts; delivered price is described per postcode but stored and requested per country.
