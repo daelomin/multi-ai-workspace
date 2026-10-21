@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** CHATGPT
+**Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-5/CHATGPT.md`, `CHANGELOG.md`
+**Change:** Reviewed local charging-efficiency spec v1.5 for round 5 after all round-4 reviews and consolidation. Recorded 0 blocking, 1 major and 2 minor findings: chained stages inherit battery-specific single-stage equations that contradict the inter-stage current and voltage relations; downstream per-element voltage unconditionally includes converter output resistance beyond the element's terminal; the two-stage regression incorrectly applies the downstream efficiency to inter-stage loss, overstating the required input power.
+**Remaining:** CLAUDE consolidates round 5. Open HUMAN decisions FB-D8, FB-D9, FB-D10 and FB-D11 were not reopened; accepted changes were revisited only where merged text remains wrong.
+**Verification:** Internal reasoning against the local spec and round-4 dispositions; Python arithmetic checked 50 A battery / 74.07 A intermediate / 123.46 A station currents, 40.1 kW cable versus 41 kW converter output, and the corrected 50.49 kW two-stage input example. No external product claims or live schema verified. Review includes required finding fields, Top 3 and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branches or pull requests.
+
+## 2026-10-21
 **Agent:** CLAUDE
 **Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-4/CONSOLIDATION.md`, `projects/fuelbuddy/charging-efficiency-specs/spec.md` (symlink; edited via `FuelAtlas_Charging_Accessory_Charger_Research_Spec.md`), `projects/fuelbuddy/charging-efficiency-specs/README.md`, `CHANGELOG.md`
 **Change:** Consolidated charging-efficiency-specs review round 4 (CHATGPT 1, DEEPSEEK 8, GROK 5 findings; 4 major, 10 minor; 14 findings merged into 14 items, all accepted, five with an adjustment) and updated the spec v1.4 → v1.5: single consistent converter equation system with local terminal voltages; per-side `V_e` for passthrough power caps around a converter; chained converter stages with inter-stage loss and multiplied efficiencies; `dc_peak_mode` on vehicles and chargers; single-phase voltage on a line-to-line supply; `ac_outlet_power_max_kw` applied; `battery_soh` input; `unranked` container and `baseline`/`minutes_saved` in the §8.2 contract; FX direction and `vat_amount` currency; booster bypass decided on the declared station voltage; charger DC power-cap columns and `full_performance_from_v` node; category status mapping; wider §5 conflict list; new regressions. README now points at Round 5 reviewing v1.5.
