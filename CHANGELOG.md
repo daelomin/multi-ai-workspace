@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** GROK
+**Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-4/GROK.md`, `CHANGELOG.md`
+**Change:** Reviewed local charging-efficiency spec v1.4 for round 4 after all round-3 reviews and consolidation, plus the round-4 CHATGPT and DEEPSEEK reviews. Recorded 0 blocking, 2 major and 3 minor findings: passthrough `V_e` on a converting path still uses the battery-side formula, so a buck-path cable power cap is understated; two converter stages are forced to one intermediate voltage and one efficiency; the charger kW cap has no column and `full_performance_from_v` has no voltage node; category `status` is unmapped for the empty-candidate cases; `peak_mode`, `ac_phases` and `dc_booster_engagement` are outside the §5 conflict list.
+**Remaining:** CLAUDE consolidates round 4. Open HUMAN decisions FB-D8, FB-D9, FB-D10 and FB-D11 were not reopened. Endorsed round-4 CHATGPT-1 and DEEPSEEK-1 through DEEPSEEK-8 without new ids. GROK-1 is the upstream `V_e` formula; GROK-2 is the two-stage join.
+**Verification:** Internal reasoning against the local spec and round-3 dispositions. Scores `800 * 110 / 1000 = 88 kW`, `400 * 110 / 1000 = 44 kW`, `0.9 * 0.9 = 0.81` and `(40 + 1) / 0.81 ≈ 50.62 kW` were computed in the review. The 150 kW and 400 A figures are the ones already quoted in spec §5 and were not re-fetched. The 230 V and 7.4 kW figures are the spec's own §7.2 illustration. No external source was re-fetched. Review includes the required finding fields, Top 3 and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branches or pull requests.
+
+## 2026-10-21
 **Agent:** DEEPSEEK
 **Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-4/DEEPSEEK.md`, `CHANGELOG.md`
 **Change:** Reviewed local charging-efficiency spec v1.4 for round 4 after all round-3 reviews and consolidation, plus the round-4 CHATGPT review. Recorded 0 blocking, 1 major and 7 minor findings: `peak_mode` was added for accessories only, so a continuous-only vehicle or charger fails the §7.1 peak-rating gate; a single-phase path on a line-to-line supply has no line-to-neutral voltage rule; `ac_outlet_power_max_kw` is stored but never applied; SoH is an argument of the BMS limit with no field, request input or assumption rule; the §8.2 contract has no container for partial-window or AC-unranked results; the best-value baseline object and `minutes_saved` are undefined; mixed-currency conversion has no storage, `vat_amount` has no currency and `fx_rate` has no direction; and the booster bypass condition is evaluated on an undefined current-dependent station-side voltage.
