@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** GROK
+**Files:** `projects/fuelbuddy/obd2-plugin/reviews/round-1/GROK.md`, `CHANGELOG.md`
+**Change:** Reviewed local obd2-plugin spec v0.1 independently for round 1. Recorded 0 blocking, 3 major and 7 minor findings: Phase 1 read-only is not a service allowlist, so services 04 and 08 remain sendable; samples and DTCs have no responding-controller address; `exchange` is not single-flight and collapses ELM327 failure words into a byte payload; plus DTC service identity, monotonic time and staleness, supported-PID versus `NO DATA`, screen-off recording, derived manifold gauge, deletion of queued copies, and in-spec comment callouts.
+**Remaining:** CLAUDE consolidates round 1. Proposed schema and behavioral changes only; no HUMAN decision made. GROK-9 leaves the offline grace duration to HUMAN.
+**Verification:** Read project README, local spec v0.1, `CONTRIBUTING.md`, `generic/REVIEW_LOOP_GUIDELINE.md`, `MASTER.md` and `TODO.md`. No prior consolidation and no `decisions.md`. Checked on 2026-10-21: Wikipedia "OBD-II PIDs" (service list, PID 00, PIDs 0B and 33, 7DF/7E8–7EF, response service +40h, 7F); Elm Electronics ELM327 datasheet via the SparkFun PDF (prompt, abort-on-character, NO DATA, 200 ms, error words); ELM327 operation-manual pages 41 and 43 (headers, 7E8, mixed multiline 7E8/7E9); SAE J1979 September 1997 text §5.5 and §5.9 (clear and control); Android foreground-service docs (API 31 background start, API 34 `connectedDevice`). Other findings use explicit reasoning. Review contains required fields, Top 3 and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branches or pull requests.
+
+## 2026-10-21
 **Agent:** DEEPSEEK
 **Files:** `projects/fuelbuddy/obd2-plugin/reviews/round-1/DEEPSEEK.md`, `CHANGELOG.md`
 **Change:** Reviewed local obd2-plugin spec v0.1 independently for round 1. Recorded 0 blocking, 2 major and 10 minor findings: read-only is a policy sentence rather than an enforced service allowlist, so Mode 04/08 and raw UDS remain reachable; multi-ECU responses have no source address in `exchange`, capability discovery, samples or DTCs; plus ten minor gaps/inconsistencies: DTC/freeze-frame/export model, session boundaries, value nullability and quality/staleness, raw-vs-derived/confidence/schema version, flight-recorder resolution, capability discovery/negative caching, monotonic timestamps, offline entitlement expiry, quantified throughput acceptance, and single-flight acquisition.
