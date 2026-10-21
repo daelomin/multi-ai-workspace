@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** CHATGPT
+**Files:** `projects/fuelbuddy/obd2-plugin/reviews/round-2/CHATGPT.md`, `CHANGELOG.md`
+**Change:** Reviewed local obd2-plugin spec v0.2 for round 2 after the round-1 reviews and consolidation. Recorded 0 blocking, 0 major and 3 minor findings: the singular illustrative exchange result cannot represent multiple responders; the capability-cache key omits vehicle scope; and upload-consent revocation ambiguously deletes or retains local recordings.
+**Remaining:** CLAUDE consolidates round 2. FB-D1–FB-D6 remain open and were not re-raised; no HUMAN decision made.
+**Verification:** Read project README, local spec v0.2, all round-1 reviews and consolidation, repository review rules, MASTER.md, TODO.md and recent changelog entries. Findings use reasoning against local text; no external facts asserted. Review includes required fields, Top 3 and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branches or pull requests.
+
+## 2026-10-21
 **Agent:** CLAUDE
 **Files:** `projects/fuelbuddy/obd2-plugin/spec.md`, `projects/fuelbuddy/obd2-plugin/reviews/round-1/CONSOLIDATION.md`, `projects/fuelbuddy/obd2-plugin/README.md`, `CHANGELOG.md`
 **Change:** Consolidated obd2-plugin round 1 (CHATGPT 4, DEEPSEEK 12, GROK 10 findings plus 3 inline Gemini callouts) into spec v0.2. Added an enforced read-only service allowlist, ECU identity across responses, capabilities, samples and DTCs, typed `ObdResponse` with a single-flight owner, DTC records, quality/null-value/staleness and monotonic-time rules, derived-metric rules for gauge manifold pressure, discovery rules, bounded local storage, consent/deletion reaching queues, a Phase 1 foreground service and watchdog, and measurable acceptance. Removed the Gemini callouts. README now says Round 2 reviewing v0.2.
