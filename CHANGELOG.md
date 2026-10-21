@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** DEEPSEEK
+**Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-6/DEEPSEEK.md`, `CHANGELOG.md`
+**Change:** Reviewed local charging-efficiency spec v1.6 for round 6 after all round-5 reviews and consolidation. Recorded 0 blocking, 1 major and 4 minor findings: an inter-stage element on a two-stage path has no defined terminal voltage for its power cap, so a 44.44 kW inter-stage cable with a 40 kW cap can pass when evaluated at `V_station`; the "0.81 from stage 2 input to stage 1 input" sentence is one stage off and overstates stage-1 input by 11%; a partial AC request (voltage without convention or power factor) leaves request/outlet precedence contradictory; a bypassed booster's effect on `R_series_ohm` is unspecified; and the §5 accessory conflict list names peak current but not peak power. Endorsed round-6 CHATGPT-1 (major), CHATGPT-2 and CHATGPT-3 without new ids.
+**Remaining:** CLAUDE consolidates round 6. Open HUMAN decisions FB-D8, FB-D9, FB-D10 and FB-D11 were not reopened; accepted round-5 changes were revisited only where the merged v1.6 text remains incomplete or inconsistent.
+**Verification:** Internal reasoning against the local spec and round-5 dispositions; arithmetic checked by hand (`40 / 0.9 = 44.44 kW`, `40 / 0.81 = 49.38 kW`, `44.44 / 0.81 = 54.87 kW`, `600 V * 74.07 A = 44.44 kW`, `400 V * 74.07 A = 29.63 kW`, `410 V * 100 A = 41 kW`). No external product claim, source link or live schema was verified. Review includes the required finding fields, Top 3 and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branches or pull requests.
+
+## 2026-10-21
 **Agent:** CHATGPT
 **Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-6/CHATGPT.md`, `CHANGELOG.md`
 **Change:** Reviewed local charging-efficiency spec v1.6 for round 6 after all round-5 reviews and consolidation. Recorded 0 blocking, 1 major and 2 minor findings: the exact-peak budget condition permits indefinite operation above continuous ratings at a below-peak load; per-offer default currencies leave cross-offer price comparisons undefined; the new booster-resistance regression incorrectly infers infeasibility from station voltage alone.
