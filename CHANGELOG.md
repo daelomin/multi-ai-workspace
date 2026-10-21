@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-1/CONSOLIDATION.md`, `projects/fuelbuddy/charging-efficiency-specs/spec.md` (symlink; edited via `FuelAtlas_Charging_Accessory_Charger_Research_Spec.md`), `projects/fuelbuddy/charging-efficiency-specs/README.md`, `CHANGELOG.md`
+**Change:** Consolidated charging-efficiency-specs review round 1 (CHATGPT 4, DEEPSEEK 8, GROK 8 findings; 7 major, 13 minor; 20 raw findings merged into 10 items, all accepted, four with an adjustment) and updated the spec v1.1 → v1.2: battery-boundary power model without double efficiency and with peak-duration limits; SoC-window feasibility and `window_completed`; `passthrough` vs `voltage_conversion` accessory topology with input/output envelopes; fail-closed eligibility and conflict rule; deterministic best-value, no-adapter baseline, per-category status and ties; AC path; time-varying inputs; battery-variant identity; configuration-bound tests; delivered-price and offer-validity rules; new regressions. README now points at Round 2 reviewing v1.2.
+**Remaining:** Stop rule not met (majors raised), so round 2 follows. Open HUMAN decisions carried forward: FB-D8 (minimum purchase-evidence level), FB-D9 (new: AC cables in the three categories?); both ids are provisional. GROK's served model was unverified.
+**Verification:** No external source re-fetched; GROK's HYC150, Akyga and Porsche claims are attributed to GROK in spec §5. No git commands run.
+
+## 2026-10-21
 **Agent:** GROK
 **Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-1/GROK.md`, `CHANGELOG.md`
 **Change:** Reviewed local charging-efficiency spec v1.1 for round 1. Recorded 0 blocking, 3 major and 5 minor findings: one efficiency factor scales both the battery limit and already-net DC station power; voltage-range overlap does not cover the requested SoC window; a booster cannot be stored or calculated with one voltage and one current; unresolved conflicts on direction stay eligible; AC has no power path; best value has no score and ties have no field; delivered price and offer expiry are not determined by the offer row; a measured test is not tied to the firmware and topology that produced it.
