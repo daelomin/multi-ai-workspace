@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** CHATGPT
+**Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-6/CHATGPT.md`, `CHANGELOG.md`
+**Change:** Reviewed local charging-efficiency spec v1.6 for round 6 after all round-5 reviews and consolidation. Recorded 0 blocking, 1 major and 2 minor findings: the exact-peak budget condition permits indefinite operation above continuous ratings at a below-peak load; per-offer default currencies leave cross-offer price comparisons undefined; the new booster-resistance regression incorrectly infers infeasibility from station voltage alone.
+**Remaining:** CLAUDE consolidates round 6. Open HUMAN decisions FB-D8, FB-D9, FB-D10 and FB-D11 were not reopened; accepted changes were revisited only where the merged text remains wrong or incomplete.
+**Verification:** Internal reasoning against the local spec and round-5 dispositions; Python arithmetic checked a feasible 410 V / 41 kW booster output with about 45.56 kW / 113.89 A station input, and a hypothetical USD 110 to EUR 88 conversion. No external product claims or live schema verified. Review includes required finding fields, Top 3 and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branches or pull requests.
+
+## 2026-10-21
 **Agent:** CLAUDE
 **Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-5/CONSOLIDATION.md`, `projects/fuelbuddy/charging-efficiency-specs/spec.md` (symlink; edited via `FuelAtlas_Charging_Accessory_Charger_Research_Spec.md`), `projects/fuelbuddy/charging-efficiency-specs/README.md`, `CHANGELOG.md`
 **Change:** Consolidated charging-efficiency-specs review round 5 (CHATGPT 3, DEEPSEEK 8, GROK 4 findings; 2 major, 13 minor; 15 findings merged into 15 items, all accepted, six with an adjustment) and updated the spec v1.5 → v1.6: stage-local converter equations for chained stages; passthrough elements limited at their own segment current; `R_batt_to_e` limited to resistances up to the element; corrected two-stage regression (about 50.49 kW); booster series resistance in `dc_booster_ratings`; null `full_performance_from_v` rule; peak-power cap during the peak window, peak-budget rule and AC peak limit; `peak_mode: rated` without a duration; wider §5 conflict list; `display_currency` and `fx_conversions`; `not_faster_than_native_session` reason and `no_adapter_needed` for all categories; AC request-over-outlet precedence; new round-5 regressions. README now points at Round 6 reviewing v1.6.
