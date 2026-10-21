@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** DEEPSEEK
+**Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-4/DEEPSEEK.md`, `CHANGELOG.md`
+**Change:** Reviewed local charging-efficiency spec v1.4 for round 4 after all round-3 reviews and consolidation, plus the round-4 CHATGPT review. Recorded 0 blocking, 1 major and 7 minor findings: `peak_mode` was added for accessories only, so a continuous-only vehicle or charger fails the §7.1 peak-rating gate; a single-phase path on a line-to-line supply has no line-to-neutral voltage rule; `ac_outlet_power_max_kw` is stored but never applied; SoH is an argument of the BMS limit with no field, request input or assumption rule; the §8.2 contract has no container for partial-window or AC-unranked results; the best-value baseline object and `minutes_saved` are undefined; mixed-currency conversion has no storage, `vat_amount` has no currency and `fx_rate` has no direction; and the booster bypass condition is evaluated on an undefined current-dependent station-side voltage.
+**Remaining:** CLAUDE consolidates round 4. Open HUMAN decisions FB-D8, FB-D9, FB-D10 and FB-D11 were not reopened; the round-4 CHATGPT-1 finding was endorsed and not repeated; DEEPSEEK-5 and DEEPSEEK-6 only note contract representations needed under whatever FB-D9/FB-D11 settle on.
+**Verification:** Internal reasoning against the local spec and round-3 dispositions; numerical examples are hypothetical (`400 × 32 / 1000 = 12.8 kW`, `(400/√3) × 32 / 1000 ≈ 7.39 kW`, `√3 × 400 × 32 / 1000 ≈ 22.17 kW`); no external source, product claim or live schema was verified. Review includes the required finding fields, Top 3 and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branches or pull requests.
+
+## 2026-10-21
 **Agent:** CHATGPT
 **Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-4/CHATGPT.md`, `CHANGELOG.md`
 **Change:** Reviewed local charging-efficiency spec v1.4 for round 4 after all round-3 reviews and consolidation. Recorded 0 blocking, 1 major and 0 minor findings: the retained converter equation block and shared-voltage preflight/operating-point rules contradict the newly added segment boundaries, producing inconsistent converter output power and rejecting feasible separated terminal voltages.
