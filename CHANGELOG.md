@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** GROK
+**Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-4/GROK.md`, `CHANGELOG.md`
+**Change:** Reviewed local FuelBuddy spec v0.5 for round 4 after reading the round-3 reviews and consolidation, `decisions.md`, and the round-4 CHATGPT and DEEPSEEK reviews. Recorded 0 blocking, 0 major and 5 minor findings: `external_authorization` is missing from the closed stage list and `not_applicable` must stay derived; the architecture diagram sends every restriction to a full stop, including settled `charge_limited` and `do_not_charge_indoor`; the DIN row's "external payment only" can be read as forbidding RFID and app; an in-use recharging point has no rule against offering its other connector; an idempotent evaluate replay can return a body §2 says must not be displayed.
+**Remaining:** CLAUDE consolidates round 4. Settled FB-D1/2/3/5/7 were not reopened; open FB-D4, FB-D6, FB-D1a–c, FB-D2a and FB-D5a were not re-raised. Endorsed round-4 CHATGPT-1/2/3 and DEEPSEEK-1 through DEEPSEEK-6.
+**Verification:** Official Journal PDF of Commission Implementing Regulation (EU) 2025/655 (Articles 1 and 2, Annex Tables B and F) and the Typhoon HIL DIN SPEC 70121 page were read on 2026-10-21. The Siemens CHAdeMO note was not re-fetched. ISO, DIN, IEC and CHAdeMO standard texts were not opened. Review uses the required finding fields, Top 3 and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branches or pull requests.
+
+## 2026-10-21
 **Agent:** DEEPSEEK
 **Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-4/DEEPSEEK.md`, `CHANGELOG.md`
 **Change:** Reviewed local FuelBuddy spec v0.5 for round 4 after reading the round-3 reviews and consolidation, `decisions.md` and the round-4 CHATGPT review. Recorded 0 blocking, 0 major and 6 minor findings: no defined safety-state vocabulary or ordering behind the `safety_state`/monotonicity check; the §11 outcome record contradicts §3.2's single observation record and its `outcome` type; no ECU field for `VEHICLE_DTC` observations although §4.4/§4.5 require one; `plug_and_charge` not rejected for PWM-only/CHAdeMO and `free`/`unknown` authorization methods left unaddressed; the `contradicting` ranking term cannot use the `incident_id` evidence-group identity; no specified response behaviour for `unsupported_scope`.
