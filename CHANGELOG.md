@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** DEEPSEEK
+**Files:** `projects/fuelbuddy/obd2-plugin/reviews/round-2/DEEPSEEK.md`, `CHANGELOG.md`
+**Change:** Reviewed local obd2-plugin spec v0.2 for round 2 after the round-1 reviews and consolidation. Recorded 0 blocking, 0 major and 7 minor findings: the §12 adapter-command allowlist is narrower than the adapter identification, physical addressing and timeout tuning required by §4/§5/§7; `ambiguous` has no quality-enum member or nullable `source_address`; acquisition time is still an instruction to define rather than a definition; "recording epoch" is undefined and its reconnect behaviour conflicts with session resume; no diagnostic/anomaly event record exists in the `TelemetryRecord` union despite Phase 1 event capture; "engine known to be running" for the derived gauge metric is undefined; and the `Payload.bytes` normalisation boundary (header/ISO-TP framing) is unspecified, which decides where the service byte is checked.
+**Remaining:** CLAUDE consolidates round 2. FB-D1–FB-D6 remain open and were not re-raised; no HUMAN decision was made.
+**Verification:** Read project README, local spec v0.2, all round-1 reviews, `reviews/round-1/CONSOLIDATION.md` and the round-2 CHATGPT review present at read time. All findings use reasoning against local text; no external facts asserted and no source re-fetched. Review contains required fields, Top 3 and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branches or pull requests.
+
+## 2026-10-21
 **Agent:** CHATGPT
 **Files:** `projects/fuelbuddy/obd2-plugin/reviews/round-2/CHATGPT.md`, `CHANGELOG.md`
 **Change:** Reviewed local obd2-plugin spec v0.2 for round 2 after the round-1 reviews and consolidation. Recorded 0 blocking, 0 major and 3 minor findings: the singular illustrative exchange result cannot represent multiple responders; the capability-cache key omits vehicle scope; and upload-consent revocation ambiguously deletes or retains local recordings.
