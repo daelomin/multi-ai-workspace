@@ -30,6 +30,36 @@ class ValidateReview(unittest.TestCase):
         self.assertIn("contradictory", rl.validate_review(GOOD + "Findings: none\n"))
 
 
+class SymlinkedSpec(unittest.TestCase):
+    def test_spec_rels_includes_the_symlink_target(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d).resolve()
+            proj = root / "projects/p/s"
+            proj.mkdir(parents=True)
+            (proj / "Real_Spec.md").write_text("Version 1.1")
+            (proj / "spec.md").symlink_to("Real_Spec.md")
+            with mock.patch.object(rl, "SPEC", proj / "spec.md"):
+                self.assertEqual(rl.spec_rels(root), ["projects/p/s/spec.md", "projects/p/s/Real_Spec.md"])
+            (proj / "plain.md").write_text("x")
+            with mock.patch.object(rl, "SPEC", proj / "plain.md"):
+                self.assertEqual(rl.spec_rels(root), ["projects/p/s/plain.md"])
+
+    def test_symlink_target_edit_is_not_flagged_as_unexpected(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d).resolve()
+            git(root, "init", "-q")
+            proj = root / "projects/p/s"
+            proj.mkdir(parents=True)
+            (proj / "Real_Spec.md").write_text("Version 1.1\n")
+            (proj / "spec.md").symlink_to("Real_Spec.md")
+            git(root, "add", ".")
+            git(root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "i")
+            (proj / "spec.md").write_text("Version 1.2\n")  # writes through the link
+            with mock.patch.object(rl, "SPEC", proj / "spec.md"), mock.patch.object(rl, "REL_PROJECT", "projects/p/s"):
+                self.assertEqual(rl.unexpected_changes(root, set(rl.spec_rels(root))), [])
+                self.assertEqual(rl.unexpected_changes(root, {"projects/p/s/spec.md"}), ["projects/p/s/Real_Spec.md"])
+
+
 class Cost(unittest.TestCase):
     USAGE = {"modelUsage": {"deepseek-flash": {"inputTokens": 1_000_000, "cacheReadInputTokens": 1_000_000, "outputTokens": 1_000_000}}}
 

@@ -2,6 +2,12 @@
 
 ## 2026-10-21
 **Agent:** CLAUDE
+**Files:** `generic/specs_review_loop.py`, `generic/tests/test_specs_review_loop.py`, `CHANGELOG.md`
+**Change:** The consolidation step now accepts a symlinked `spec.md`. In `charging-efficiency-specs`, `spec.md` links to `FuelAtlas_Charging_Accessory_Charger_Research_Spec.md`; the consolidator's edit through the link showed up in git as a change to the target, and the post-step check ("CLAUDE changed files outside the consolidation") aborted round 1 after the model had finished, leaving the consolidation uncommitted. New helper `spec_rels()` adds the link's target to the allowed and committed paths, in both the normal and the resume-at-commit paths.
+**Verification:** 68 mocked tests pass (2 new, one with a real git repo and a symlinked spec). Round 1 of the efficiency loop not yet resumed: its consolidation (spec v1.2, README Round 2, CONSOLIDATION.md) is still uncommitted in its worktree until the loop is rerun.
+
+## 2026-10-21
+**Agent:** CLAUDE
 **Files:** `generic/specs_review_loop.py`, `generic/loop_monitor.py`, `generic/loop_wizard.html`, `generic/tests/test_specs_review_loop.py`, `generic/tests/test_loop_monitor.py`, `generic/REVIEW_LOOP_GUIDELINE.md`, `CHANGELOG.md`
 **Change:** Cost per step. The engine records `cost_usd` and `cost_basis` in each step's timing file: DeepSeek from its token counts at DeepSeek's list prices (peak/off-peak by Beijing time, CNY converted at `CNY_USD`, default 0.14), ChatGPT from Codex's estimate, Claude from Claude Code's `total_cost_usd`, Grok flagged "not reported by Cursor". The Jarvis nodes carry cost in the name tooltip and metadata, the chips show it, and each loop card shows the round total with unreported steps listed. Claude Code's own cost for DeepSeek runs is ignored (wrong price table: flash read higher than pro).
 **Verification:** 66 mocked tests pass (5 new: peak window, price maths, unknown model, zero cost, round total). The function on the real round-3/4 DeepSeek logs gives $0.18 (priced at peak: it started 3 s before the window closed) and $0.03. Not yet seen live on a running round.

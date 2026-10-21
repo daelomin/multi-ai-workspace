@@ -788,10 +788,21 @@ def do_review(agent: str, n: int, root: Path) -> dict:
     return prov
 
 
+def spec_rels(root: Path) -> list[str]:
+    """Repo paths of the spec: spec.md and, when spec.md is a symlink, the file it points to (git sees an edit
+    through the link as a change of the target, which the post-step safety check must allow)."""
+    rels = [os.path.relpath(SPEC, root)]
+    if SPEC.is_symlink():
+        target = os.path.relpath(SPEC.resolve(), root.resolve())
+        if not target.startswith(".."):
+            rels.append(target)
+    return rels
+
+
 def do_consolidation(n: int, reviewers: list[str], converged: bool, root: Path,
                      provenance: dict | None = None) -> None:
     path = round_dir(n) / "CONSOLIDATION.md"
-    rel_all = [str(p.relative_to(root)) for p in (path, SPEC, README)] + ["CHANGELOG.md"]
+    rel_all = [str(path.relative_to(root)), *spec_rels(root), str(README.relative_to(root)), "CHANGELOG.md"]
     if path.exists():
         if is_pushed(root, rel_all[0]):
             log(f"round {n}: consolidation complete and pushed, skipping")
@@ -814,7 +825,7 @@ def do_consolidation(n: int, reviewers: list[str], converged: bool, root: Path,
         raise SystemExit(f"CLAUDE did not bump the spec version (still v{before}); see {logfile}")
     if not converged and current_round() != n + 1:
         raise SystemExit(f"CLAUDE did not move README to round {n + 1}; see {logfile}")
-    rel = [str(p.relative_to(root)) for p in (path, SPEC, README)] + ["CHANGELOG.md"]
+    rel = list(rel_all)
     extra = unexpected_changes(root, set(rel))
     if extra:
         raise SystemExit(f"CLAUDE changed files outside the consolidation: {extra}")
