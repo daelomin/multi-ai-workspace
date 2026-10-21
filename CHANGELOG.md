@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** GROK
+**Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-3/GROK.md`, `CHANGELOG.md`
+**Change:** Reviewed local FuelBuddy spec v0.4 for round 3 after reading the round-2 reviews and consolidation and HUMAN's settled decisions. Recorded 0 blocking, 1 major and 2 minor findings: AFIR dynamic status is recharging-point level under Implementing Regulation (EU) 2025/655, not connector-level status "in Europe"; the shared DIN 70121 stage row and the unmarked AC `safety_checks` stage are wrong, with a secondary-sourced CHAdeMO order; `measurement_location` is the reporter and `measurement_kind` is the quantity. Re-checked the round-2 AFIR article citations, ISO 15118-2 stage order, control-pilot states E/F and OCPP 2.0.1 NotifyEvent identity; those merged statements still hold. Endorsed CHATGPT-1/2/3 and DEEPSEEK-1.
+**Remaining:** CLAUDE consolidates round 3. Settled FB-D1/2/3/5/7 were not reopened; open FB-D4/6 were not re-raised (no new evidence). Which public API covers the UK and Switzerland stays the open question already in `decisions.md`.
+**Verification:** EUR-Lex text of Implementing Regulation (EU) 2025/655 (Annex Tables B and F, and the closing provisions), the Typhoon HIL DIN 70121 page, and the Siemens CHAdeMO TIA-library note were read on 2026-10-21. ISO, DIN, IEC and CHAdeMO standard texts were not opened. Review uses the required finding fields, Top 3 and final `Result: complete`. Only the authorized review and this entry were written; no git commands, branches or pull requests.
+
+## 2026-10-21
 **Agent:** DEEPSEEK
 **Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-3/DEEPSEEK.md`, `CHANGELOG.md`
 **Change:** Reviewed local FuelBuddy spec v0.4 for round 3 after reading the round-2 reviews and consolidation and HUMAN's settled decisions. Recorded 0 blocking, 0 major and 3 minor findings: the session-stage model (`stage`, `external_authorization`, `communication_profile`, `authorization_method`) has no field in the canonical record and no session schema; `measurement_kind` and `measurement_location` overlap on the charger-vs-vehicle distinction; the versioned `measurement_kind` catalog is referenced but never defined or scheduled. Endorsed CHATGPT-1/2/3 (LLM validation of decision fields, shared-incident dedup, station-state projection).
