@@ -1,5 +1,1 @@
-# charging-efficiency-specs specification
-
-Version 0.1
-
-(write the spec here)
+FuelAtlas_Charging_Accessory_Charger_Research_Spec.md
