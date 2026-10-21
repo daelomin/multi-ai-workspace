@@ -1,11 +1,11 @@
 # FuelBuddy — OBD-II Telemetry Module Specification
 
-**Version:** v0.2  
+**Version:** v0.3  
 **Status:** Draft / proposed architecture  
 **Date:** 2026-10-21  
 **Scope:** Optional paid OBD-II module, offline-first Phase 1, cloud observability Phase 2
 
-Items marked *(provisional — FB-Dn)* depend on an open HUMAN decision listed in `reviews/round-1/CONSOLIDATION.md`; the text shows the interim default and is not a decision.
+Items marked *(provisional — FB-Dn)* depend on an open HUMAN decision listed in `reviews/round-2/CONSOLIDATION.md` (carried forward from round 1); the text shows the interim default and is not a decision.
 
 ## 1. Objectives
 
@@ -110,12 +110,19 @@ Phase 2 credentials: use short-lived tokens with refresh, stored with Android pl
 ```kotlin
 interface ObdTransport {
     suspend fun connect(): ConnectionInfo
-    suspend fun exchange(request: ObdRequest): ObdResponse
+    suspend fun exchange(request: ObdRequest): ObdExchange
     suspend fun disconnect()
 }
 
+data class ObdExchange(
+    val request: ObdRequest,
+    val outcomes: List<ObdResponse>,   // one or more per responder
+    val completion: ExchangeCompletion // Complete | DeadlineExpired | Disconnected
+)
+
+// Per-responder outcome
 sealed interface ObdResponse {
-    data class Payload(val source: EcuAddress, val bytes: ByteArray) : ObdResponse
+    data class Payload(val source: EcuAddress?, val bytes: ByteArray) : ObdResponse // bytes: normalised OBD payload, service byte at index 0
     data class NoData(val request: ObdRequest) : ObdResponse
     data class Negative(val source: EcuAddress, val code: Int) : ObdResponse
     data class Timeout(val request: ObdRequest) : ObdResponse
@@ -139,16 +146,26 @@ interface TelemetryExporter {
     suspend fun export(batch: List<TelemetryRecord>): ExportResult
 }
 
-// TelemetryRecord = VehicleMetricSample | DtcRecord | (later) FreezeFrame
+// TelemetryRecord = VehicleMetricSample | DtcRecord | DiagnosticEvent | (later) FreezeFrame
 ```
 
 Separate adapter/transport-specific framing from ELM327 AT commands, OBD request scheduling, PID decoding, and storage. Use Kotlin coroutines/Flow where the app is native Kotlin; adapt this design to the actual stack otherwise.
 
 **Single owner, one exchange at a time.** One acquisition component owns the `ObdTransport`; every request (discovery, polling, DTC reads) goes through its single-flight queue and no other component calls `exchange`. An ELM327-class adapter is one text channel: the next command is sent only after the `>` prompt, and a character sent earlier can abort the command in progress. `samples()` is a shared stream fed by that component; a second collector must not start a second poll loop. Test: discovery, polling and a DTC read run together and each response is paired with its request.
 
-**Typed results, not raw bytes.** Adapter words (`NO DATA`, `?`, `UNABLE TO CONNECT`, `CAN ERROR`, `DATA ERROR`, `BUFFER FULL`, `BUS BUSY`, `BUS ERROR`, `STOPPED`), a negative response (service byte `7F`) and timeouts are mapped to the non-payload `ObdResponse` cases and never reach the PID decoder. A `Payload` may be decoded as `valid` only if its response service byte equals the request service + `0x40`.
+**One exchange, all responders.** One exchange collects all responder outcomes until the adapter prompt or a bounded deadline; a failure or negative response from one responder does not discard another responder's valid payload. An incomplete exchange keeps the completed outcomes together with its completion status. The single-flight queue advances only once the channel is idle or has been recovered.
 
-**ECU identity.** A functional request (CAN `7DF`) may be answered by several ECUs (`7E8`–`7EF`), possibly with different supported-PID bitmaps and interleaved multiline frames. Configure the adapter so the responder is visible (headers on, or physical addressing). Reassemble multiline responses per responder. Capabilities, samples and DTC records carry the responder address (`EcuAddress`, scoped to the vehicle and connection protocol). Different responders are never merged implicitly and never averaged. The ECU used for each canonical metric comes from an explicit validated mapping in the vehicle profile; other responders are kept with their provenance. If the responder cannot be established the result is `ambiguous` and is excluded from ECU-specific diagnostics (§10).
+**Typed results, not raw bytes.** Adapter words (`NO DATA`, `?`, `UNABLE TO CONNECT`, `CAN ERROR`, `DATA ERROR`, `BUFFER FULL`, `BUS BUSY`, `BUS ERROR`, `STOPPED`, `LV RESET`), a negative response (service byte `7F`) and timeouts are mapped to the non-payload `ObdResponse` cases and never reach the PID decoder. Progress lines (`SEARCHING...`, `BUS INIT: ...` and a following `OK`) are ignored and the exchange keeps reading until the prompt; a progress line never discards a later payload. Any other non-hex line is an `AdapterError`. A `Payload` may be decoded as `valid` only if its response service byte equals the request service + `0x40`.
+
+**Negative and pending responses.** A normalised response `7F <requested service> <code>` is `Negative` when the code is anything other than `0x78`; the second byte must equal the service that was requested and `Negative.code` is the third byte. Code `0x78` (response pending) does not finish the exchange and does not become a sample: keep waiting for a later positive, negative or timeout from that same responder, up to one bounded wait, extended once if that responder sends `0x78` again. A positive payload from one responder does not cancel a pending wait on another.
+
+**Payload boundary.** `Payload.bytes` is the normalised OBD payload of one responder, response service byte at index 0. The transport moves the responder address into `source`, removes ISO-TP length/sequence framing and the PCI byte (which remains in the adapter text when headers are on, even with CAN auto-formatting), and concatenates multiline frames for that responder before any check. The `+ 0x40` and `7F` tests both use that normalised byte 0. Raw adapter lines are not stored in `bytes`; keep them separately only if diagnostics need them.
+
+**PID identity.** For service `01` a payload is `valid` only if the service byte matches and each value is taken from a PID that the request asked for, identified by the echoed PID byte, never by position in the request (replies need not follow request order). A returned PID that was not requested is `error` and is not decoded. A request may carry several supported PIDs; each echoed PID becomes its own sample. Bank 1 and bank 2 fuel trims use separate `metric_key`s (`06`/`08` short-term, `07`/`09` long-term) and are never averaged.
+
+**Expected-response count.** An adapter expected-response count is a maximum, not a hint: a count below the number of ECUs that actually answer makes the adapter return early and drops the later responders. Measure how many responses arrive for that request and set the count to that number; until measured, wait for the adapter prompt with the default timeout and send no count. A shortened response timeout stays at least as long as the slowest responder already observed for that request.
+
+**ECU identity.** A functional request (CAN `7DF`) may be answered by several ECUs (`7E8`–`7EF`), possibly with different supported-PID bitmaps and interleaved multiline frames. Configure the adapter so the responder is visible (headers on, or physical addressing). Reassemble multiline responses per responder. Phase 1 records the protocol the adapter actually negotiated. On 11-bit ISO 15765-4 the functional request is `7DF` and responders are `7E8`–`7EF`; on 29-bit ISO 15765-4 the responder address is the 29-bit id the adapter reports (not a value in `7E8`–`7EF`); on non-CAN protocols it is the source byte of the header. An address that does not match the negotiated protocol is `ambiguous`. If Phase 1 is later limited to 11-bit CAN, other negotiated protocols are refused at connect rather than parsed as `7E8`. Capabilities, samples and DTC records carry the responder address (`EcuAddress`, scoped to the vehicle and connection protocol) when attribution succeeds. Different responders are never merged implicitly and never averaged. The ECU used for each canonical metric comes from an explicit validated mapping in the vehicle profile; other responders are kept with their provenance. If the responder cannot be established the result is `ambiguous` (§6) and is excluded from ECU-specific diagnostics (§10).
 
 ## 6. Canonical vehicle metric schema
 
@@ -164,11 +181,13 @@ Suggested fields:
 | `unit` | Canonical unit, e.g. `rpm`, `km/h`, `kPa`, `degC`; null for categorical values |
 | `observed_at` | UTC time of acquisition (display, export, cross-device correlation) |
 | `monotonic_ns` | Monotonic acquisition time within a recording epoch (ordering, durations, recorder windows) |
+| `epoch_id` | Recording epoch of `monotonic_ns` (see Time); monotonic values are never compared across epochs |
 | `received_at` | Optional processing timestamp (server-side in Phase 2) |
 | `source` | `obd2`, `oem_api`, `ev_bms`, etc. |
-| `source_address` | Responding ECU address (`EcuAddress`); required for `obd2` |
+| `source_address` | Responding ECU address (`EcuAddress`); required for `obd2` unless `attribution` is `ambiguous`, then null |
+| `attribution` | `attributed` or `ambiguous` (samples and `DtcRecord`) |
 | `protocol` | OBD mode/PID or OEM protocol identifier |
-| `quality` | `valid`, `estimated`, `stale`, `unavailable`, `unsupported`, `error` |
+| `quality` | `valid`, `estimated`, `stale`, `unavailable`, `unsupported`, `error`, `ambiguous` |
 | `stale_after_ms` | Per-metric age limit; a sample is stale when its monotonic age exceeds it |
 | `sample_interval_ms` | Effective acquisition interval |
 | `origin` | `raw` or `derived` |
@@ -176,13 +195,15 @@ Suggested fields:
 | `adapter_id` | Optional pseudonymous adapter identifier |
 | `decoder_version` | Reproducibility and compatibility (raw decoding) |
 
-**Quality and values.** `unavailable`, `unsupported` and `error` samples carry a null `value` (never zero). A `stale` sample keeps its last value but is not used for diagnosis. Diagnoses use only `valid` inputs (and `estimated` where a rule says so).
+**Quality and values.** `unavailable`, `unsupported` and `error` samples carry a null `value` (never zero). A `stale` sample keeps its last value but is not used for diagnosis. Diagnoses use only `valid` inputs (and `estimated` where a rule says so). An `ambiguous` sample (responder not established, null `source_address`) keeps its decoded value, is never `valid`, and is excluded from ECU-specific diagnostics and from any merging or averaging.
 
-**Time.** Ordering, durations and recorder windows use `monotonic_ns`; the wall clock is for display and export. Define whether acquisition time is request start or response completion, and keep request/response timing where it expresses uncertainty. A reconnect or recording-epoch change invalidates prior live inputs. Test a backwards UTC clock change.
+**Time.** Ordering, durations and recorder windows use `monotonic_ns`; the wall clock is for display and export. `observed_at` and `monotonic_ns` are stamped at response completion, when the value becomes known; where the request-to-response interval expresses uncertainty, record `request_started_monotonic_ns` separately. All age and separation comparisons use the response-completion timestamp. A recording epoch is the interval in which the monotonic clock is continuous (process or device-boot lifetime); a process restart starts a new epoch, and records and `derivation` input refs carry `epoch_id`. A reconnect does not start a new epoch: it invalidates open live inputs and diagnostic windows and adds a gap marker, while stored ordering stays comparable. A resumed session may span epochs with a gap. Test a backwards UTC clock change.
 
-**DTCs are records, not samples.** `DtcRecord`: code, service (`03` stored, `07` pending, `0A` permanent; the three stay separate), `source_address`, first/last seen, occurrence count, MIL status, raw bytes. A DTC with no responder address is stored as `ambiguous` and excluded from diagnostic ranking. Freeze frames (Mode 02) are outside Phase 1 *(provisional — FB-D2)*; if added they name Mode 02 and link to the triggering DTC. Exports carry a versioned manifest and redact VIN and adapter identifiers unless the user chooses otherwise.
+**DTCs are records, not samples.** `DtcRecord`: code, service (`03` stored, `07` pending, `0A` permanent; the three stay separate), `source_address`, `attribution`, first/last seen, occurrence count, MIL status, raw bytes. A DTC with no responder address is stored with `attribution=ambiguous` and a null `source_address`, and is excluded from diagnostic ranking. Each DTC is two bytes decoded to the five-character form: bits A7–A6 of the first byte are the category (00 P, 01 C, 10 B, 11 U) and the remaining 14 bits are the four hex digits. `0000` padding pairs in a response are not records. `mil_on` is copied from the same responder's Mode `01` PID `01` bit A7, not from the service `03` payload. `occurrence_count` is how many recordings of this vehicle and responder observed the code; it is not read from the ECU, and PID `01` bits A6–A0 (the module's stored-code count) are not stored as it.
 
-**Derived metrics.** Derived samples are marked `origin=derived` with the formula version and inputs. Gauge manifold pressure = PID `0B` (MAP) − PID `33` (barometric), both kPa, only when both inputs are `valid`, from the same `source_address`, within the declared maximum time separation, and the engine is known to be running; otherwise the derived sample is `unavailable` with a null value. The result is signed (negative = vacuum). It is intake-manifold gauge pressure, not turbocharger-outlet pressure, and not a confirmed fault. If PID `33` is not supported, no estimate is produced and no constant is substituted.
+**Diagnostic events.** `DiagnosticEvent`: event id, session id, rule id and version, status (`insufficient_data | hypothesis | confirmed`), input refs with ages and `source_address`, confidence, pre/post window range or sample refs, created timestamps. Flight-recorder windows (§8) are keyed to the event id, and exports include events with their window references. Freeze frames (Mode 02) are outside Phase 1 *(provisional — FB-D2)*; if added they name Mode 02 and link to the triggering DTC. Exports carry a versioned manifest and redact VIN and adapter identifiers unless the user chooses otherwise.
+
+**Derived metrics.** Derived samples are marked `origin=derived` with the formula version and inputs. Gauge manifold pressure = PID `0B` (MAP) − PID `33` (barometric), both kPa, only when both inputs are `valid`, from the same `source_address`, and within the declared maximum time separation (no engine-state condition: with the engine off, MAP equals ambient and the result is a correct reading); otherwise the derived sample is `unavailable` with a null value. The result is signed (negative = vacuum). It is intake-manifold gauge pressure, not turbocharger-outlet pressure, and not a confirmed fault. If PID `33` is not supported, no estimate is produced and no constant is substituted.
 
 **Sessions.** A session is a recording of drive data between a start and an end, with `started_at`, `ended_at`, `end_reason` and gap markers. A DTC-only read with the engine off is a `diagnostic_read`, not a drive session. Interim Phase 1 rule *(provisional — FB-D4)*: a session starts when the user starts a recording on a connected adapter and ends when the user stops it, the adapter disconnects beyond the reconnect grace period, or the recording service stops; a reconnect within the grace period resumes the same session with a gap marker. Charging sessions are a Phase 3 concern.
 
@@ -192,9 +213,9 @@ Maintain a separate **vehicle specification/profile** (make/model/year/engine, s
 
 - Poll only discovered supported PIDs; do not assume all can be sampled at 1 Hz simultaneously.
 - **Discovery:** read Mode 01 PID `00` and follow the bitmap pages (`20`, `40`, …) only while the next-range bit is set, per responding ECU. Classify each PID `supported | unsupported | unknown | adapter_error`; a set bit means supported for that ECU. Show `unknown` in the UI rather than "not supported".
-- A single `NO DATA`, timeout or `7F` sets that sample's quality to `unavailable` or `error` and leaves the capability record unchanged for the session. Re-run discovery on adapter change, protocol change, reconnect after a vehicle power cycle, or a configurable number of consecutive misses; cache per adapter + firmware + protocol + ECU.
+- A single `NO DATA`, timeout or `7F` sets that sample's quality to `unavailable` or `error` and leaves the capability record unchanged for the session. Re-run discovery on adapter change, protocol change, reconnect after a vehicle power cycle, or a configurable number of consecutive misses; cache per `vehicle_id` + adapter + firmware + protocol + ECU, and re-run discovery when the selected vehicle changes. Cached capabilities are hints until validated for the current vehicle connection; if the connection cannot be reliably associated with the cached vehicle, discover anew rather than reuse the cache as authoritative.
 - Schedule fast-changing metrics (RPM, MAP, throttle) more frequently than temperatures or static status.
-- Measure actual adapter/ECU round-trip latency and adjust polling to avoid overload. With the ELM327 default 200 ms response wait, about 4 queries/s is the ceiling; shorter timeouts and expected-response counts are part of adapter validation.
+- Measure actual adapter/ECU round-trip latency and adjust polling to avoid overload. With the ELM327 default 200 ms response wait, about 4 queries/s is the ceiling; shorter timeouts and expected-response counts are part of adapter validation, under the count and timeout rules in §5.
 - Use bounded queues and record dropped sample counts; never let network upload block the OBD polling loop.
 - Stop or throttle acquisition when disconnected or under restrictive power/thermal conditions; throttling below the flight-recorder floor (§8) is recorded as a gap.
 - **Connection resilience (Phase 1, mandatory):** Bluetooth Classic (RFCOMM) links can drop or stall on lifecycle changes. Provide a connection watchdog, a lifecycle-aware foreground service (§4) and automatic reconnection with backoff, so a drop never freezes the UI or silently loses data.
@@ -212,7 +233,7 @@ Maintain a separate **vehicle specification/profile** (make/model/year/engine, s
 
 These are **starting policies, not guarantees**: effective rate depends on OBD throughput, bandwidth, power, user settings, and backend cost. Network type alone is not a reliable indicator of available bandwidth; use observed performance and metering status.
 
-**Flight recorder:** configurable ring buffer, initially 30 seconds before and 60 seconds after a detected anomaly, retaining high-resolution data locally. The buffer stores every locally accepted sample, independent of upload policy; "high-resolution" means the local acquisition rate. Anomaly-relevant metrics (RPM, MAP, throttle, fuel trims) have a minimum local acquisition floor *(provisional rate, e.g. ≥1 Hz — FB-D6)*; windows containing a gap are marked so diagnostics do not treat them as continuous. Use bounded storage and avoid automatic upload without consent.
+**Flight recorder:** configurable ring buffer, initially 30 seconds before and 60 seconds after a detected anomaly, retaining high-resolution data locally. The buffer stores every locally accepted sample, independent of upload policy; "high-resolution" means the local acquisition rate. Anomaly-relevant metrics (RPM, MAP, throttle, fuel trims) have a minimum local acquisition floor *(provisional rate, e.g. ≥1 Hz — FB-D6)*; windows containing a gap are marked so diagnostics do not treat them as continuous. Each window is keyed to its `DiagnosticEvent` id (§6). Use bounded storage and avoid automatic upload without consent.
 
 ## 9. Payload and storage budgeting
 
@@ -239,11 +260,11 @@ Plan a simulator/benchmark with configurable metric count, rates, event frequenc
 - Gate premium UI/export/analysis at the feature layer; keep the canonical telemetry schema independent of subscription logic.
 - Avoid collecting telemetry before consent or when a user has disabled the module.
 - Define what happens to existing locally stored data if the subscription expires (recommended: user can still export/delete their data).
-- **Consent and deletion reach the queues.** Check current cloud consent and account/vehicle ownership when dispatching every batch, including retries. Revoking consent, disabling the module or deleting telemetry stops new dispatches, cancels pending retries and attempts to cancel in-flight transfers, and discards the matching samples in the database, the in-memory ring and the durable upload queue, so reconnect or retry cannot recreate deleted data. Already accepted uploads require the cloud deletion flow, which must be disclosed. Local recordings remain under the user's local policy. A later opt-in states explicitly whether historical local recordings are eligible for upload. Test revoke-while-offline then reconnect, and deletion with a pending retry.
+- **Consent and deletion reach the queues.** Check current cloud consent and account/vehicle ownership when dispatching every batch, including retries. Revoking upload consent stops new dispatches, cancels pending retries, attempts to cancel in-flight transfers and invalidates matching upload-queue entries; retained local recordings remain subject to the user's local policy. Disabling the module also stops acquisition without implicitly deleting retained recordings. An explicit telemetry-deletion request removes the requested records from local storage, the in-memory ring and pending upload copies, and prevents retries from recreating them. Already accepted uploads require the cloud deletion flow, which must be disclosed. A later opt-in states explicitly whether historical local recordings are eligible for upload. Test revoke-while-offline then reconnect (local recordings stay exportable and no revoked batch is dispatched), and, separately, deletion with a pending retry.
 
 ## 12. Security, privacy, and safety
 
-- **Read-only is enforced.** The framing layer, before `ObdTransport.exchange`, sends only an explicit allowlist: OBD services `01`, `03`, `07`, `0A` (plus `02`/`09` only if FB-D2 adds them) and the adapter-local commands needed to connect and enable response headers. Anything else is dropped and logged as an error, never passed to the adapter. In particular service `04` (clear DTCs and stored data, MIL off), service `08` (control of on-board components), UDS write/routine services and arbitrary raw CAN frames are rejected, from every caller including debug tools and user controls. Test that a forbidden service is rejected. Manual DTC clearing is not part of this module (FB-D3).
+- **Read-only is enforced.** The framing layer, before `ObdTransport.exchange`, sends only an explicit allowlist: OBD services `01`, `03`, `07`, `0A` (plus `02`/`09` only if FB-D2 adds them) and a fixed, reviewed set of adapter-local commands: adapter identification/version query, echo and line-ending configuration, protocol identification and try-protocol (`AT TP`), response headers on, CAN header and receive-address filter (for physical addressing), and response timeout and expected-response count. Adapter commands that write adapter EEPROM or programmable parameters (including set-protocol `AT SP`), enter an unsolicited monitor mode, or replace the wakeup/keepalive message are outside the set; the app sends no wakeup-message command and defines no periodic message (the chip's own default ISO 9141/14230 keepalive may occur, its payload is not replaced). No adapter command may carry a vehicle service byte outside the OBD allowlist. Anything else is dropped and logged as an error, never passed to the adapter. In particular service `04` (clear DTCs and stored data, MIL off), service `08` (control of on-board components), UDS write/routine services and arbitrary raw CAN frames are rejected, from every caller including debug tools and user controls. Test that a forbidden service is rejected and that every allowed adapter command is in the set. Manual DTC clearing is not part of this module (FB-D3).
 - Pair only with a user-approved adapter and protect credentials/keys using Android platform facilities.
 - TLS and authenticated ingestion in Phase 2; avoid VIN/location exposure unless necessary and consented.
 - Explicit choices for local-only vs cloud upload, retention, data deletion, and sharing.
@@ -263,7 +284,7 @@ Evaluate actual capabilities, maintenance status, licensing, and Android compati
 
 ## 14. Acceptance criteria
 
-**Phase 1** is complete when a supported Android device can pair with a validated adapter, discover available PIDs per ECU, stream and display at least five supported live signals, record a trip offline, read available DTCs, export a recording (with DTC records), and recover gracefully from disconnection. Unsupported PIDs must be clearly represented. Measurable targets *(provisional values — FB-D6, to be set from the §15 item 3 benchmark)*: five signals at ≥1 Hz for 10 minutes with ≥95% of expected samples, reconnection within 10 seconds, achieved per-PID rate and drop count reported. Replay fixtures with two ECUs returning different support bitmaps, conflicting values and interleaved multiline responses must show that ECU attribution survives storage and export; a test confirms forbidden services are never sent.
+**Phase 1** is complete when a supported Android device can pair with a validated adapter, discover available PIDs per ECU, stream and display at least five supported live signals, record a trip offline, read available DTCs, export a recording (with DTC records), and recover gracefully from disconnection. Unsupported PIDs must be clearly represented. Measurable targets *(provisional values — FB-D6, to be set from the §15 item 3 benchmark)*: five signals at ≥1 Hz for 10 minutes with ≥95% of expected samples, reconnection within 10 seconds, achieved per-PID rate and drop count reported. Replay fixtures with two ECUs returning different support bitmaps, conflicting values and interleaved multiline responses, a positive and a negative (including `7F xx 78` pending) outcome in the same exchange, and one unattributed (`ambiguous`) reply must show that ECU attribution survives storage and export and that no ECU is dropped by a count or timeout; a `DiagnosticEvent` survives storage and export with its rule version; a test confirms forbidden services are never sent.
 
 **Phase 2** is complete when the user can opt in to authenticated cloud sync, queued samples survive offline operation and reconnect, dashboards show received data, bandwidth/retention limits are enforced, and data can be deleted per policy, including queued copies. Upload must not interrupt acquisition.
 
@@ -277,6 +298,6 @@ Evaluate actual capabilities, maintenance status, licensing, and Android compati
 6. Benchmark JSON versus OTLP/protobuf with batching and compression using realistic samples.
 7. Only then choose Phase 2 backend retention, metric aggregation, ingestion cost, and sync policy.
 
-HUMAN decisions FB-D1 to FB-D6 are tracked in `reviews/round-1/CONSOLIDATION.md`.
+HUMAN decisions FB-D1 to FB-D6 are tracked in `reviews/round-2/CONSOLIDATION.md`.
 
 **Recommendation:** keep Phase 1 local-only, but define the `TelemetryExporter` interface and stable metric schema immediately so cloud support can be added without reworking acquisition or vehicle models.

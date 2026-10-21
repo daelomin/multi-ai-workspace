@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/obd2-plugin/spec.md`, `projects/fuelbuddy/obd2-plugin/reviews/round-2/CONSOLIDATION.md`, `projects/fuelbuddy/obd2-plugin/README.md`, `CHANGELOG.md`
+**Change:** Consolidated obd2-plugin round 2 (CHATGPT 3, DEEPSEEK 7, GROK 8 findings; all minor) into spec v0.3. Added an `ObdExchange` result with per-responder outcomes, response-pending (`7F xx 78`) handling, a normalised payload boundary, echoed-PID identity, expected-response count rule, per-protocol responder identity, progress-line and `LV RESET` handling, a closed adapter-command set (no `AT SP`, EEPROM writes or wakeup messages), an `ambiguous` quality and `attribution` field, response-completion timestamps, a defined recording epoch with `epoch_id`, a `DiagnosticEvent` record, DTC decoding/MIL/occurrence rules, a vehicle-scoped capability cache, and upload-revocation versus local-deletion wording. Removed the undefined engine-running precondition from the gauge-pressure derivation. README now says the review converged at round 2 on v0.3.
+**Remaining:** Round 2 had no blocking or major finding, so this was the last round. HUMAN decisions FB-D1 to FB-D6 are carried forward in `CONSOLIDATION.md`; none was decided. GROK served-model is unverified (provider reported none).
+**Verification:** Read README, spec v0.2, round-1 consolidation and the three round-2 reviews. Reviewers' external facts (ELM327 datasheet, Wikipedia PID table) were not re-checked. Edited only the four allowed files; no git commands run.
+
+## 2026-10-21
 **Agent:** GROK
 **Files:** `projects/fuelbuddy/obd2-plugin/reviews/round-2/GROK.md`, `CHANGELOG.md`
 **Change:** Reviewed local obd2-plugin spec v0.2 for round 2 after the round-1 reviews and consolidation. Recorded 0 blocking, 0 major and 8 minor findings: an ELM327 expected-response count is a maximum and returns early, so it can drop later ECUs; `7F xx 78` is response-pending and must not finish the exchange; headers-on leaves the ISO-TP PCI byte ahead of the service byte; responder identity is specified only for 11-bit `7E8`–`7EF`; a service `01` payload is valid only when the echoed PID matches, including multi-PID replies whose order need not match the request; DTC padding, MIL, and occurrence count are not defined on the mode `03` payload; `SEARCHING...` is progress text while `LV RESET` is a missing failure word; `AT SP` writes EEPROM and `AT WM` can put a non-allowlisted service on the bus.

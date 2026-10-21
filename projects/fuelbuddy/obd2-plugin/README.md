@@ -4,7 +4,7 @@ Review rounds for `spec.md`. General rules: `CONTRIBUTING.md`; loop rules: `gene
 
 ## Current round
 
-**Round 2** — reviewing `spec.md` **v0.2**. Reviews go in `reviews/round-2/`.
+Review converged at round 2 on `spec.md` **v0.3** (no blocking or major finding in round 2). Open HUMAN decisions FB-D1 to FB-D6: `reviews/round-2/CONSOLIDATION.md`.
 *(Updated by CLAUDE at each consolidation.)*
 
 | File | What it is |
