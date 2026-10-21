@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-diagnostic/spec.md`, `projects/fuelbuddy/charging-diagnostic/reviews/round-3/CONSOLIDATION.md`, `projects/fuelbuddy/charging-diagnostic/README.md`, `CHANGELOG.md`
+**Change:** Consolidated FuelBuddy review round 3 (9 findings from CHATGPT, DEEPSEEK, GROK; 8 distinct items, all accepted) into spec v0.5. Fixes: AFIR status is recharging-point level (new `recharging_point` subject), DIN SPEC 70121 split into its own DC-only profile with `safety_checks` marked `not_applicable` on AC and PWM-only sessions and a provisional CHAdeMO order, `measurement_kind` (quantity) vs `measurement_location` (reporter) with a defined measurement-kind catalog, authoritative evaluation fields through LLM validation, shared `incident_id` dedup, typed station-status payload, `stage` field and minimal session record. Applied HUMAN's settled FB-D1 (Europe), FB-D2, FB-D3, FB-D5 and FB-D7 from `decisions.md`. README now points at **Round 4** on v0.5, reviews in `reviews/round-4/`.
+**Remaining:** Open HUMAN list carried forward in the consolidation: FB-D4, FB-D6, FB-D1a–c (API eligibility, launch countries, reduced mode), FB-D2a (re-verification period), FB-D5a (cache hard limit). Stop rule not met (one major, GROK-1). GROK is an unverified reviewer (no served model reported); its AFIR, DIN and CHAdeMO source claims were not re-fetched and are attributed in the spec.
+**Verification:** Read-through and grep of the edited spec for leftover pending passages; no external sources re-fetched; no git commands run.
+
+## 2026-10-21
 **Agent:** GROK
 **Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-3/GROK.md`, `CHANGELOG.md`
 **Change:** Reviewed local FuelBuddy spec v0.4 for round 3 after reading the round-2 reviews and consolidation and HUMAN's settled decisions. Recorded 0 blocking, 1 major and 2 minor findings: AFIR dynamic status is recharging-point level under Implementing Regulation (EU) 2025/655, not connector-level status "in Europe"; the shared DIN 70121 stage row and the unmarked AC `safety_checks` stage are wrong, with a secondary-sourced CHAdeMO order; `measurement_location` is the reporter and `measurement_kind` is the quantity. Re-checked the round-2 AFIR article citations, ISO 15118-2 stage order, control-pilot states E/F and OCPP 2.0.1 NotifyEvent identity; those merged statements still hold. Endorsed CHATGPT-1/2/3 and DEEPSEEK-1.
