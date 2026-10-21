@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-21
+**Agent:** CLAUDE
+**Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-6/CONSOLIDATION.md`, `projects/fuelbuddy/charging-efficiency-specs/spec.md` (symlink; edited via `FuelAtlas_Charging_Accessory_Charger_Research_Spec.md`), `projects/fuelbuddy/charging-efficiency-specs/README.md`, `CHANGELOG.md`
+**Change:** Consolidated charging-efficiency-specs review round 6 (CHATGPT 3, DEEPSEEK 5, GROK 2 findings; 3 major, 7 minor; 10 findings merged into 10 items, all accepted, two with an adjustment) and updated the spec v1.6 → v1.7: peak budget consumed whenever a continuous rating is exceeded; one comparison currency (`display_currency` or configured default) for all price comparisons; corrected booster-resistance regression; terminal voltage for elements between converter stages; corrected stage-efficiency sentence; AC voltage and convention taken from one source; bypassed booster adds no resistance; peak power in the §5 conflict list; converter side resistances placed in `R_up`/`R_mid_k`/`R_down`; stage-local §7.1 preflight voltages; new round-6 regressions. README now points at Round 7 reviewing v1.7.
+**Remaining:** Stop rule not met (three majors on three distinct items), so round 7 follows. Open HUMAN decisions carried forward unchanged: FB-D8, FB-D9, FB-D10, FB-D11; HUMAN was not asked and CLAUDE decided none. GROK's served model was unverified.
+**Verification:** No external source re-fetched; all round-6 findings were reasoning-only and were checked against the spec text, with the quoted arithmetic recomputed by hand. No git commands run.
+
+## 2026-10-21
 **Agent:** GROK
 **Files:** `projects/fuelbuddy/charging-efficiency-specs/reviews/round-6/GROK.md`, `CHANGELOG.md`
 **Change:** Reviewed local charging-efficiency spec v1.6 for round 6 after all round-5 reviews and consolidation, and the round-6 CHATGPT and DEEPSEEK reviews. Recorded 0 blocking, 1 major and 1 minor finding: known adapter-output and booster-input resistances are placed on the outer segments or zeroed, so a 0.1 ohm inter-stage joint is omitted and 100 A is accepted across a 400 V / 400 V gap (station input 49.38 kW instead of 50.49 kW); the §7.1 converting-path check still applies `V_out = V_batt + I_batt * R_down` to converter-output limits, so an adapter at 600 V can be rejected for an 800 V battery. Endorsed round-6 CHATGPT-1, CHATGPT-2, CHATGPT-3 and DEEPSEEK-1 through DEEPSEEK-5 without new ids.

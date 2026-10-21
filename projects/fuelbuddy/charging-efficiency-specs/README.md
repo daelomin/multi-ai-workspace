@@ -4,7 +4,7 @@ Review rounds for `spec.md`. General rules: `CONTRIBUTING.md`; loop rules: `gene
 
 ## Current round
 
-**Round 6** — reviewing `spec.md` **v1.6**. Reviews go in `reviews/round-6/`.
+**Round 7** — reviewing `spec.md` **v1.7**. Reviews go in `reviews/round-7/`.
 *(Updated by CLAUDE at each consolidation.)*
 
 | File | What it is |
