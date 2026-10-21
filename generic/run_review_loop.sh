@@ -20,21 +20,24 @@ PROJECT="$1"; NAME="$2"; shift 2
 if [ "$#" -eq 2 ]; then BRANCH="$1"; shift; else BRANCH="agent/loop/$(printf '%s' "$NAME" | tr '[:upper:]' '[:lower:]')-review"; fi
 PROJECT_ARGS=(--project "$PROJECT" --name "$NAME" --branch "$BRANCH")
 
-# FAST=1 -> Codex Fast service tier (about 2x speed, 2x price) and Grok 4.7 high-fast.
+# FAST=1 -> Codex Fast service tier (about 2x speed, 2x price) and Grok 4.7 medium-fast.
 # DeepSeek and the Anthropic consolidator have no fast variant, so they are unchanged.
 if [ "${FAST:-0}" = "1" ]; then
-  export GROK_MODEL="${GROK_MODEL:-grok-4.7-high-fast}"
+  export GROK_MODEL="${GROK_MODEL:-grok-4.7-medium-fast}"
   export CODEX_SERVICE_TIER="${CODEX_SERVICE_TIER:-fast}"
 fi
 
 # --- configuration (override by exporting before running) ---
-export GROK_MODEL="${GROK_MODEL:-grok-4.7-high}"
-export DEEPSEEK_MODEL="${DEEPSEEK_MODEL:-deepseek-v4-pro}"
+export GROK_MODEL="${GROK_MODEL:-grok-4.7-medium}"
+export DEEPSEEK_MODEL="${DEEPSEEK_MODEL:-deepseek-flash}"
 export DEEPSEEK_SMALL_MODEL="${DEEPSEEK_SMALL_MODEL:-deepseek-flash}"
+# Effort level of every backend (low|medium|high|xhigh|max); Grok's is part of its model name above.
+export DEEPSEEK_EFFORT="${DEEPSEEK_EFFORT:-medium}"
+export CONSOLIDATOR_EFFORT="${CONSOLIDATOR_EFFORT:-medium}"
 export CLAUDE_CONSOLIDATOR_MODEL="${CLAUDE_CONSOLIDATOR_MODEL:-claude-sonnet-5-5}"
 export ANTHROPIC_CLAUDE_CONFIG_DIR="${ANTHROPIC_CLAUDE_CONFIG_DIR:-$HOME/.claude-anthropic}"
 export CURSOR_AGENT_BIN="${CURSOR_AGENT_BIN:-$(command -v cursor-agent || command -v agent || echo cursor-agent)}"
-export CODEX_EXTRA_ARGS="${CODEX_EXTRA_ARGS:--c sandbox_workspace_write.network_access=true}"
+export CODEX_EXTRA_ARGS="${CODEX_EXTRA_ARGS:--c sandbox_workspace_write.network_access=true -c 'model_reasoning_effort=\"medium\"'}"
 export DEEPSEEK_ACCEPT_UNVERIFIED="${DEEPSEEK_ACCEPT_UNVERIFIED:-0}"   # decision D2: default refuse
 export REVIEW_MAX_ROUNDS="${REVIEW_MAX_ROUNDS:-5}"
 REVIEWERS="${REVIEWERS:-CHATGPT,DEEPSEEK,GROK}"

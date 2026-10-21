@@ -30,6 +30,69 @@ class ValidateReview(unittest.TestCase):
         self.assertIn("contradictory", rl.validate_review(GOOD + "Findings: none\n"))
 
 
+class Timing(unittest.TestCase):
+    def test_fmt_duration(self):
+        self.assertEqual([rl.fmt_duration(x) for x in (4, 91, 477, 3725)], ["4s", "1m31s", "7m57s", "1h02m05s"])
+
+    def test_timed_writes_start_then_end_and_marks_failure(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(rl, "LOG_DIR", Path(d)):
+            with rl.timed(3, "GROK"):
+                self.assertNotIn("end", json.loads((Path(d) / "r3-grok.timing.json").read_text()))
+            t = json.loads((Path(d) / "r3-grok.timing.json").read_text())
+            self.assertTrue(t["ok"] and "seconds" in t and "end" in t)
+            with self.assertRaises(RuntimeError), rl.timed(3, "CLAUDE"):
+                raise RuntimeError("boom")
+            self.assertFalse(json.loads((Path(d) / "r3-claude.timing.json").read_text())["ok"])
+
+
+class StepConfig(unittest.TestCase):
+    def test_models_efforts_tiers(self):
+        with mock.patch.object(rl, "GROK_MODEL", "grok-4.7-high-fast"), mock.patch.object(rl, "DEEPSEEK_MODEL", "deepseek-flash"), \
+                mock.patch.object(rl, "DEEPSEEK_EFFORT", ""), mock.patch.object(rl, "CONSOLIDATOR_EFFORT", "high"), \
+                mock.patch.object(rl, "CODEX_SERVICE_TIER", "fast"), \
+                mock.patch.object(rl, "CODEX_EXTRA_ARGS", ["-c", 'model_reasoning_effort="high"']):
+            self.assertEqual(rl.step_config("GROK"), {"model": "grok-4.7-high-fast", "effort": "high", "tier": "fast"})
+            self.assertEqual(rl.step_config("DEEPSEEK"), {"model": "deepseek-flash", "effort": "default", "tier": ""})
+            self.assertEqual(rl.step_config("CLAUDE")["effort"], "high")
+            c = rl.step_config("CHATGPT")
+            self.assertEqual((c["effort"], c["tier"]), ("high", "fast"))
+
+    def test_all_defaults_are_medium(self):
+        for agent in ("CHATGPT", "DEEPSEEK", "GROK", "CLAUDE"):
+            self.assertEqual(rl.step_config(agent)["effort"], "medium", agent)
+        self.assertIn('model_reasoning_effort="medium"', rl.CODEX_EXTRA_ARGS)
+
+    def test_codex_banner_is_what_actually_ran(self):
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "l.log"
+            f.write_text("$ codex exec\n--- stderr\nOpenAI Codex v1\n--------\nmodel: gpt-6.1-sol\nprovider: openai\n"
+                         "reasoning effort: medium\nsession id: x\n")
+            self.assertEqual(rl.codex_banner(f), {"model": "gpt-6.1-sol", "effort": "medium"})
+            self.assertEqual(rl.codex_banner(Path(d) / "missing"), {})
+
+    def test_timing_file_carries_config_and_reported_model(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(rl, "LOG_DIR", Path(d)):
+            with rl.timed(3, "DEEPSEEK") as t:
+                self.assertIn("model", json.loads((Path(d) / "r3-deepseek.timing.json").read_text()))
+                t.note(reported="deepseek-flash")
+            j = json.loads((Path(d) / "r3-deepseek.timing.json").read_text())
+            self.assertEqual((j["reported"], j["effort"]), ("deepseek-flash", rl.DEEPSEEK_EFFORT or "default"))
+
+    def test_effort_flag_passed_to_claude_code_only_when_set(self):
+        seen = []
+        def fake_run(args, **kw):
+            seen.append(args)
+            return subprocess.CompletedProcess(args, 0, stdout="{}", stderr="")
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(rl, "run", fake_run), \
+                mock.patch.object(rl, "ANTHROPIC_CONFIG_DIR", Path(d)):
+            with mock.patch.object(rl, "CONSOLIDATOR_EFFORT", "xhigh"):
+                rl._claude_once("ANTHROPIC", "p", Path(d), Path(d) / "l", 5, "m")
+            with mock.patch.object(rl, "CONSOLIDATOR_EFFORT", ""):
+                rl._claude_once("ANTHROPIC", "p", Path(d), Path(d) / "l", 5, "m")
+        self.assertEqual(seen[0][seen[0].index("--effort") + 1], "xhigh")
+        self.assertNotIn("--effort", seen[1])
+
+
 class DeepSeekProfile(unittest.TestCase):
     def test_deepseek_never_uses_the_default_claude_profile(self):
         seen = {}
@@ -144,7 +207,7 @@ class Provenance(unittest.TestCase):
             return rl.run_claude("DEEPSEEK", "p", Path(d), Path(d) / "l.log", 1)
 
     def test_verified(self):
-        r = self.run_ds({"deepseek-v4-pro": {}}, False)
+        r = self.run_ds({rl.DEEPSEEK_MODEL: {}}, False)
         self.assertTrue(r["_provenance"]["verified"])
 
     def test_empty_telemetry_needs_opt_in(self):

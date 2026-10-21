@@ -49,6 +49,7 @@ a{color:var(--blue)}
 const TOKEN = '__TOKEN__';
 const COLORS = {preflight: '#eab308', running: 'var(--green)', complete: 'var(--blue)', failed: 'var(--red)', pending: 'var(--grey)'};
 const chat = document.getElementById('chat'), dash = document.getElementById('dash');
+const dur = s => s == null ? '' : ' ' + (s >= 3600 ? Math.floor(s/3600) + 'h' + String(Math.floor(s%3600/60)).padStart(2,'0') + 'm' : s >= 60 ? Math.floor(s/60) + 'm' + String(Math.round(s%60)).padStart(2,'0') + 's' : Math.round(s) + 's');
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 async function api(name, body) {
@@ -74,7 +75,7 @@ async function refresh() {
         <b>${esc(l.name)}</b><span class="badge" style="background:${COLORS[l.status]}">${l.status}</span>
         <span class="note"> ${l.round ? 'round ' + l.round : ''} ${l.after ? '· after ' + esc(l.after) : ''}</span>
         <a style="float:right" target="_blank" href="http://127.0.0.1:8777/?run_id=review-loop-${esc(l.id)}">Open in Jarvis ↗</a><br>
-        ${(l.preflight ? [{name: 'PREFLIGHT', status: l.preflight.status}].concat((l.preflight.probes || []).map(x => ({name: 'probe ' + x.name, status: x.status}))) : []).concat(l.steps).map(x => `<span class="chip" style="background:${COLORS[x.status]}">${esc(x.name)}</span>`).join('')}
+        ${(l.preflight ? [{name: 'PREFLIGHT', status: l.preflight.status}].concat((l.preflight.probes || []).map(x => ({name: 'probe ' + x.name, status: x.status}))) : []).concat(l.steps).map(x => `<span class="chip" style="background:${COLORS[x.status]}" title="${esc([x.model, x.effort ? 'effort ' + x.effort : '', x.tier ? x.tier + ' tier' : '', x.reported && x.reported !== x.model ? 'served: ' + x.reported : ''].filter(Boolean).join(' · '))}">${esc(x.name)}${dur(x.seconds)}${x.model ? ' · ' + esc(x.model) + ' / ' + esc(x.effort || 'default') : ''}</span>`).join('')}
         ${l.detail ? `<div class="err">${esc(l.detail)}</div>` : ''}
         ${l.status === 'failed' ? (l.preflight && l.preflight.status === 'failed'
           ? `<button class="danger" onclick="rerunPreflight('${l.id}')">Re-run preflight</button> <span class="note">fix the key/login first, then re-run</span>`

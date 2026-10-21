@@ -118,6 +118,36 @@ class State(Base):
         self.assertEqual(n["r2-PREFLIGHT-GROK"]["status"], "failed")
         self.assertEqual(n["r2-PREFLIGHT"]["status"], "failed")
 
+    def test_step_durations(self):
+        p = self.project("a")
+        logs = p / "automation" / "logs"
+        (p / "reviews" / "round-2").mkdir()
+        (p / "reviews" / "round-2" / "CHATGPT.md").write_text(GOOD)
+        (logs / "r2-chatgpt.timing.json").write_text(json.dumps({"start": "2026-10-21T11:58:24", "end": "2026-10-21T11:59:55", "seconds": 91.0, "ok": True}))
+        start = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(time.time() - 125))
+        (logs / "r2-grok.timing.json").write_text(json.dumps({"start": start}))
+        with mock.patch.object(lm, "lock_holder", return_value=9), mock.patch.object(lm, "is_preflight", return_value=False):
+            s = lm.evaluate(self.loop("a"))
+        by = {x["name"]: x for x in s["steps"]}
+        self.assertEqual(by["CHATGPT"]["seconds"], 91.0)
+        self.assertTrue(120 <= by["GROK"]["seconds"] <= 135)  # running: time so far
+        self.assertEqual(lm.label("CHATGPT", 91.0), "CHATGPT 1m31s")
+        # engine died: a start-only file of a step that is not running shows no ticking time
+        s = lm.evaluate(self.loop("a"))
+        self.assertIsNone({x["name"]: x for x in s["steps"]}["GROK"]["seconds"])
+        (logs / "r2-chatgpt.timing.json").write_text(json.dumps({"start": "2026-10-21T11:58:24", "end": "x", "seconds": 91.0, "ok": True,
+            "model": "gpt-6.1-sol", "effort": "medium", "tier": "standard"}))
+        s = lm.evaluate(self.loop("a"))
+        self.assertEqual(lm.describe({"model": "m", "effort": "high", "tier": "fast", "reported": "m2"}),
+                         "m · effort high · fast tier · served: m2")
+        with mock.patch.object(lm, "JARVIS_DIR", self.root / "j"):
+            lm.write_jarvis([s])
+        g = json.loads((self.root / "j/memory/graph_review-loop-a.json").read_text())["nodes"]
+        self.assertIn("1m31s", g["r2-CHATGPT"]["name"])
+        self.assertIn("gpt-6.1-sol · effort medium", g["r2-CHATGPT"]["name"])
+        self.assertEqual(g["r2-CHATGPT"]["metadata"]["effort"], "medium")
+        self.assertEqual(g["r2-CHATGPT"]["metadata"]["duration_seconds"], 91.0)
+
     def test_is_preflight_reads_cmdline(self):
         import subprocess
         p = subprocess.Popen([sys.executable, "-c", "import time;time.sleep(5)", "--preflight"])
@@ -157,6 +187,30 @@ class State(Base):
             fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
             self.assertTrue(lm.lock_held(f))
         self.assertFalse(lm.lock_held(f))
+
+
+class Sound(Base):
+    def test_rings_once_when_a_consolidation_appears_not_on_first_look(self):
+        p = self.project("a", rounds=("round-1",))
+        loop = self.loop("a")
+        with mock.patch.object(lm, "OUT_DIR", self.root), \
+                mock.patch.object(lm, "play_sound") as ring:
+            self.assertEqual(lm.notify_consolidations([loop]), [])  # first look: records round 1, silent
+            self.assertEqual(lm.notify_consolidations([loop]), [])  # nothing new
+            (p / "reviews" / "round-2").mkdir()
+            (p / "reviews" / "round-2" / "CONSOLIDATION.md").write_text("x")
+            self.assertEqual(lm.notify_consolidations([loop]), ["a: round 2 consolidation finished"])
+            self.assertEqual(lm.notify_consolidations([loop]), [])  # rings once
+            ring.assert_called_once()
+            loop["sound"] = False
+            (p / "reviews" / "round-3").mkdir()
+            (p / "reviews" / "round-3" / "CONSOLIDATION.md").write_text("x")
+            self.assertEqual(lm.notify_consolidations([loop]), [])  # "sound": false in loops.json silences it
+
+    def test_sound_can_be_disabled_by_env(self):
+        with mock.patch.dict("os.environ", {"LOOP_MONITOR_SOUND": "0"}), mock.patch.object(lm.subprocess, "Popen") as po:
+            lm.play_sound("x")
+            po.assert_not_called()
 
 
 class Chaining(Base):

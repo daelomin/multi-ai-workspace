@@ -48,7 +48,7 @@ DECISIONS: Path = Path()
 LOG_DIR: Path = Path()
 NAME = ""
 BRANCH = ""
-DEEPSEEK_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-pro")
+DEEPSEEK_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-flash")
 DEEPSEEK_BASE_URL = "https://api.deepseek.com/anthropic"
 CLAUDE_MODEL = os.environ.get("CLAUDE_CONSOLIDATOR_MODEL", "claude-sonnet-5-5")
 # Claude Code profile that talks to Anthropic. ~/.claude points at DeepSeek on
@@ -61,14 +61,15 @@ ANTHROPIC_CONFIG_DIR = Path(
 DEEPSEEK_CONFIG_DIR = Path(
     os.environ.get("DEEPSEEK_CLAUDE_CONFIG_DIR", str(Path.home() / ".claude-deepseek"))
 ).expanduser()
-GROK_MODEL = os.environ.get("GROK_MODEL", "grok-4.7-high")
+GROK_MODEL = os.environ.get("GROK_MODEL", "grok-4.7-medium")
 CURSOR_REVIEW_MODEL = os.environ.get("CURSOR_REVIEW_MODEL", "auto")
 CURSOR_AGENT_BIN = os.environ.get(
     "CURSOR_AGENT_BIN", shutil.which("cursor-agent") or shutil.which("agent") or "cursor-agent"
 )
 STEP_TIMEOUT = int(os.environ.get("REVIEW_STEP_TIMEOUT", str(90 * 60)))
 CODEX_EXTRA_ARGS = shlex.split(
-    os.environ.get("CODEX_EXTRA_ARGS", "-c sandbox_workspace_write.network_access=true")
+    os.environ.get("CODEX_EXTRA_ARGS",
+                   "-c sandbox_workspace_write.network_access=true -c 'model_reasoning_effort=\"medium\"'")
 )
 CODEX_SESSIONS = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))) / "sessions"
 # USD per 1M tokens: (fresh input, cached input, cache write, output). Source:
@@ -177,6 +178,85 @@ def current_round() -> int:
 def spec_version() -> str:
     m = VERSION_RE.search(SPEC.read_text(encoding="utf-8")[:500])
     return m.group(1) if m else "?"
+
+
+def fmt_duration(seconds: float) -> str:
+    m, sec = divmod(int(round(seconds)), 60)
+    h, m = divmod(m, 60)
+    return f"{h}h{m:02d}m{sec:02d}s" if h else (f"{m}m{sec:02d}s" if m else f"{sec}s")
+
+
+EFFORT_RE = re.compile(r"\b(low|medium|high|xhigh|max)\b", re.I)
+CONSOLIDATOR_EFFORT = os.environ.get("CONSOLIDATOR_EFFORT", "medium").strip()
+DEEPSEEK_EFFORT = os.environ.get("DEEPSEEK_EFFORT", "medium").strip()
+
+
+def _codex_config_value(key: str) -> str:
+    try:
+        m = re.search(rf'^{key}\s*=\s*"([^"]+)"', (Path.home() / ".codex" / "config.toml").read_text(), re.M)
+    except OSError:
+        return ""
+    return m.group(1) if m else ""
+
+
+def step_config(agent: str) -> dict:
+    """Model, effort and tier a step is configured to run with ("default" = left to the tool)."""
+    if agent == "CHATGPT":
+        m = re.search(r'model_reasoning_effort="?(\w+)', " ".join(CODEX_EXTRA_ARGS))
+        return {"model": _codex_config_value("model") or "default",
+                "effort": (m.group(1) if m else _codex_config_value("model_reasoning_effort")) or "default",
+                "tier": CODEX_SERVICE_TIER or "standard"}
+    if agent == "DEEPSEEK":
+        return {"model": DEEPSEEK_MODEL, "effort": DEEPSEEK_EFFORT or "default", "tier": ""}
+    if agent in ("GROK", "CURSOR"):
+        model = GROK_MODEL if agent == "GROK" else CURSOR_REVIEW_MODEL
+        m = EFFORT_RE.search(model)
+        return {"model": model, "effort": m.group(1).lower() if m else "default",
+                "tier": "fast" if model.endswith("-fast") else ""}
+    return {"model": CLAUDE_MODEL, "effort": CONSOLIDATOR_EFFORT or "default", "tier": ""}  # CLAUDE
+
+
+def codex_banner(logfile: Path) -> dict:
+    """What Codex says it actually ran with (its startup banner)."""
+    try:
+        head = logfile.read_text(encoding="utf-8", errors="replace")[:4000]
+    except OSError:
+        return {}
+    out = {}
+    for key, name in (("model", "model"), ("reasoning effort", "effort")):
+        m = re.search(rf"^{key}:\s*(\S+)", head, re.M)
+        if m:
+            out[name] = m.group(1)
+    return out
+
+
+class timed:
+    """Time one step: writes automation/logs/r{n}-{step}.timing.json when it starts and again, with
+    end/seconds/ok, when it finishes or fails (read by generic/loop_monitor.py)."""
+
+    def __init__(self, n: int, step: str):
+        self.path = LOG_DIR / f"r{n}-{step.lower()}.timing.json"
+        self.n, self.step = n, step
+        self.info = step_config(step)  # configured model/effort/tier; note() adds what the backend reported
+
+    def note(self, **kw) -> None:
+        self.info.update({k: v for k, v in kw.items() if v})
+
+    def _write(self, **extra) -> None:
+        self.path.write_text(json.dumps({"start": self.start_iso, **self.info, **extra}), encoding="utf-8")
+
+    def __enter__(self):
+        self.t0 = time.time()
+        self.start_iso = time.strftime("%FT%T")
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        self._write()
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        secs = time.time() - self.t0
+        self._write(end=time.strftime("%FT%T"), seconds=round(secs, 1), ok=exc_type is None)
+        log(f"round {self.n}: {self.step} {'done' if exc_type is None else 'FAILED'} in {fmt_duration(secs)}")
+        return False
 
 
 def round_dir(n: int) -> Path:
@@ -325,6 +405,9 @@ def _claude_once(profile: str, prompt: str, root: Path, logfile: Path, timeout: 
             "--allowedTools", "Read,Write,Edit,Glob,Grep,WebFetch,WebSearch",
             "--disallowedTools", "Bash"]
     tmp = None
+    effort = DEEPSEEK_EFFORT if profile == "DEEPSEEK" else CONSOLIDATOR_EFFORT
+    if effort:
+        args += ["--effort", effort]
     if profile == "DEEPSEEK":
         key = deepseek_key()
         if not key:
@@ -636,21 +719,24 @@ def do_review(agent: str, n: int, root: Path) -> dict:
     prompt = review_prompt(agent, n)
     prov = {"requested": "default configuration", "reported": [], "verified": False,
             "note": "backend does not report the served model"}
-    if agent == "CHATGPT":
-        usage = run_codex(prompt, root, logfile, STEP_TIMEOUT)
-        if usage:
-            prov = {"requested": usage["model"], "reported": [usage["model"]] if usage["model"] else [],
-                    "verified": False, "note": "model from the Codex banner", "usage": usage}
-    elif agent == "DEEPSEEK":
-        prov = run_claude("DEEPSEEK", prompt, root, logfile, STEP_TIMEOUT)["_provenance"]
-    elif agent == "GROK":
-        run_cursor_agent(prompt, root, logfile, STEP_TIMEOUT, GROK_MODEL)
-        prov["requested"] = GROK_MODEL
-    elif agent == "CURSOR":
-        run_cursor_agent(prompt, root, logfile, STEP_TIMEOUT, CURSOR_REVIEW_MODEL)
-        prov["requested"] = CURSOR_REVIEW_MODEL
-    else:
-        raise SystemExit(f"no runner for reviewer {agent!r}")
+    with timed(n, agent) as t:
+        if agent == "CHATGPT":
+            usage = run_codex(prompt, root, logfile, STEP_TIMEOUT)
+            t.note(**codex_banner(logfile))
+            if usage:
+                prov = {"requested": usage["model"], "reported": [usage["model"]] if usage["model"] else [],
+                        "verified": False, "note": "model from the Codex banner", "usage": usage}
+        elif agent == "DEEPSEEK":
+            prov = run_claude("DEEPSEEK", prompt, root, logfile, STEP_TIMEOUT)["_provenance"]
+            t.note(reported=", ".join(prov.get("reported") or []))
+        elif agent == "GROK":
+            run_cursor_agent(prompt, root, logfile, STEP_TIMEOUT, GROK_MODEL)
+            prov["requested"] = GROK_MODEL
+        elif agent == "CURSOR":
+            run_cursor_agent(prompt, root, logfile, STEP_TIMEOUT, CURSOR_REVIEW_MODEL)
+            prov["requested"] = CURSOR_REVIEW_MODEL
+        else:
+            raise SystemExit(f"no runner for reviewer {agent!r}")
     if not path.exists():
         raise SystemExit(f"{agent} did not write {path}; see {logfile}")
     err = validate_review(path.read_text(encoding="utf-8"))
@@ -680,7 +766,9 @@ def do_consolidation(n: int, reviewers: list[str], converged: bool, root: Path,
     before = spec_version()
     log(f"round {n}: CLAUDE consolidating (spec v{before})")
     logfile = LOG_DIR / f"r{n}-claude.log"
-    run_claude("ANTHROPIC", consolidation_prompt(n, reviewers, converged, provenance), root, logfile, STEP_TIMEOUT)
+    with timed(n, "claude") as t:
+        res = run_claude("ANTHROPIC", consolidation_prompt(n, reviewers, converged, provenance), root, logfile, STEP_TIMEOUT)
+        t.note(reported=", ".join(res.get("_provenance", {}).get("reported") or []))
     if not path.exists():
         raise SystemExit(f"CLAUDE did not write {path}; see {logfile}")
     if spec_version() == before:

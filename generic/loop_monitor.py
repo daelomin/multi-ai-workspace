@@ -99,6 +99,41 @@ def read_json(path: Path) -> dict:
         return {}
 
 
+def step_info(logdir: Path, n: int, step: str) -> dict:
+    """Model, effort, tier and served model of a step, from the engine's timing file."""
+    t = read_json(logdir / f"r{n}-{step.lower()}.timing.json")
+    return {k: t[k] for k in ("model", "effort", "tier", "reported") if t.get(k)}
+
+
+def describe(x: dict) -> str:
+    """'deepseek-flash · effort default' (plus tier / served model when they differ)."""
+    if not x.get("model"):
+        return ""
+    bits = [x["model"], f"effort {x.get('effort', 'default')}"]
+    if x.get("tier"):
+        bits.append(f"{x['tier']} tier")
+    if x.get("reported") and x["reported"] != x["model"]:
+        bits.append(f"served: {x['reported']}")
+    return " · ".join(bits)
+
+
+def step_seconds(logdir: Path, n: int, step: str, state: str) -> float | None:
+    """Time a step took (from the engine's timing file); a running step shows the time so far."""
+    t = read_json(logdir / f"r{n}-{step.lower()}.timing.json")
+    if "seconds" in t:
+        return t["seconds"]
+    if state == "running" and t.get("start"):
+        try:
+            return max(0.0, time.time() - time.mktime(time.strptime(t["start"], "%Y-%m-%dT%H:%M:%S")))
+        except ValueError:
+            return None
+    return None
+
+
+def label(name: str, seconds: float | None) -> str:
+    return f"{name} {rl.fmt_duration(seconds)}" if seconds is not None else name
+
+
 def step_state(rdir: Path, logdir: Path, n: int, step: str, running: bool, first_open: bool) -> tuple[str, str]:
     """(state, detail) of one step of round n; `first_open` marks the step the loop is working on."""
     if step == "CLAUDE":
@@ -182,7 +217,8 @@ def evaluate(loop: dict) -> dict:
         state, detail = step_state(rdir, logdir, n, step, running, first_open is None)
         if state != "complete" and first_open is None:
             first_open = step
-        out["steps"].append({"name": step, "status": state, "detail": detail})
+        out["steps"].append({"name": step, "status": state, "detail": detail,
+                             "seconds": step_seconds(logdir, n, step, state), **step_info(logdir, n, step)})
     pf = preflight_state(logdir, n, pre_running)
     out["preflight"] = pf
     out["rounds"].append({"n": n, "steps": out["steps"], "preflight": pf})
@@ -266,8 +302,8 @@ def write_html(states: list[dict]) -> Path:
         pchips = "".join(f'<span class="chip" style="background:{COLORS[x["status"]]}" title="{html.escape(x["detail"])}">'
                          f'probe {html.escape(x["name"])}</span>' for x in (pf or {}).get("probes", []))
         chips = (f'<span class="chip" style="background:{COLORS[pf["status"]]}" title="{html.escape(pf["detail"])}">PREFLIGHT</span>'
-                 + pchips if pf else "") + "".join(f'<span class="chip" style="background:{COLORS[x["status"]]}" title="{html.escape(x["detail"])}">'
-                        f'{html.escape(x["name"])}</span>' for x in s["steps"]) or '<span class="muted">no steps</span>'
+                 + pchips if pf else "") + "".join(f'<span class="chip" style="background:{COLORS[x["status"]]}" title="{html.escape(x["detail"] or describe(x))}">'
+                        f'{html.escape(label(x["name"], x.get("seconds")))}</span>' for x in s["steps"]) or '<span class="muted">no steps</span>'
         after = f'<div class="muted">after {html.escape(s["after"])}</div>' if s["after"] else ""
         rnd = f'round {s["round"]}' if s["round"] else "—"
         cards.append(
@@ -317,11 +353,13 @@ def write_jarvis(states: list[dict]) -> None:
             for x in r["steps"]:
                 nid = f"r{r['n']}-{x['name']}"
                 last = x["name"] == "CLAUDE"
-                nodes[nid] = {"id": nid, "name": f"{s['name']} · round {r['n']} · {x['name']}",
+                nodes[nid] = {"id": nid, "name": " · ".join(filter(None, [f"{s['name']} · round {r['n']} · {label(x['name'], x.get('seconds'))}", describe(x)])),
                               "phase": "implement" if last else "validate", "description": nid,
                               "status": JARVIS_STATUS[x["status"]],
                               "depends_on": reviewers if last else ([gate] if gate else []),
-                              "error": x["detail"] or None, "metadata": {**meta, "round": r["n"]}}
+                              "error": x["detail"] or None,
+                              "metadata": {**meta, "round": r["n"], "duration_seconds": x.get("seconds"),
+                                           **{k: x[k] for k in ("model", "effort", "tier", "reported") if x.get(k)}}}
             prev = f"r{r['n']}-CLAUDE"
         (mem / f"graph_{run_id}.json").write_text(json.dumps({"run_id": run_id, "nodes": nodes}, indent=2), encoding="utf-8")
         entries = [{"timestamp": now, "run_id": run_id, "decision": "run_start", "message": s["name"]}]
@@ -330,6 +368,50 @@ def write_jarvis(states: list[dict]) -> None:
         elif s["status"] == "failed":
             entries.append({"timestamp": now, "run_id": run_id, "decision": "run_fail", "message": s["detail"]})
         (logs / f"run_{run_id}.jsonl").write_text("".join(json.dumps(e) + "\n" for e in entries), encoding="utf-8")
+
+
+SOUND_FILE = Path(os.environ.get("LOOP_MONITOR_SOUND_FILE", "/usr/share/sounds/freedesktop/stereo/complete.oga"))
+
+
+def consolidated_round(loop: dict) -> int:
+    """Highest round whose CONSOLIDATION.md exists (0 when none)."""
+    reviews = WORKSPACE / loop["project"] / "reviews"
+    return max((n for n in round_numbers(WORKSPACE / loop["project"]) if (reviews / f"round-{n}" / "CONSOLIDATION.md").is_file()), default=0)
+
+
+def play_sound(message: str) -> None:
+    """Sound + desktop notification on this machine; silent failure when there is no audio/desktop."""
+    if os.environ.get("LOOP_MONITOR_SOUND", "1") == "0":
+        return
+    for cmd in (["paplay", str(SOUND_FILE)], ["canberra-gtk-play", "-i", "complete"]):
+        try:
+            subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            break
+        except OSError:
+            continue
+    try:
+        subprocess.Popen(["notify-send", "Review loop", message], stdin=subprocess.DEVNULL,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError:
+        pass
+
+
+def notify_consolidations(loops: list[dict]) -> list[str]:
+    """Play the sound when a loop's consolidation finishes (a round gets its CONSOLIDATION.md).
+    The first look at a loop only records the current state, so old rounds never ring."""
+    notified = OUT_DIR / "notified.json"
+    seen = read_json(notified)
+    fired = []
+    for l in loops:
+        now = consolidated_round(l)
+        if l["id"] in seen and now > seen[l["id"]] and l.get("sound", True):
+            msg = f"{l['name']}: round {now} consolidation finished"
+            play_sound(msg)
+            fired.append(msg)
+        seen[l["id"]] = now
+    OUT_DIR.mkdir(exist_ok=True)
+    notified.write_text(json.dumps(seen), encoding="utf-8")
+    return fired
 
 
 def tick(loops: list[dict], do_launch: bool = True) -> list[dict]:
@@ -343,6 +425,8 @@ def tick(loops: list[dict], do_launch: bool = True) -> list[dict]:
         else:
             states[nxt["id"]]["detail"] = "due, but the git tree is not clean"
     ordered = [states[l["id"]] for l in loops]
+    if do_launch:  # only the watcher rings; `status` is read-only
+        notify_consolidations(loops)
     write_html(ordered)
     write_jarvis(ordered)
     return ordered
