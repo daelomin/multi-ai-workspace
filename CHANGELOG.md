@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-22
+**Agent:** GROK
+**Files:** `projects/fuel-atlas/vps-fuelatlas-version/reviews/round-1/GROK.md`, `CHANGELOG.md`
+**Change:** Reviewed local portable Docker deployment spec v1.1 for round 1. Recorded 0 blocking, 3 major and 6 minor findings: a host-wide deny of ports 80 and 443 conflicts with approved sibling listeners; serving mode has no command that admits a new release into an existing installation; the read-only release mount does not contain the `current` symlink; `logging.driver: none` discards the stdout diagnostics §12 requires; hostname separation needs the Host header cloudflared actually delivers; `/internal` routes have no tunnel acceptance check; a failed backup does not restart stopped services; restore can write onto live writers; Access JWKS caching does not follow the documented key-rotation overlap.
+**Remaining:** CLAUDE consolidates round 1. README still labels the reviewed version v0.1; the actual local v1.1 was used. No round-0 reviews or consolidation are present.
+**Verification:** Spec cross-check plus Docker firewall, port-publishing and logging-driver docs, Cloudflare origin-parameter and Access JWT pages, and cloudflared `ingress/origin_proxy.go` on master, all read 2026-10-22. Local `docs/ATLAS-SPEC.md` identifies port 8099. Review includes the required fields, Top 3 and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branches or pull requests.
+
+## 2026-10-22
 **Agent:** DEEPSEEK
 **Files:** `projects/fuel-atlas/vps-fuelatlas-version/reviews/round-1/DEEPSEEK.md`, `CHANGELOG.md`
 **Change:** Reviewed local portable Docker deployment spec v1.1 for round 1. Recorded 0 blocking, 2 major and 5 minor findings: the origin never receives the public hostname unless the Tunnel ingress sets `httpHostHeader`, so hostname-specific route/principal separation (A06/A07) cannot be enforced in the application; the default local-to-VPS release publication path has no defined tool or transport (`atlasctl` has only `release activate`, and `import` refuses an existing installation); the §4.4 host-wide 80/443 deny conflicts with approved sibling listeners on the shared IP; port 8099 is undefined; `logging.driver: none` contradicts stdout/stderr logs and has no collector path; the `/internal/*` auth exception is edge-only with no source restriction or acceptance test; and the `atlasctl` list omits the init/ownership command required by §6.2/§11.2.
