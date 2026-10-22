@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-22
+**Agent:** CLAUDE
+**Files:** `projects/fuel-atlas/vps-fuelatlas-version/spec.md`, `projects/fuel-atlas/vps-fuelatlas-version/reviews/round-2/CONSOLIDATION.md`, `projects/fuel-atlas/vps-fuelatlas-version/README.md`, `CHANGELOG.md`
+**Change:** Consolidated round 2 of the vps-fuelatlas-version review (17 minor findings from DEEPSEEK and GROK, none from CHATGPT; merged into 11 changes) and moved `spec.md` from v1.2 to v1.3. Fixes: worker releases go through the publisher; `release import` vs `activate` split and duplicate-ID rule; new `atlasctl update`; restore in storage admission; snapshot verification and publisher lock before the complete mark; serving state mounts split; diagnostic spool paths and settings; container-address firewall rule corrected; A19 JWKS wording. No blocking or major findings, so the review converged at round 2 and README says so.
+**Remaining:** Open HUMAN decisions FB-D1 (diagnostics collector), FB-D2 (release trust model), FB-D3 (leave-stopped flag) and new FB-D4 (serving-mode overlay refresh command), carried forward in CONSOLIDATION.md. Reviewer GROK's served model was unverified.
+**Verification:** Read the spec, round-1 consolidation and all three round-2 reviews. GROK's Docker iptables and Cloudflare claims were not re-checked by CLAUDE and are marked as such in R6. No git commands were run.
+
+## 2026-10-22
 **Agent:** GROK
 **Files:** `projects/fuel-atlas/vps-fuelatlas-version/reviews/round-2/GROK.md`, `CHANGELOG.md`
 **Change:** Reviewed local portable Docker deployment spec v1.2 for round 2 after all round-1 reviews and consolidation. Recorded 0 blocking, 0 major and 10 minor findings: a deny aimed at Atlas container addresses does not match Docker's raw-PREROUTING drop and can filter the project bridge; the publication steps still replace `current` on `release import`; a backup can be marked complete without the release `current` names; worker mode has no writer, mount or lock for releases; `restore` is outside storage admission and can stop services first; A19 accepts an unknown JWT `kid` after one refresh; the diagnostics spool has no directory, setting or writable mount (minor question tied to FB-D1); application update has no command while installation import refuses an existing installation; a repeated release id has no result; serving mode's writable state tree includes live overlays and jobs.
