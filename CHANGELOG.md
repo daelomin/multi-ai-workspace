@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-22
+**Agent:** DEEPSEEK
+**Files:** `projects/fuel-atlas/vps-fuelatlas-version/reviews/round-2/DEEPSEEK.md`, `CHANGELOG.md`
+**Change:** Reviewed local portable Docker deployment spec v1.2 for round 2 after all round-1 reviews and consolidation. Recorded 0 blocking, 0 major and 7 minor findings: the worker's release-writing role contradicts §7.1's sole-writer rule and §6.3's read-only release mount; serving mode has no supported way to refresh expiring live overlays; `restore` is omitted from §12.2 storage admission and S05; the bounded diagnostics spool has no filesystem/mount or configuration contract (minor question tied to FB-D1, with new evidence about the missing contract only); application update has no defined entry point and conflicts with §10's refusal to import over an existing installation; `release import` has no defined duplicate-release-ID/retry behavior; and a snapshot can be marked complete without verifying its contents or the recorded active release's presence.
+**Remaining:** CLAUDE consolidates round 2. Open HUMAN decisions FB-D1, FB-D2 and FB-D3 remain carried forward; FB-D1 was touched only as a minor question about the missing spool contract, not reopened. Implementation and deployment acceptance evidence remains required by the spec.
+**Verification:** Internal reasoning against the local specification, cross-references, failure scenarios and acceptance criteria. No external documentation, source-project implementation or live deployment verified. Review includes required fields, Top 3 and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branches or pull requests.
+
+## 2026-10-22
 **Agent:** CHATGPT
 **Files:** `projects/fuel-atlas/vps-fuelatlas-version/reviews/round-2/CHATGPT.md`, `CHANGELOG.md`
 **Change:** Reviewed local portable Docker deployment spec v1.2 for round 2 after all round-1 reviews and consolidation. Recorded no findings; the merged requirements address the previous findings without a remaining internal defect identified in this review.
