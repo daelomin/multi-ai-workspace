@@ -1,9 +1,11 @@
 # Fuel Atlas — portable Docker deployment specification
 
-Version 1.1 · 22 October 2026 · Status: implementation specification; no deployment performed
+Version 1.2 · 22 October 2026 · Status: implementation specification; no deployment performed
 author: CHATGPT - Astra medium
 
 ### Revision history
+
+Version 1.2 consolidates round-1 review (`reviews/round-1/CONSOLIDATION.md`). It corrects the release mount so the `current` pointer is visible, adds `atlasctl release import` and `atlasctl init`, defines request-to-release binding, restores services after failed or interrupted backups, makes restore stop the target installation's writers, replaces the host-wide 80/443 deny with an Atlas-scoped isolation rule, fixes the Host-header and `/internal` ingress rules, adds JWKS key-rotation handling and resolves the `logging.driver: none` contradiction. No new implementation or deployment evidence is claimed.
 
 Version 1.1 incorporates Astra’s conceptual review for multiple independent Docker applications on the same VPS. It supersedes v1.0 for implementation. The original source inspection and dataset measurements are unchanged; this revision adds requirements rather than claiming new implementation or deployment evidence.
 
@@ -113,7 +115,11 @@ App operations may start/stop or recreate only their own services. No daemon res
 
 Use owner-supplied hostnames such as `atlas.<domain>` for the private UI and `atlas-api.<domain>` for approved read clients. Both resolve to the named Tunnel, never to the VPS IP. The API hostname routes only an explicitly reviewed allowlist of read paths/methods. Other routes return 404/405 before handler execution.
 
-Host classification must use normalized, configured hostnames and not an arbitrary forwarded host header. Unknown hosts fail closed. Both hostnames may target `http://atlas-web:8088`; application middleware enforces route and principal separation.
+Host classification must use the normalized `Host` header delivered to `atlas-web`, compared with the configured hostnames. Ignore `X-Forwarded-Host` and any client-supplied forwarded-host header for classification. Unknown hosts fail closed. Both hostnames may target `http://atlas-web:8088`; application middleware enforces route and principal separation.
+
+The origin must receive the public hostname. For each public hostname, either show with the pinned connector version that the original `Host` is preserved, or set that ingress rule's `httpHostHeader` to exactly that hostname (never one shared value for both). Record the observed behavior in the deployment report. The edge also uses distinct Access applications/audiences, so hostname separation does not rest on the Host header alone.
+
+Each public hostname's ingress forwards application routes and SHALL NOT forward `/internal/` to `atlas-web`; both hostnames return 404 for `/internal/*`. Compose probes call `/internal/healthz` and `/internal/readyz` over the project network.
 
 No quick/temporary Tunnel in production. Use a remotely managed named Tunnel dedicated to this application and environment. Never share its token with a different application’s connector: connectors using the same Tunnel are replicas, not independent routes. All replicas of one Tunnel would need equivalent reachability and compatible state; cross-host replicas are outside the initial scope. Maintain a non-secret configuration inventory covering tunnel ID/name, published hostname/service mappings, Access application IDs/audiences, policies and DNS records. The Tunnel token alone does not reproduce Cloudflare-side configuration.
 
@@ -123,7 +129,7 @@ No quick/temporary Tunnel in production. Use a remotely managed named Tunnel ded
 - No `network_mode: host`, privileged mode or Docker socket mount.
 - `atlas-web` and `cloudflared` share a project-specific bridge, not unrelated application networks.
 - `cloudflared` needs outbound connectivity. Do not put it exclusively on an `internal: true` network that blocks its egress.
-- Web requires outbound access for Access JWKS and explicitly inventoried external service reads; workers require approved data-source connectivity. These are connectivity requirements, not a claim that a standard Docker bridge enforces destination allowlists. If restricted egress is required, the host runbook SHALL specify and test its firewall/proxy mechanism, DNS behavior and update procedure.
+- Web requires outbound access for Access JWKS and explicitly inventoried external service reads, including any diagnostics collector destination (§12.2); workers require approved data-source connectivity. These are connectivity requirements, not a claim that a standard Docker bridge enforces destination allowlists. If restricted egress is required, the host runbook SHALL specify and test its firewall/proxy mechanism, DNS behavior and update procedure.
 - App listens on `0.0.0.0:8088` inside its container. This is not a published host listener.
 - Tunnel credentials are mounted only into `cloudflared`, with read access verified for its actual runtime UID.
 - Connector health/metrics endpoints remain internal.
@@ -136,7 +142,7 @@ Different isolated applications may use the same internal port, including 8088. 
 
 ### 4.4 VPS firewall and remote administration
 
-The host runbook SHALL inventory existing services before changing firewall rules, preserve required neighboring-service connectivity, and test those services afterward. For Atlas, deny inbound application traffic on IPv4 and IPv6, including ports 80, 443, 8088 and 8099. Restrict SSH to an owner-approved administrative source or established private management network. Keep provider console recovery available before tightening SSH. Public SSH is not part of the application architecture.
+The host runbook SHALL inventory existing services before changing firewall rules, preserve required neighboring-service connectivity, and test those services afterward. Atlas publishes no host ports. For Atlas, deny inbound traffic on IPv4 and IPv6 to Atlas container addresses and to any host port that would publish Atlas, including 8088. Port 8099 is the optional Python query server from `docs/ATLAS-SPEC.md` (`127.0.0.1`, local validation only); it is not a production published service. Do not install host-wide denies for ports 80/443 merely because Atlas uses Tunnel: record the owner of each existing public listener and keep every owner-approved neighboring listener (including TCP 80/443) reachable. After any firewall change, repeat A05 against Atlas and each neighbor's own reachability check. Docker published ports bypass ufw/firewalld and `DOCKER-USER` sees post-DNAT addresses, so a host-wide destination-port rule is not the Atlas control; any extra Docker filtering belongs in the host runbook and is tested there. Restrict SSH to an owner-approved administrative source or established private management network. Keep provider console recovery available before tightening SSH. Public SSH is not part of the application architecture.
 
 Permit outbound DNS, HTTPS and Tunnel transport. Cloudflare currently requires outbound TCP/UDP 7844 for HTTP/2/QUIC; verify current destination requirements when deploying [R1]. Host and provider firewall rules must allow established return traffic. Docker's packet handling means a host firewall alone is not proof of isolation: independently test the public IP and inspect Compose port mappings.
 
@@ -149,9 +155,9 @@ Permit outbound DNS, HTTPS and Tunnel transport. Cloudflare currently requires o
 - No anonymous API bypass in the first release.
 - A browser/mobile app must not embed an Access service token. FuelBuddy's backend holds any machine secret and calls the tunneled API. A later direct mobile API requires short-lived per-user authorization and a separately reviewed edge policy.
 
-Validate `Cf-Access-Jwt-Assertion` cryptographically using Cloudflare's JWKS, configured issuer, correct hostname-specific audience, permitted algorithms and time claims. Cache signing keys with bounded refresh and fail closed when a token cannot be verified. Never trust an email header or mere presence of a JWT. Machine service identities need a verified claim mapping and a read-only role, not an assumption that they have human email claims. Test actual Cloudflare-issued tokens [R2].
+Validate `Cf-Access-Jwt-Assertion` cryptographically using Cloudflare's JWKS, configured issuer, correct hostname-specific audience, permitted algorithms and time claims. Load the key set from the team's `/cdn-cgi/access/certs` endpoint and select the key by the JWT `kid`; do not pin a single `public_cert`. Cloudflare rotates signing keys about every six weeks and keeps the previous key valid for seven days, so cache with a bounded refresh interval shorter than that overlap and refresh once immediately when a `kid` is missing from the cache. Fail closed when a token cannot be verified, including when that refresh fails. Never trust an email header or mere presence of a JWT. Machine service identities need a verified claim mapping and a read-only role, not an assumption that they have human email claims. Test actual Cloudflare-issued tokens [R2].
 
-If interactive and service policies require separate Access applications, use distinct audiences. Read credentials must not authorize admin endpoints through either hostname. Internal health checks are the only narrowly defined authentication exception; ingress must block those exact routes.
+If interactive and service policies require separate Access applications, use distinct audiences. Read credentials must not authorize admin endpoints through either hostname. Internal health checks are the only narrowly defined authentication exception; ingress must block those exact routes, and the application SHALL also serve `/internal/*` only to loopback or the project-network probe source, returning 404 otherwise, so a misconfigured ingress rule does not expose them.
 
 ### 5.2 Machine consumer lifecycle
 
@@ -194,7 +200,7 @@ Run as a fixed non-root UID/GID with read-only root filesystem, bounded tmpfs, d
 
 Startup validates configuration, active release and required persistent mounts, then becomes ready. It must not modify published data or create a transient fallback database. Separate liveness (`/internal/healthz`) from readiness (`/internal/readyz`). Readiness requires a verified usable release, not availability of every external feed or country. Missing countries are supported data gaps.
 
-Add one init/preflight command. If actual production features require SQL state, use explicit durable storage or an optional PostgreSQL service with a persistent volume and backup procedure. Do not replace the current unused scaffold with a mandatory database without evidence. PGLite in memory is prohibited for persistent state. Migrations run as an explicit, serialized deployment step after backup, never in image build or concurrently across services.
+Provide an idempotent `atlasctl init` (creates the documented directories and ownership, §10) and a non-mutating `atlasctl preflight`. If actual production features require SQL state, use explicit durable storage or an optional PostgreSQL service with a persistent volume and backup procedure. Do not replace the current unused scaffold with a mandatory database without evidence. PGLite in memory is prohibited for persistent state. Migrations run as an explicit, serialized deployment step after backup, never in image build or concurrently across services.
 
 ### 6.3 Required Compose shape
 
@@ -229,7 +235,7 @@ fuel-atlas/
   secrets/                 # supplied separately; never in ordinary export
 ```
 
-Inside containers, use stable paths under `/opt/fuel-atlas` for code and `/srv/fuel-atlas` for data/state. Mount the release parent, not only the current symlink target, so atomic pointer switches are visible. Resolve the active release once per request and retain that version throughout the request. Never follow symlinks outside the validated root.
+Inside containers, use stable paths under `/opt/fuel-atlas` for code and `/srv/fuel-atlas` for data/state. Mount `data/` into the web container read-only. It contains both `releases/` and `current`, and `current` is a relative symlink to a target inside the same mount, so atomic pointer switches are visible. Do not mount only `releases/<release-id>` or only `releases/`. The one-shot publisher mounts the same `data/` directory writable and is the only writer of `releases/` and `current`. Resolve the active release once per request and retain that version throughout the request. Never follow symlinks outside the validated root.
 
 ### 7.2 Configuration
 
@@ -266,6 +272,10 @@ A release contains the existing consumer manifest plus a separate deployment env
 6. Check representative API/UI queries. If validation or activation checks fail, keep or restore the prior pointer and retain evidence. Do not remove either release.
 
 No partial publication and no manifest/data mixture. Test the rename/pointer behavior under interruption. Public reads never run consolidation, rebuild tiles or wait for research. Missing release files cause explicit errors and readiness failure rather than silent reconstruction.
+
+A manifest and its dependent tiles/indexes SHALL identify a single release through immutable release-qualified URLs or an equivalent explicit release selector. Requests carrying that identity resolve the retained release rather than the current pointer, and cache keys include it. Test a promotion between a manifest fetch and its dependent requests and verify that all returned files belong to the selected release. State separately that independent live API requests may observe a newer release.
+
+A new release reaches an existing installation through `atlasctl release import` (§10), which writes only `data/releases/<release-id>/`; `release activate` is the following pointer switch under the publisher lock.
 
 Import accepts only a trusted release source. Checksums detect corruption, not malicious substitution: release authenticity comes from authenticated transport and a verified producer, or signed release manifests with an explicitly configured trust key.
 
@@ -322,9 +332,15 @@ All modes exclude secrets by default. A separate explicitly requested encrypted 
 
 Support registry-online import and image-archive import using Docker save/load. Do not use `docker export`/`docker import` as the application backup mechanism: these do not capture the required mounted data and image deployment metadata. Bundled image archives must match the destination architecture. Offline image loading does not mean offline operation: Cloudflare Tunnel and live sources still need connectivity.
 
-Exporter takes a coherent snapshot after quiescing all mutable-state writers and recording active release/queue state. Pausing the publisher alone is insufficient: web audit/control state, worker jobs, overlays and databases can still change. The initial supported backup method stops this installation's connector and web/worker writers during the mutable snapshot, after draining requests/jobs; other installations keep running. Copy immutable releases outside this pause where possible. Record backup start/end, active release, state schema and snapshot completion, then restart only the paused services. Database state uses its supported consistent backup or a stopped-volume copy. Online filesystem/database snapshots are an optional later method and must prove cross-component consistency. Any failed snapshot remains marked incomplete and cannot be restored as a valid backup. Importer verifies checksums, size/disk requirements, supported formats, archive traversal/link attacks and image references before activation. Extract into a new directory, refuse overwriting an existing installation by default, and never merge silently with existing state. Checksum failure leaves the running installation untouched.
+Exporter takes a coherent snapshot after quiescing all mutable-state writers and recording active release/queue state. Pausing the publisher alone is insufficient: web audit/control state, worker jobs, overlays and databases can still change. The initial supported backup method stops this installation's connector and web/worker writers during the mutable snapshot, after draining requests/jobs; other installations keep running. Copy immutable releases outside this pause where possible. Before quiescing, durably record which of this installation's services were running and the operation phase. Record backup start/end, active release, state schema and snapshot completion, then restart only the paused services. On failure or interruption, attempt to restore only the recorded running set (writers and web first, verifying readiness before reconnecting ingress), unless the operator passed an explicit leave-stopped flag; never start services that were previously stopped. If readiness cannot be restored, leave ingress stopped and emit an actionable alert. Provide an idempotent recovery command for abrupt process or host interruption, and test copy failure and interruption after services stop. Database state uses its supported consistent backup or a stopped-volume copy. Online filesystem/database snapshots are an optional later method and must prove cross-component consistency. Any failed snapshot remains marked incomplete and cannot be restored as a valid backup. Importer verifies checksums, size/disk requirements, supported formats, archive traversal/link attacks and image references before activation. Extract into a new directory, refuse overwriting an existing installation by default, and never merge silently with existing state. Checksum failure leaves the running installation untouched.
 
-Implement one versioned `atlasctl` CLI with subcommands `preflight`, `verify`, `export`, `import`, `backup`, `restore` and `release activate`. These are one operational interface, not seven separate products. Each command requires an explicit installation target. Each offers help, meaningful nonzero exits, dry-run where relevant, redacted logs and an operation report. They must not prune Docker images or delete staging/old releases automatically.
+`atlasctl restore` targets one explicit installation and accepts only a snapshot marked complete. It stops that installation's connector and web/worker writers before replacing mutable state or the release pointer, never writes into a running writer and never stops another installation. If restore fails before activation, it leaves the previous state in place and restarts the stopped services; after successful activation it starts them.
+
+`atlasctl release import` targets one explicit existing installation. It accepts a checksummed release package from an authenticated transport or a signed archive checked with the configured trust key, applies the §8.1 validation and the §12.2 storage admission, and writes only `data/releases/<release-id>/`. It leaves installation identity, secrets, mutable state and `current` unchanged. Installation `import` still refuses an existing installation.
+
+`atlasctl init` is idempotent and requires explicit authorization for the installation target. It creates the documented directories and ownership without recursive chmod/chown and never overwrites existing content.
+
+Implement one versioned `atlasctl` CLI with subcommands `init`, `preflight`, `verify`, `export`, `import`, `backup`, `restore`, `release import` and `release activate`. These are one operational interface, not separate products. Each command requires an explicit installation target. Each offers help, meaningful nonzero exits, dry-run where relevant, redacted logs and an operation report. They must not prune Docker images or delete staging/old releases automatically.
 
 ## 11. Backup, recovery and migration
 
@@ -340,7 +356,7 @@ Persist a last-success backup timestamp and report failures. Retention is append
 
 1. Complete the separate host runbook: inventory neighboring apps, capacity and ingress; establish/retest SSH and recovery access; install Docker/Compose only if needed. Assign the installation identity, storage allocation and resource budgets.
 2. Create Cloudflare named Tunnel, DNS and Access applications/policies. Define exact admin/read identities.
-3. Import a verified serving package into a new directory; create state directories/permissions and supply file secrets.
+3. Import a verified serving package into a new directory; run `atlasctl init` to create state directories/permissions and supply file secrets.
 4. Run preflight, verify route policy and inspect the rendered Compose configuration for published ports and secret leakage.
 5. Start containers and verify readiness through an internal probe. Test the Tunnel and authorized consumer calls.
 6. Check public IPv4 and IPv6 directly from outside: app/API ports must be unreachable. Test forged headers and disallowed methods/paths.
@@ -367,7 +383,7 @@ Starting limits to tune through measurement: web 2 GB RAM/1.5 CPU, connector 256
 
 Benchmark representative small/large countries and charger queries. Initial acceptance target after warmup: 10 concurrent typical requests for 15 minutes, no OOM or incorrect responses, under 1% server errors and p95 under 1 second internally for bounded read queries. Report cold start, large downloads and external Tunnel latency separately. Record dataset, query shapes, image digest and peak RSS; revise the VM estimate if this target fails. A soak test must show bounded cache growth.
 
-Use stdout/stderr structured logs with request/job/release IDs and redaction. Do not enable automatic rotation that deletes stored log files without explicit owner authorization naming the affected files. Set a disk budget, alert before reaching it, and define a bounded remote log sink or a stop-spooling behavior when the budget is exhausted; record any dropped diagnostic-event counts. Keep administrative audit records durable, append-only and backed up. If audit persistence fails, reject new administrative mutations rather than losing their audit trail. Durable audit retention follows the explicit owner deletion rule.
+Emit structured, redacted diagnostics with request/job/release IDs through the bounded spool or collector defined in §12.2 (not through Docker's retained stdout copy). Do not enable automatic rotation that deletes stored log files without explicit owner authorization naming the affected files. Set a disk budget, alert before reaching it, and define a bounded remote log sink or a stop-spooling behavior when the budget is exhausted; record any dropped diagnostic-event counts. Keep administrative audit records durable, append-only and backed up. If audit persistence fails, reject new administrative mutations rather than losing their audit trail. Durable audit retention follows the explicit owner deletion rule.
 
 Expose internal-only metrics or status for readiness, active release, uptime, errors, queue depth, last feed attempt/success, expired overlays, last backup and free disk. Prometheus/Grafana are optional profiles, not base requirements. Stopping Tunnel fails closed; there is no direct-IP fallback.
 
@@ -389,7 +405,7 @@ Before an image pull/load, release import, export, backup or publication, estima
 
 Use per-app filesystem quotas or dedicated storage allocations where available. Bind-directory organization alone is not a disk quota. Docker's shared image/log store also needs host monitoring and admission control. A source archive's size is not a bound on extracted size; importer enforces declared and measured extraction limits.
 
-The release must choose and test an actual logging configuration. For the initial no-automatic-deletion policy, disable Docker's retained stdout copy for Atlas (`logging.driver: none`) and send redacted diagnostics to a host-approved bounded collector, or implement an explicitly bounded file spool that stops accepting diagnostics at its cap without deleting stored records. Verify the collector's retention policy follows owner authorization. Do not claim that application spool limits bound Docker's separate default logs. Preserve counters for dropped diagnostics and separate durable audit records. If no bounded collector/spool is configured, preflight fails rather than allowing unlimited log growth.
+The release must choose and test an actual logging configuration. For the initial no-automatic-deletion policy, set `logging.driver: none` for every Atlas service (including `cloudflared` and one-shot helpers) so Docker keeps no second copy. The application and helpers SHALL write redacted diagnostics directly to a host-approved bounded collector or an explicitly bounded file spool that stops accepting diagnostics at its cap without deleting stored records; the collector destination and its egress are listed in §4.2. `docker logs` is empty under this driver and is not the diagnostic path. `cloudflared` output that cannot reach the spool is covered by its metrics and exit status, and this limit is documented. Verify the collector's retention policy follows owner authorization. Do not claim that application spool limits bound Docker's separate default logs. Preserve counters for dropped diagnostics and separate durable audit records. If no bounded collector/spool is configured, preflight fails rather than allowing unlimited log growth.
 
 At a soft threshold, alert and suspend new storage-heavy jobs. At the hard allocation threshold, reject new imports/publication/mutations, preserve existing reads where safe, and report the affected installation. Restoring capacity requires added storage or explicit item-specific removal authorization. Backup completeness must never be inferred from an out-of-space partial archive.
 
@@ -433,7 +449,7 @@ Do not bundle application deployment or Cloudflare policy changes into merely wr
 | A02 | Production container starts with no source checkout, Vite, Python, Jarvis or systemd available in serving mode |
 | A03 | Image build receives no production secrets and performs no DB migration; image/export secret scan finds no credential material |
 | A04 | Rendered production Compose has zero published ports and no host networking, privileged mode or Docker socket |
-| A05 | External IPv4/IPv6 probes cannot reach origin app/API/metrics; correct hostname works only through Tunnel; disabling Tunnel removes app access |
+| A05 | External IPv4/IPv6 probes cannot reach origin app/API/metrics (approved neighboring listeners remain reachable and are not a failure); correct hostname works only through Tunnel; disabling Tunnel removes app access |
 | A06 | Invalid/missing/expired/wrong-issuer/wrong-audience JWTs and forged identity headers fail; a read principal cannot use admin routes on either hostname |
 | A07 | No state change via GET, alternate host, SSR/server-function transport or unclassified route; CSRF attempt fails |
 | A08 | Authenticated existing fuel/charger queries preserve representative IDs, filters, units, counts and error semantics; consumer backend works with machine auth |
@@ -444,13 +460,17 @@ Do not bundle application deployment or Cloudflare policy changes into merely wr
 | A13 | Expired live overlay is ignored; absent optional feed token does not break readiness; private/admin data is not shared-cache served |
 | A14 | Load/soak benchmark records memory and latency against §12, and backup restore drill records measured RPO/RTO |
 | A15 | All export/import/update/backup scripts contain no image-prune/data-cleanup or automatic backup-expiration action |
+| A16 | From outside, both public hostnames return a non-success response for `/internal/healthz`, `/internal/readyz` and the metrics path and the handler does not run; `/internal/*` from a non-probe source on the project network is refused |
+| A17 | The application observes the public hostname on each Tunnel hostname; an API-hostname request sending `X-Forwarded-Host` set to the UI hostname stays on the API route class |
+| A18 | A promotion between a manifest fetch and its dependent tile/index requests never returns files from two releases |
+| A19 | `release import` adds a release to a running installation without changing identity, secrets, state or `current`; `init` is idempotent; JWKS key rotation (unknown `kid`) is accepted after one refresh |
 | S01 | Two installations with identical directory basenames get distinct explicit project IDs; project/network/volume/mount collisions fail before mutation |
 | S02 | Deploy/update/stop/restore Atlas while a sibling app runs; sibling container IDs, health, network, data hashes and reachability remain unchanged |
 | S03 | Each app/environment has its own named Tunnel/token; stopping Atlas ingress leaves the sibling hostname working |
 | S04 | Inspect effective memory/CPU/PID/swap controls for all services/helpers; combined load plus backup stays within host budget and sibling service targets |
 | S05 | Insufficient bytes/inodes/quota and excessive extraction size reject operations without affecting active releases or deleting data |
 | S06 | Logging saturation stops spooling/drops diagnostics as documented, preserves audit behavior, and creates no unlimited Docker stdout copy |
-| S07 | Snapshot while audit/control writers are active proves quiescing or a consistent snapshot; restore verifies all mutable state, not just published files |
+| S07 | Snapshot while audit/control writers are active proves quiescing or a consistent snapshot; restore verifies all mutable state, not just published files; a failed or interrupted backup restores the previously running service set, and restore stops only the target installation's writers |
 | S08 | Real FuelBuddy service authentication works; expired credentials, redirects and rotation are handled safely; read credentials cannot mutate |
 | W01 | Worker jobs survive restart as resumable/interrupted state without duplicate execution or subprocess orphaning |
 | W02 | Simultaneous edits honor revisions/idempotency and persist overrides; accepted edit becomes visible only after complete validated publication |

@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-22
+**Agent:** CLAUDE
+**Files:** `projects/fuel-atlas/vps-fuelatlas-version/spec.md`, `projects/fuel-atlas/vps-fuelatlas-version/reviews/round-1/CONSOLIDATION.md`, `projects/fuel-atlas/vps-fuelatlas-version/README.md`, `CHANGELOG.md`
+**Change:** Consolidated round 1 of the vps-fuelatlas-version review (19 findings from CHATGPT, DEEPSEEK, GROK; 5 major, 14 minor, merged into 11 changes) and moved `spec.md` from v1.1 to v1.2. Fixes: `current` symlink now inside the mounted `data/`; new `atlasctl release import` and `init`; manifest-to-tile release binding; backup restarts the previously running services and restore stops only its own installation's writers; Atlas-scoped firewall rule instead of a host-wide 80/443 deny; Host-header and `/internal` ingress rules; JWKS rotation by `kid`; `logging.driver: none` with a direct bounded spool. New acceptance items A16–A19. README now at Round 2 (v1.2, `reviews/round-2/`).
+**Remaining:** Open HUMAN decisions FB-D1 (diagnostics collector), FB-D2 (release trust model), FB-D3 (leave-stopped flag), carried forward in CONSOLIDATION.md. Reviewer GROK's served model was unverified.
+**Verification:** Read all three reviews and the spec; port 8099 confirmed in `docs/ATLAS-SPEC.md`. Cloudflare and cloudflared claims in the reviews were not re-checked, and the Host-header disagreement between DEEPSEEK-1 and GROK-5 was handled by a rule that holds either way. No git commands were run.
+
+## 2026-10-22
 **Agent:** GROK
 **Files:** `projects/fuel-atlas/vps-fuelatlas-version/reviews/round-1/GROK.md`, `CHANGELOG.md`
 **Change:** Reviewed local portable Docker deployment spec v1.1 for round 1. Recorded 0 blocking, 3 major and 6 minor findings: a host-wide deny of ports 80 and 443 conflicts with approved sibling listeners; serving mode has no command that admits a new release into an existing installation; the read-only release mount does not contain the `current` symlink; `logging.driver: none` discards the stdout diagnostics §12 requires; hostname separation needs the Host header cloudflared actually delivers; `/internal` routes have no tunnel acceptance check; a failed backup does not restart stopped services; restore can write onto live writers; Access JWKS caching does not follow the documented key-rotation overlap.
