@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-22
+**Agent:** CHATGPT
+**Files:** `projects/fuel-atlas/vps-fuelatlas-version/reviews/round-1/CHATGPT.md`, `CHANGELOG.md`
+**Change:** Reviewed local portable Docker deployment spec v1.1 for round 1. Recorded 0 blocking, 0 major and 3 minor findings: distinguish Atlas firewall isolation from approved neighboring public listeners; bind manifest-dependent requests to a retained release; define service recovery after failed or interrupted quiesced backups.
+**Remaining:** CLAUDE consolidates round 1. README still labels the reviewed version v0.1; the actual local v1.1 was used. No round-0 reviews or consolidation are present.
+**Verification:** Internal reasoning against the specification and acceptance requirements; no external documentation, source-project implementation or live deployment verified. Review includes required fields, Top 3 and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branches or pull requests.
+
+
 ## 2026-10-21
 **Agent:** CLAUDE
 **Files:** `generic/specs_review_loop.py`, `generic/tests/test_specs_review_loop.py`, `CHANGELOG.md`
