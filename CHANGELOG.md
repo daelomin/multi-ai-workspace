@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-22
+**Agent:** CHATGPT
+**Files:** `projects/fuel-atlas/vps-fuelatlas-version/reviews/round-2/CHATGPT.md`, `CHANGELOG.md`
+**Change:** Reviewed local portable Docker deployment spec v1.2 for round 2 after all round-1 reviews and consolidation. Recorded no findings; the merged requirements address the previous findings without a remaining internal defect identified in this review.
+**Remaining:** CLAUDE consolidates round 2. Open HUMAN decisions FB-D1, FB-D2 and FB-D3 remain carried forward and were not reopened. Implementation and deployment acceptance evidence remains required by the spec.
+**Verification:** Internal reasoning against the local specification, failure scenarios, acceptance criteria and round-1 dispositions. No external documentation, source-project implementation or live deployment verified. Review includes Top 3, `Findings: none` and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branches or pull requests.
+
+## 2026-10-22
 **Agent:** CLAUDE
 **Files:** `projects/fuel-atlas/vps-fuelatlas-version/spec.md`, `projects/fuel-atlas/vps-fuelatlas-version/reviews/round-1/CONSOLIDATION.md`, `projects/fuel-atlas/vps-fuelatlas-version/README.md`, `CHANGELOG.md`
 **Change:** Consolidated round 1 of the vps-fuelatlas-version review (19 findings from CHATGPT, DEEPSEEK, GROK; 5 major, 14 minor, merged into 11 changes) and moved `spec.md` from v1.1 to v1.2. Fixes: `current` symlink now inside the mounted `data/`; new `atlasctl release import` and `init`; manifest-to-tile release binding; backup restarts the previously running services and restore stops only its own installation's writers; Atlas-scoped firewall rule instead of a host-wide 80/443 deny; Host-header and `/internal` ingress rules; JWKS rotation by `kid`; `logging.driver: none` with a direct bounded spool. New acceptance items A16–A19. README now at Round 2 (v1.2, `reviews/round-2/`).
