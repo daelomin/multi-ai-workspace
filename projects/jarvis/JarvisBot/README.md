@@ -6,6 +6,10 @@ The deliverable is an argued recommendation for HUMAN's choice. `spec.md` is the
 
 **Round 2** — option assessment and debate on proposal v0.1. Files go in `reviews/round-2/`.
 
+**Workflow status:** awaiting_human_choice
+
+The round-2 debate (proposals, challenges, responses) is complete and Claude's decision brief is in `reviews/round-2/CONSOLIDATION.md`. It is ready for HUMAN's choice: select an option, amend one, or request more evidence. Claude's stated preference is not HUMAN approval. `spec.md` is unchanged, the implementation spec is not converged, and no further round starts until HUMAN decides.
+
 Round 1 used the former specification-review rubric. Its reviews and logs are preserved as context; they do not count as debate passes.
 
 ## Workflow
