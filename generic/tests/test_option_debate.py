@@ -106,6 +106,12 @@ class Debate(unittest.TestCase):
         next_loop={'id':'next','after':'demo','autostart':True}
         self.assertIsNone(lm.due([next_loop], {'demo':state, 'next':{'status':'pending'}}))
 
+    def test_documented_status_example_is_not_an_active_gate(self):
+        template = (rl.TEMPLATES / 'option-debate/readme.md').read_text()
+        self.assertFalse(rl.awaiting_choice(template))
+        self.assertFalse(rl.awaiting_choice('Set `**Workflow status:** awaiting_human_choice` after debate.'))
+        self.assertTrue(rl.awaiting_choice('**Round 2**\n**Workflow status:** awaiting_human_choice\n'))
+
     def test_legacy_default_and_model_metadata(self):
         # Point at a project with no workflow without deleting the fixture.
         with mock.patch.object(rl, 'PROJECT', self.root):

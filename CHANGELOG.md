@@ -568,3 +568,9 @@
 **Change:** Added reusable Markdown workflow templates and wizard selection. Option debates have independent proposals, all-peer challenges, responses, and Claude's argued recommendation; per-project HUMAN priorities reach every pass. Full specifications are gated on HUMAN's recorded choice, and the proposal is protected during consolidation. Monitor shows all passes and a waiting-for-choice gate; waiting does not release chained loops. Existing spec reviews retain their behavior. JarvisBot's existing worktree now starts a new round under this rubric, preserving earlier reviews and logs.
 **Verification:** 77 generic tests passed, including debate ordering, choice gate, immutable proposal, wizard template creation and legacy behavior; Python compilation and diff whitespace checks passed. Live debate verification pending.
 **Handoff:** CHATGPT releases workflow/template changes; no implementation option chosen on HUMAN's behalf.
+
+
+## 2026-10-24 — Match active choice status only
+**Agent:** CHATGPT
+**Change:** Live preflight passed for all backends. Startup exposed a false positive: the README's documented waiting-status example was interpreted as an active gate. Anchored detection to a standalone status line; added regression coverage. Initial debate dispatch stopped without producing a consolidation; existing proposal unchanged.
+**Verification:** Generic suite rerun below; restart with all additional HUMAN priorities.

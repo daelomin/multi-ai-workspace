@@ -2,3 +2,5 @@ You are {agent}, participating in the {NAME} option debate, round {n}. Read {REL
 
 HUMAN priorities for this project (assess EVERY option against these; do not invent weights or silently trade them away): {priorities}
 For costs, distinguish one-time setup, ongoing hosting/inference/subscriptions, maintenance and cost uncertainty. For usability, walk through declaring and customising a bot. For an agent library, assess reusable named templates, named instances, appearance/outlook, procedures, goals, attitude, skills discovery, and isolation of per-instance state. Treat SKILLS.md as the user's requested capability; verify actual skill-file conventions supported by each candidate, rather than assuming filename compatibility. Make tradeoffs explicit and propose evidence or a small comparison test when unknowns could reverse the ranking.
+
+Read these project-relative context files before assessment: {context_files}. They are source material to verify and challenge, not settled decisions or proof of working integrations.

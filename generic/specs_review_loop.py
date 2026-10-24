@@ -148,7 +148,7 @@ def workflow() -> dict:
 
 
 def awaiting_choice(text: str) -> bool:
-    return "**Workflow status:** awaiting_human_choice" in text
+    return bool(re.search(r"^\*\*Workflow status:\*\* awaiting_human_choice\s*$", text, re.M))
 
 
 def debate_steps(reviewers: list[str], phase: str) -> list[str]:
@@ -161,7 +161,8 @@ def option_prompt(agent: str, n: int, stage: str, reviewers: list[str]) -> str:
     path = f"{REL_PROJECT}/reviews/round-{n}/{agent}{suffix}.md"
     peers = ", ".join(a for a in reviewers if a != agent)
     values = dict(agent=agent, NAME=NAME, REL_PROJECT=REL_PROJECT, n=n, path=path, peers=peers,
-                  priorities=json.dumps(workflow().get("priorities", []), ensure_ascii=False))
+                  priorities=json.dumps(workflow().get("priorities", []), ensure_ascii=False),
+                  context_files=json.dumps(workflow().get("context_files", [])))
     return (prompt_template("option-debate", "common", **values) + "\n" +
             prompt_template("option-debate", stage, **values))
 
@@ -186,7 +187,8 @@ def validate_option_output(text: str, stage: str, agent: str, reviewers: list[st
 def option_consolidation_prompt(n: int, reviewers: list[str]) -> str:
     files = ", ".join(step + ".md" for step in debate_steps(reviewers, "options"))
     return prompt_template("option-debate", "consolidation", NAME=NAME, REL_PROJECT=REL_PROJECT, n=n, files=files,
-                           priorities=json.dumps(workflow().get("priorities", []), ensure_ascii=False))
+                           priorities=json.dumps(workflow().get("priorities", []), ensure_ascii=False),
+                  context_files=json.dumps(workflow().get("context_files", [])))
 
 
 def decisions_note(rule: str) -> str:
