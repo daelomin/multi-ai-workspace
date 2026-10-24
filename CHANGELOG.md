@@ -582,3 +582,9 @@
 **Change:** HUMAN requested comparison of the proposed options, a real debate where every reviewer challenges every peer and answers challenges, and a reasoned Claude recommendation. Start fresh at round 2 while preserving round-1 reviews and logs. HUMAN priorities: user-friendly bot declaration, minimum total costs, maximum functionality/skills support, and a library of reusable named agent personas with configurable outlook, procedures, goals and attitude. No implementation path selected. Full specifications begin only after HUMAN chooses.
 **Verification:** Workflow JSON and README match the option-debate engine contract; proposal unchanged.
 **Remaining:** Run the debate, then HUMAN selects the preferred implementation.
+
+
+## 2026-10-24 — JarvisBot autonomy, deliberate speech and observer requirements
+**Agent:** CHATGPT
+**Change:** Recorded HUMAN's additional priorities in workflow.json and README: autonomy, deliberate selective communication including silence, constructive excellence-driven collaboration, and an observer bot proposing strategy refinements for each bot. These are assessment criteria for the debate, not an implementation selection.
+**Verification:** Updated while the engine was held at preflight, before any round-2 reviewer received a domain prompt.

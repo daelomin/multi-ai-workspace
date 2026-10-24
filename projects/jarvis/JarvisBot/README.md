@@ -40,3 +40,10 @@ Record HUMAN's actual option selection and constraints in `decisions.md`; do not
 - Provide an agent library of pre-declared agents with specific names, reusable as templates for named instances with custom outlook/appearance, procedures, goals, attitude and skills; distinguish template defaults from per-instance identity and memory.
 
 These priorities were supplied by HUMAN on 2026-10-24. Do not invent numeric weights; explain tradeoffs and identify which unknowns could change the preferred option. No implementation path has been selected by HUMAN.
+
+## Additional HUMAN priorities
+
+- Maximise bot autonomy within the user's intent: bots should plan, act, coordinate and resolve routine issues independently, and escalate only meaningful decisions or blockers.
+- Bots must deliberate before communicating and sometimes choose silence: assess when to respond, ask, act quietly or remain silent; avoid chatter, premature claims and repetitive updates. Report useful conclusions and evidence rather than private reasoning traces.
+- Bot dynamics should be collaborative and driven by excellence: challenge each other's assumptions constructively, defend claims with evidence, accept corrections and improve outcomes rather than manufacture consensus or conversation.
+- Include a smart observer bot that evaluates each bot's effectiveness and proposes refinements to its strategy, procedures, goals, skills and communication. Compare observer overhead and cost, feedback usefulness and how proposed strategy changes are evaluated; do not silently rewrite user-defined goals or personas.
