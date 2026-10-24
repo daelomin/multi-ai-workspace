@@ -574,3 +574,10 @@
 **Agent:** CHATGPT
 **Change:** Live preflight passed for all backends. Startup exposed a false positive: the README's documented waiting-status example was interpreted as an active gate. Anchored detection to a standalone status line; added regression coverage. Initial debate dispatch stopped without producing a consolidation; existing proposal unchanged.
 **Verification:** Generic suite rerun below; restart with all additional HUMAN priorities.
+
+
+## 2026-10-24 — Document safe review-loop restart commands
+**Agent:** CHATGPT
+**Files:** `generic/REVIEW_LOOP_GUIDELINE.md`
+**Change:** Added exact foreground/background JarvisBot resume commands, lock/clean-tree checks, expected resume semantics, logs and completed-but-uncommitted pass recovery. Documented the standalone Findings: none marker and validation/finalization without a model rerun.
+**Verification:** Commands follow the existing launcher and engine signatures; live recovery of the round-2 CHATGPT response is being performed with these calls.

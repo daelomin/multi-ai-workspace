@@ -135,3 +135,86 @@ Existing projects without `workflow.json` keep `spec-review`. For an option deba
 This option-debate rule overrides §6's instruction to proceed without HUMAN decisions: choosing the primary implementation is an explicit gate. No full specifications before the choice. After HUMAN explicitly selects, record it in project `decisions.md`, switch workflow to `{"template": "spec-review", "phase": "specification", "human_choice": "<actual HUMAN choice and decision reference>"}`, remove the README waiting marker and advance to the next round. Then write/review the full specification of that selected option. AI recommendations never count as HUMAN selection.
 
 Use new rounds to change an existing loop's purpose; preserve earlier reviews and logs. Do not reuse spec-review outputs as completed option-debate passes.
+
+## 12. Restart a failed loop without repeating completed work
+
+Use the original worktree, branch, round and reviewer list. The launcher rechecks the backends, then the engine skips validated, pushed pass files and starts the first unfinished pass. It does not resume inside a model's interrupted reasoning session. Do not delete reviews/logs, reset the branch, advance the round, or clear the HUMAN-choice gate to restart.
+
+### Normal restart (JarvisBot example)
+
+Run these commands in Bash on the host where the loop runs:
+
+```bash
+JARVIS_REPO=/home/remi/GIT/multi-ai-workspace
+JARVIS_WORKTREE=/home/remi/GIT/multi-ai-workspace.loops/jarvisbot
+JARVIS_PROJECT=projects/jarvis/JarvisBot
+
+git -C "$JARVIS_WORKTREE" status --short
+python3 "$JARVIS_REPO/generic/loop_monitor.py" status
+```
+
+The working tree must be clean before launching. A running/preflight loop already holds a lock: leave it running instead of launching another copy. If files remain uncommitted from the failed task, use the recovery procedure below first. For a foreground restart:
+
+```bash
+LOOP_WORKTREE="$JARVIS_WORKTREE" REVIEWERS=CHATGPT,DEEPSEEK,GROK \
+  "$JARVIS_REPO/generic/run_review_loop.sh" \
+  "$JARVIS_PROJECT" JarvisBot agent/loop/jarvisbot-review full
+```
+
+The launcher reads backend credentials from the existing host setup (`~/.credentials` and configured login profiles); never put keys in these commands or committed files. `full` still stops an option debate after its consolidation for HUMAN's choice. The `one` mode also resumes, but permits at most one review round in that invocation.
+
+For a restart that survives closing the terminal, use a new log filename:
+
+```bash
+JARVIS_RESUME_LOG="$JARVIS_WORKTREE/$JARVIS_PROJECT/automation/logs/resume-$(date +%Y%m%dT%H%M%S).log"
+nohup env LOOP_WORKTREE="$JARVIS_WORKTREE" REVIEWERS=CHATGPT,DEEPSEEK,GROK \
+  "$JARVIS_REPO/generic/run_review_loop.sh" \
+  "$JARVIS_PROJECT" JarvisBot agent/loop/jarvisbot-review full \
+  >> "$JARVIS_RESUME_LOG" 2>&1 < /dev/null &
+JARVIS_RESUME_PID=$!
+printf 'Launcher PID: %s\nLog: %s\n' "$JARVIS_RESUME_PID" "$JARVIS_RESUME_LOG"
+tail -f "$JARVIS_RESUME_LOG"
+```
+
+`Ctrl+C` stops `tail`, while the detached launcher continues. The Jarvis graph is `http://127.0.0.1:8777/?run_id=review-loop-jarvisbot`. Check that the log skips completed passes and reaches the expected unfinished pass; successful process launch alone does not prove a successful restart. Completion is a consolidation plus `awaiting_choice`, not just exit code zero from preflight.
+
+### Recover a completed but uncommitted pass
+
+Read the failure message and the affected review before changing anything. A generated pass can be substantively complete but fail its required format. It must contain the required headings and end with `Result: complete`; if it has no new formal findings, `Findings: none` must occupy its own line. For example:
+
+```markdown
+Findings: none
+
+No new concrete defect is added in this response.
+
+Result: complete
+```
+
+`Findings: none. No new concrete defect...` on one line does **not** satisfy the current strict parser. Preserve the original in an ignored log file before making a mechanical formatting repair. Do not add `Findings: none` to an incomplete response or one that actually contains new severity findings. Leave its arguments and conclusions intact.
+
+After inspection and any necessary repair, the following command validates and finalizes the existing CHATGPT response in round 2, committing/pushing that pass and its existing CHANGELOG entry without calling a model:
+
+```bash
+cd /home/remi/GIT/multi-ai-workspace
+python3 - <<'PY'
+import sys
+from pathlib import Path
+sys.path.insert(0, "generic")
+import specs_review_loop as loop
+
+root = Path("/home/remi/GIT/multi-ai-workspace.loops/jarvisbot")
+loop.configure(root / "projects/jarvis/JarvisBot", name="JarvisBot",
+               branch="agent/loop/jarvisbot-review")
+reviewers = ["CHATGPT", "DEEPSEEK", "GROK"]
+path = loop.round_dir(2) / "CHATGPT-RESPONSE.md"
+assert path.is_file(), "Expected existing response; do not dispatch a replacement"
+error = loop.validate_option_output(path.read_text(encoding="utf-8"),
+                                    "response", "CHATGPT", reviewers)
+assert error is None, error
+loop.do_review("CHATGPT", 2, root, stage="response", reviewers=reviewers)
+PY
+```
+
+Adapt the reviewer, round and stage only to the actual failed pass (`review`, `challenge`, or `response`). Unrelated dirty/staged files are refused; inspect them instead of stashing or deleting them automatically. Once the worktree is clean, run the normal restart above. For this incident, the completed CHATGPT response is preserved, and DEEPSEEK-RESPONSE is the next unfinished pass.
+
+If the output is genuinely partial, preserve it and obtain a completed response before finalizing it. A formatting marker does not establish substantive completion. Never overwrite a partial pass or start a new round simply to bypass a failed validation without reviewing the recovery plan.
