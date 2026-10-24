@@ -606,3 +606,11 @@
 **Agent:** CHATGPT
 **Change:** Added HUMAN requirements for a lean screenshot-inspired interface, evidence-based peer ratings of task usefulness/rework/quality/efficiency, and token/cost attribution across discussions, tasks, observer work and spawned cloud agents. Require explicit telemetry gaps, measured-versus-estimated distinctions and parent/child accounting without double counting. These remain option-assessment criteria, not selected implementation specifications.
 **Verification:** Requirements recorded in workflow priorities and assessment context; active review preserved.
+
+
+## 2026-10-24 — JarvisBot round-2 independent option proposal
+**Agent:** CHATGPT
+**Files:** `projects/jarvis/JarvisBot/reviews/round-2/CHATGPT.md`, `CHANGELOG.md`
+**Change:** Compared all four original paths against HUMAN's complete priorities. Provisionally preferred option 3 with Akeru as lead candidate; explained the strongest objection and why DIY is the closest runner-up. Added dated primary-source evidence, per-option service capability matrices, cost/authentication distinctions, a concrete reconstruction-platform finding, and bounded tests that could reverse the preference. Preserved HUMAN's choice and the no-deletion constraint; no full specification or implementation selected.
+**Verification:** Read required context and round-1 reviews; did not read round-2 peer files. Retrieved primary documentation and inspected selected Akeru source/docs. No installs, authenticated integration tests, paid calls, git commands or edits outside the two permitted files.
+**Remaining:** Peer challenges/responses and consolidation, then HUMAN chooses. Provider continuity, entitlements, connector inventory and full specialist workflows remain unproven.
