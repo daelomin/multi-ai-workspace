@@ -614,3 +614,9 @@
 **Change:** Compared all four original paths against HUMAN's complete priorities. Provisionally preferred option 3 with Akeru as lead candidate; explained the strongest objection and why DIY is the closest runner-up. Added dated primary-source evidence, per-option service capability matrices, cost/authentication distinctions, a concrete reconstruction-platform finding, and bounded tests that could reverse the preference. Preserved HUMAN's choice and the no-deletion constraint; no full specification or implementation selected.
 **Verification:** Read required context and round-1 reviews; did not read round-2 peer files. Retrieved primary documentation and inspected selected Akeru source/docs. No installs, authenticated integration tests, paid calls, git commands or edits outside the two permitted files.
 **Remaining:** Peer challenges/responses and consolidation, then HUMAN chooses. Provider continuity, entitlements, connector inventory and full specialist workflows remain unproven.
+
+
+## 2026-10-24 — Early complexity and cost triage
+**Agent:** CHATGPT
+**Change:** Added the HUMAN requirement to flag large/complex/costly tasks early and route them to an advanced model or a precise specification/decomposition enabling a simpler model. Include specification readiness, total delivery cost and rework, visible rationale, uncertainty and re-triage. No invented budgets or implementation choice.
+**Verification:** Recorded as shared debate priorities and context while preserving the active reviewer.
