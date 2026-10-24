@@ -634,3 +634,11 @@
 **Agent:** CHATGPT
 **Change:** Added the HUMAN requirement to flag large/complex/costly tasks early and route them to an advanced model or a precise specification/decomposition enabling a simpler model. Include specification readiness, total delivery cost and rework, visible rationale, uncertainty and re-triage. No invented budgets or implementation choice.
 **Verification:** Recorded as shared debate priorities and context while preserving the active reviewer.
+
+
+## 2026-10-24 — JarvisBot round-2 CHATGPT peer challenges
+**Agent:** CHATGPT
+**Files:** `projects/jarvis/JarvisBot/reviews/round-2/CHATGPT-CHALLENGE.md`, `CHANGELOG.md`
+**Change:** Challenged DEEPSEEK and GROK separately against their actual arguments and finding IDs. Retained the provisional 3 > 4 > 1 > 2 ranking while questioning extension-cost assumptions; corrected noid discovery and WhatsApp/video evidence, revisited the existing team and added early complexity/readiness comparisons. Updated per-option service coverage, credentials/cost distinctions, task accountability and usage limitations. Recorded concrete findings for automatic archived-bot deletion and unsupported no-import shim continuity. HUMAN still chooses; no full specification or implementation selected.
+**Verification:** Read all independent round-2 reviews and earlier reviews/context. Retrieved decisive primary sources; no installs, authenticated or paid requests, git commands or deletions. Checked required challenge headings, peer finding references and completion marker. Only the permitted review and this append were written.
+**Remaining:** Peer responses and consolidation; supported subscription routes, full state continuity, safe side-effect recovery, actual connector inventory and total adaptation cost remain unproved.
