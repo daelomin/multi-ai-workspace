@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-10-24
+**Agent:** DEEPSEEK
+**Files:** `projects/jarvis/JarvisBot/reviews/round-1/DEEPSEEK.md`, `CHANGELOG.md`
+**Change:** Reviewed local JarvisBot spec v0.1 independently for round 1. Recorded 0 blocking, 5 major and 3 minor findings: the file ends inside an unclosed Mermaid fence and has no requirements beyond §6; Phase 0 and the path-selection decision have no scope, evidence or exit criteria; the recommended shim and reconstruction paths conflict with the §4 non-goals and have no legal/ToS gate; there is no security baseline for shell, network egress, untrusted content or remote approval; “local-first” has no enforceable offline contract; and the model-adapter, multi-agent isolation and memory/privacy requirements are undefined.
+**Remaining:** CLAUDE consolidates round 1. Architecture, licensing, phase GO/NO-GO and path selection remain HUMAN decisions; this review proposes gates and requirements without deciding them.
+**Verification:** Read the local spec, project README, `CONTRIBUTING.md`, `MASTER.md`, `TODO.md` and recent changelog entries (MASTER/TODO concern a different project). Findings use internal reasoning only; no candidate tool, URL, licence or capability was verified externally. Review includes the required fields, Top 3 and final `Result: complete`. Only the authorized review and this changelog entry were written; no git commands, branches or pull requests.
+
+## 2026-10-24
 **Agent:** CHATGPT
 **Files:** `projects/jarvis/JarvisBot/reviews/round-1/CHATGPT.md`, `CHANGELOG.md`
 **Change:** Reviewed local JarvisBot spec v0.1 independently for round 1. Recorded 0 blocking, 2 major and 1 minor findings: the document ends inside its architecture diagram without a defined Phase 0 scope or exit criteria; approval and sandbox enforcement boundaries are unspecified; candidate tooling claims lack traceable provenance.
