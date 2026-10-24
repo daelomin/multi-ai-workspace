@@ -60,6 +60,14 @@ class CreateInWorktree(Repo):
         e = json.loads(self.cfg.read_text())["loops"][0]
         self.assertEqual((e["branch"], e["worktree"]), ("agent/loop/billing-spec-review", str(wt)))
 
+    def test_option_debate_template_is_created_and_committed(self):
+        r = self.create("projects/acme/options", "Option Debate", template="option-debate")
+        project = Path(r["worktree"]) / "projects/acme/options"
+        self.assertEqual(json.loads((project / "workflow.json").read_text())["phase"], "options")
+        self.assertIn("Challenges", (project / "README.md").read_text())
+        self.assertIn("awaiting_human_choice", (project / "README.md").read_text())
+        self.assertEqual(git(r["worktree"], "status", "--porcelain"), "")
+
     def test_two_loops_have_independent_branches_and_commits(self):
         a = self.create("projects/p/a", "Alpha")
         b = self.create("projects/p/b", "Beta")

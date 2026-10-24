@@ -213,6 +213,7 @@ async function existing() {
 async function newLoop(chain) {
   const {loops} = await api('loops');
   const fields = [
+    {id: 'template', short: 'Workflow', label: 'What should the AIs do?', options: [['spec-review', 'Review an implementation specification'], ['option-debate', 'Assess options, debate, then wait for my choice']]},
     {id: 'folder', short: 'Folder', label: 'Spec folder (projects/<project>/<spec>)', value: 'projects/', re: /^projects\/[\w.-]+\/[\w.-]+$/, msg: 'Use projects/<project>/<spec>, e.g. projects/acme/billing-spec'},
     {id: 'name', short: 'Name', label: 'Short name (used in commit messages)', ph: 'MySpec', re: /^[\w -]{2,30}$/, msg: 'Letters, digits and spaces, 2–30 characters'},
   ];
@@ -224,7 +225,7 @@ async function newLoop(chain) {
   form('Where should the new spec live, and what do you call it?', fields, v => {
     say(`I'll create a branch, the spec and README skeletons, commit them, and register the loop${chain ? ' (chained)' : ''}.`);
     step('Create the loop', 'Creates a git worktree on a new branch <code>agent/loop/&lt;name&gt;-review</code> (from your current branch), writes spec.md + README.md there, commits only that folder, and adds the loop to the monitor. The loop then works only in that worktree.', 'Create it',
-      () => api('create_loop', {folder: v.folder, name: v.name, ...(chain ? {after: v.after, autostart: v.auto === 'yes'} : {})}),
+      () => api('create_loop', {folder: v.folder, name: v.name, template: v.template, ...(chain ? {after: v.after, autostart: v.auto === 'yes'} : {})}),
       {after: r => {
         say(`Created loop <b>${esc(r.id)}</b> on branch <code>${esc(r.branch)}</code> in <code>${esc(r.worktree)}</code>. <b>Put the real spec into <code>${esc(r.spec)}</code> and commit it</b> (the next step does the commit) before the loop runs; it reviews that file.`);
         gitStep(r.id); monitorStep();

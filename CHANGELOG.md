@@ -560,3 +560,11 @@
 **Change:** Recorded FB-D5: offline/unverifiable-package behaviour degrades by risk (safety content always available, restrictions never cleared offline, playbooks with a staleness notice, withdrawn items shown as unverified, LLM explanations unavailable offline). The hard staleness limit is left as an open question for HUMAN. `spec.md` unchanged until the next consolidation.
 **Remaining:** FB-D4 and FB-D6 (legal) open. Round 3 not yet run.
 **Verification:** Document-only edit.
+
+
+## 2026-10-24 — Separate spec-review and option-debate workflows
+**Agent:** CHATGPT
+**Files:** `generic/specs_review_loop.py`, `generic/loop_monitor.py`, `generic/loop_wizard.py`, `generic/loop_wizard.html`, `generic/templates/`, `generic/REVIEW_LOOP_GUIDELINE.md`, `generic/tests/test_option_debate.py`, `generic/tests/test_worktrees.py`
+**Change:** Added reusable Markdown workflow templates and wizard selection. Option debates have independent proposals, all-peer challenges, responses, and Claude's argued recommendation; per-project HUMAN priorities reach every pass. Full specifications are gated on HUMAN's recorded choice, and the proposal is protected during consolidation. Monitor shows all passes and a waiting-for-choice gate; waiting does not release chained loops. Existing spec reviews retain their behavior. JarvisBot's existing worktree now starts a new round under this rubric, preserving earlier reviews and logs.
+**Verification:** 77 generic tests passed, including debate ordering, choice gate, immutable proposal, wizard template creation and legacy behavior; Python compilation and diff whitespace checks passed. Live debate verification pending.
+**Handoff:** CHATGPT releases workflow/template changes; no implementation option chosen on HUMAN's behalf.

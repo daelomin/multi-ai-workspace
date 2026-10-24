@@ -139,42 +139,7 @@ def a_commit(a: dict) -> dict:
     return {"ok": rc == 0, "output": out}
 
 
-README_TEMPLATE = """# {name} spec — multi-AI review
-
-Review rounds for `spec.md`. General rules: `CONTRIBUTING.md`; loop rules: `generic/REVIEW_LOOP_GUIDELINE.md`.
-
-## Current round
-
-**Round 1** — reviewing `spec.md` **v0.1**. Reviews go in `reviews/round-1/`.
-*(Updated by CLAUDE at each consolidation.)*
-
-| File | What it is |
-|---|---|
-| `spec.md` | The specification. Only CLAUDE edits it, when consolidating a round. |
-| `reviews/round-N/<AGENT>.md` | One review per AI per round. Each AI writes only its own file. |
-| `decisions.md` | Decisions HUMAN has settled (optional). Reviewers treat them as fixed. |
-| `reviews/round-N/CONSOLIDATION.md` | CLAUDE's merge of round N. |
-
-**Stop rule:** iteration ends when a round produces no `blocking` or `major` findings, or when HUMAN stops it.
-
-## Review format
-
-```markdown
-### <AGENT>-<n> · <short title>
-
-- **Section:** §x.y (or "general")
-- **Type:** error | gap | risk | inconsistency | suggestion | question
-- **Severity:** blocking | major | minor
-- **Finding:** what is wrong or missing, in two or three sentences.
-- **Proposed change:** the exact text or rule to add, change or delete.
-- **Evidence:** source URL + date checked, or "reasoning only".
-- **Confidence:** high | medium | low
-```
-
-Rules: facts need sources; don't invent identifiers; propose, don't decide (safety, legal and scope are HUMAN decisions);
-don't edit `spec.md` or another review. End with a short **Top 3**. A review ends with `Result: complete`, and has
-findings or `Findings: none`.
-"""
+README_TEMPLATE = (HERE / "templates/spec-review/readme.md").read_text(encoding="utf-8")
 
 
 def a_create_loop(a: dict) -> dict:
@@ -182,6 +147,9 @@ def a_create_loop(a: dict) -> dict:
     folder, name = a.get("folder", ""), a.get("name", "").strip()
     if not FOLDER_RE.match(folder) or not NAME_RE.match(name):
         raise ValueError("folder must look like projects/<project>/<spec>; name 2-30 letters/digits/spaces")
+    template = a.get("template", "spec-review")
+    if template not in ("spec-review", "option-debate"):
+        raise ValueError("unknown workflow template")
     lid = rl.slug(name)
     branch = a.get("branch") or f"agent/loop/{lid}-review"
     base = a.get("base") or sh(["git", "branch", "--show-current"])[1]
@@ -207,7 +175,10 @@ def a_create_loop(a: dict) -> dict:
     (proj / "reviews" / ".gitkeep").write_text("")
     (proj / "automation" / ".gitignore").write_text("logs/\n")
     (proj / "spec.md").write_text(f"# {name} specification\n\nVersion 0.1\n\n(write the spec here)\n", encoding="utf-8")
-    (proj / "README.md").write_text(README_TEMPLATE.format(name=name), encoding="utf-8")
+    readme_template = (HERE / "templates" / template / "readme.md").read_text(encoding="utf-8")
+    (proj / "README.md").write_text(readme_template.format(name=name), encoding="utf-8")
+    if template == "option-debate":
+        (proj / "workflow.json").write_text(json.dumps({"template": template, "phase": "options"}, indent=2) + "\n")
     log.append(f"wrote {folder}/spec.md, README.md, automation/.gitignore")
     step("git add", sh(["git", "add", "--", folder], wt))
     step("git commit", sh(["git", "commit", "-m", f"HUMAN: add {name} spec for the review loop", "--", folder], wt))

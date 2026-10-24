@@ -46,8 +46,8 @@ OUT_DIR = HERE / ".monitor"
 JARVIS_DIR = WORKSPACE / ".jarvis" / "tracker"
 LAUNCHER = HERE / "run_review_loop.sh"
 DEFAULT_REVIEWERS = "CHATGPT,DEEPSEEK,GROK"
-COLORS = {"preflight": "#eab308", "running": "#22c55e", "failed": "#ef4444", "complete": "#3b82f6", "pending": "#94a3b8"}
-JARVIS_STATUS = {"preflight": "pending", "running": "in_progress", "failed": "failed", "complete": "completed", "pending": "pending"}
+COLORS = {"preflight": "#eab308", "running": "#22c55e", "failed": "#ef4444", "complete": "#3b82f6", "pending": "#94a3b8", "awaiting_choice": "#a855f7"}
+JARVIS_STATUS = {"preflight": "pending", "running": "in_progress", "failed": "failed", "complete": "completed", "pending": "pending", "awaiting_choice": "pending"}
 
 
 def load_config(path: Path = CONFIG) -> list[dict]:
@@ -251,7 +251,9 @@ def evaluate(loop: dict) -> dict:
         return out
     n = int(m.group(1))
     out["round"] = n
-    steps = [r.strip().upper() for r in loop["reviewers"].split(",") if r.strip()] + ["CLAUDE"]
+    reviewers = [r.strip().upper() for r in loop["reviewers"].split(",") if r.strip()]
+    phase = read_json(project / "workflow.json").get("phase", "specification")
+    steps = rl.debate_steps(reviewers, phase) + ["CLAUDE"]
     first_open = None
     rdir = project / "reviews" / f"round-{n}"
     for step in steps:
@@ -270,7 +272,9 @@ def evaluate(loop: dict) -> dict:
                 if x["name"] == ("CLAUDE" if name == "ANTHROPIC" else name) and x["status"] == "pending":
                     x.update(status="failed", detail=f"preflight: {why}")
     failed = [s for s in out["steps"] if s["status"] == "failed"]
-    if pre_running:
+    if rl.awaiting_choice(text) and not running:
+        out.update(status="awaiting_choice", detail="Option debate complete; waiting for HUMAN to choose before full specifications")
+    elif pre_running:
         out.update(status="preflight", detail="preflight probes running (no review round started)")
     elif running:
         out["status"] = "running"
@@ -343,7 +347,7 @@ def reap_orphans(loops: list[dict]) -> None:
         mark = logs_dir(l) / ".monitor.json"
         data = read_json(mark)
         if data and data.get("exit") is None and not Path(f"/proc/{data.get('pid', 0)}").exists():
-            data["exit"] = 0 if evaluate(l)["status"] in ("complete", "pending") else 1
+            data["exit"] = 0 if evaluate(l)["status"] in ("complete", "pending", "awaiting_choice") else 1
             mark.write_text(json.dumps(data), encoding="utf-8")
 
 
@@ -395,6 +399,8 @@ def write_jarvis(states: list[dict]) -> None:
         nodes, prev = {}, None
         for r in s["rounds"]:
             reviewers = [f"r{r['n']}-{x['name']}" for x in r["steps"] if x["name"] != "CLAUDE"]
+            initial = [f"r{r['n']}-{x['name']}" for x in r["steps"] if x["name"] != "CLAUDE" and "-" not in x["name"]]
+            challenges = [f"r{r['n']}-{x['name']}" for x in r["steps"] if x["name"].endswith("-CHALLENGE")]
             gate = prev
             if r.get("preflight"):  # only the current round has one
                 pf = r["preflight"]
@@ -414,15 +420,21 @@ def write_jarvis(states: list[dict]) -> None:
             for x in r["steps"]:
                 nid = f"r{r['n']}-{x['name']}"
                 last = x["name"] == "CLAUDE"
+                dependencies = reviewers if last else (initial if x["name"].endswith("-CHALLENGE") else
+                                  challenges if x["name"].endswith("-RESPONSE") else ([gate] if gate else []))
                 nodes[nid] = {"id": nid, "name": " · ".join(filter(None, [f"{s['name']} · round {r['n']} · {label(x['name'], x.get('seconds'))}", describe(x)])),
                               "phase": "implement" if last else "validate", "description": nid,
                               "status": JARVIS_STATUS[x["status"]],
-                              "depends_on": reviewers if last else ([gate] if gate else []),
+                              "depends_on": dependencies,
                               "error": x["detail"] or None,
                               "metadata": {**meta, "round": r["n"], "duration_seconds": x.get("seconds"),
                                            **{k: x[k] for k in ("model", "effort", "tier", "reported", "cost_usd", "cost_basis")
                                               if x.get(k) is not None}}}
             prev = f"r{r['n']}-CLAUDE"
+        if s["status"] == "awaiting_choice":
+            nodes["human-choice"] = {"id": "human-choice", "name": "HUMAN · select preferred option", "phase": "design",
+                                     "description": s["detail"], "status": "pending", "depends_on": [prev] if prev else [],
+                                     "metadata": meta}
         (mem / f"graph_{run_id}.json").write_text(json.dumps({"run_id": run_id, "nodes": nodes}, indent=2), encoding="utf-8")
         entries = [{"timestamp": now, "run_id": run_id, "decision": "run_start", "message": s["name"]}]
         if s["status"] == "complete":

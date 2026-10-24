@@ -120,3 +120,18 @@ Every step records its cost in `automation/logs/r{n}-{step}.timing.json` (`cost_
 | GROK | not reported by Cursor, flagged as missing in the round total | Cursor plan |
 
 Claude Code's own cost figure for DeepSeek runs is not used: it prices the tokens with another table. DeepSeek prices live in `DEEPSEEK_PRICES` (override with `DEEPSEEK_PRICES_JSON`); they were read on 2026-10-21 and may change.
+
+## 11. Choose a workflow template before starting
+
+The wizard offers two templates, stored in `generic/templates/`:
+
+| Template | Input and output | Stop rule |
+|---|---|---|
+| `spec-review` | Review an implementation spec; Claude merges accepted corrections and bumps its version. | No blocking/major findings (existing behavior). |
+| `option-debate` | Compare proposed options; every reviewer proposes, challenges every peer, then responds; Claude moderates and recommends one choice with arguments. | Always stop after the debate for HUMAN's choice, regardless of severity counts. |
+
+Existing projects without `workflow.json` keep `spec-review`. For an option debate, add `workflow.json` with `{"template": "option-debate", "phase": "options"}` and use the corresponding `readme.md` template. Never edit or bump the input proposal in this phase. Prompts for independent proposals, peer challenges, responses and consolidation are separately editable Markdown templates. Every pass uses distinct files and logs; resume preserves completed passes. The monitor shows all debate passes and an `awaiting_choice` state, which does not unlock chained implementation loops.
+
+This option-debate rule overrides §6's instruction to proceed without HUMAN decisions: choosing the primary implementation is an explicit gate. No full specifications before the choice. After HUMAN explicitly selects, record it in project `decisions.md`, switch workflow to `{"template": "spec-review", "phase": "specification", "human_choice": "<actual HUMAN choice and decision reference>"}`, remove the README waiting marker and advance to the next round. Then write/review the full specification of that selected option. AI recommendations never count as HUMAN selection.
+
+Use new rounds to change an existing loop's purpose; preserve earlier reviews and logs. Do not reuse spec-review outputs as completed option-debate passes.

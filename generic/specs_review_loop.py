@@ -96,22 +96,13 @@ ROUND_RE = re.compile(r"\*\*Round (\d+)\*\*")
 # "Version 0.4", "version: 1.1", "**Version:** 1.1 (proposal)", "Version v2.0"
 VERSION_RE = re.compile(r"\bversion\b\W{0,6}v?(\d+\.\d+)", re.I)
 
-REVIEW_RULES = """\
-Automated loop rules (they override anything in the README about git or pull requests):
-- Write ONLY {review_path} and a new entry at the top of CHANGELOG.md (repository root, \
-same format as the existing entries, Agent: {agent}). Do not edit spec.md or any other file.
-- Do not run git, do not create branches, do not open pull requests: the loop commits and \
-pushes your files for you as "{agent}: {name} spec review round {n}".
-{decisions_rule}- HUMAN is not answering during the loop. Items already listed as open HUMAN decisions in \
-the previous CONSOLIDATION.md must not be raised again as blocking or major findings; \
-comment on them only if you have new evidence, as a `question` of severity `minor`.
-- Severity discipline: `blocking` and `major` keep the loop running, so use them only for \
-problems that would make the spec unsafe, wrong or unimplementable. Use `minor` for the rest.
-- Do not repeat findings that the previous consolidation already accepted and merged, \
-unless the merged text is still wrong.
-- End the review file with a line `Result: complete`. If you have no findings, write a line \
-`Findings: none` before it. A file without `Result: complete` is treated as unfinished.
-- When the file is written, stop."""
+TEMPLATES = HERE / "templates"
+REVIEW_RULES = (TEMPLATES / "spec-review" / "review.md").read_text(encoding="utf-8")
+
+
+def prompt_template(kind: str, step: str, **values) -> str:
+    return (TEMPLATES / kind / f"{step}.md").read_text(encoding="utf-8").format(**values)
+
 
 
 def slug(text: str) -> str:
@@ -138,6 +129,64 @@ def configure(project: str | Path, name: str | None = None, branch: str | None =
     parts = Path(REL_PROJECT).parts
     NAME = name or (parts[1] if len(parts) > 1 and parts[0] == "projects" else PROJECT.name)
     BRANCH = branch or f"agent/loop/{slug(NAME)}-review"
+
+
+def workflow() -> dict:
+    """Opt-in option debate; legacy specification loops retain their existing behavior."""
+    path = PROJECT / "workflow.json"
+    if not path.is_file():
+        return {"phase": "specification"}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    expected = "option-debate" if data.get("phase") == "options" else "spec-review"
+    if data.get("template", expected) != expected:
+        raise SystemExit("workflow.json template must match its phase")
+    if data.get("phase") not in ("options", "specification"):
+        raise SystemExit("workflow.json phase must be options or specification")
+    if data["phase"] == "specification" and not data.get("human_choice"):
+        raise SystemExit("Record HUMAN's explicit choice in workflow.json human_choice before specification work")
+    return data
+
+
+def awaiting_choice(text: str) -> bool:
+    return "**Workflow status:** awaiting_human_choice" in text
+
+
+def debate_steps(reviewers: list[str], phase: str) -> list[str]:
+    stages = ("", "-CHALLENGE", "-RESPONSE") if phase == "options" else ("",)
+    return [agent + suffix for suffix in stages for agent in reviewers]
+
+
+def option_prompt(agent: str, n: int, stage: str, reviewers: list[str]) -> str:
+    suffix = "" if stage == "review" else "-" + stage.upper()
+    path = f"{REL_PROJECT}/reviews/round-{n}/{agent}{suffix}.md"
+    peers = ", ".join(a for a in reviewers if a != agent)
+    values = dict(agent=agent, NAME=NAME, REL_PROJECT=REL_PROJECT, n=n, path=path, peers=peers,
+                  priorities=json.dumps(workflow().get("priorities", []), ensure_ascii=False))
+    return (prompt_template("option-debate", "common", **values) + "\n" +
+            prompt_template("option-debate", stage, **values))
+
+
+def validate_option_output(text: str, stage: str, agent: str, reviewers: list[str]) -> str | None:
+    err = validate_review(text)
+    if err:
+        return err
+    required = {"review": ["Option comparison", "Preferred choice", "What would change my mind"],
+                "challenge": ["Challenges to peers", "Preferred choice"],
+                "response": ["Responses to challenges", "Preferred choice", "What would change my mind"]}[stage]
+    for heading in required:
+        if not re.search(r"^## " + re.escape(heading) + r"\s*$", text, re.M | re.I):
+            return f"missing section: {heading}"
+    if stage in ("challenge", "response"):
+        for peer in reviewers:
+            if peer != agent and peer not in text:
+                return f"missing engagement with {peer}"
+    return None
+
+
+def option_consolidation_prompt(n: int, reviewers: list[str]) -> str:
+    files = ", ".join(step + ".md" for step in debate_steps(reviewers, "options"))
+    return prompt_template("option-debate", "consolidation", NAME=NAME, REL_PROJECT=REL_PROJECT, n=n, files=files,
+                           priorities=json.dumps(workflow().get("priorities", []), ensure_ascii=False))
 
 
 def decisions_note(rule: str) -> str:
@@ -202,6 +251,7 @@ def _codex_config_value(key: str) -> str:
 
 def step_config(agent: str) -> dict:
     """Model, effort and tier a step is configured to run with ("default" = left to the tool)."""
+    agent = agent.upper().partition("-")[0]
     if agent == "CHATGPT":
         m = re.search(r'model_reasoning_effort="?(\w+)', " ".join(CODEX_EXTRA_ARGS))
         return {"model": _codex_config_value("model") or "default",
@@ -695,6 +745,8 @@ def review_prompt(agent: str, n: int) -> str:
 
 
 def consolidation_prompt(n: int, reviewers: list[str], converged: bool, provenance: dict | None = None) -> str:
+    if workflow()["phase"] == "options":
+        return option_consolidation_prompt(n, reviewers)
     nxt = n + 1
     files = ", ".join(f"reviews/round-{n}/{a}.md" for a in reviewers)
     final = ("This round has no blocking or major finding, so it is the LAST round: apply the accepted "
@@ -711,49 +763,44 @@ def consolidation_prompt(n: int, reviewers: list[str], converged: bool, provenan
         prov_lines = (f"\n\nReviewer provenance (requested vs served model; 'unverified' means the "
                       f"provider reported no served model): {rows}. Add a short 'Reviewer provenance' "
                       f"section to CONSOLIDATION.md stating which reviewers were unverified.")
-    return (
-        f"You are CLAUDE, the consolidator of the {NAME} spec review. Read {REL_PROJECT}/README.md, "
-        f"spec.md (v{spec_version()}), reviews/round-{n - 1}/CONSOLIDATION.md if it exists, and the "
-        f"round-{n} reviews: {files}.\n\n"
-        f"Consolidate round {n} the same way as reviews/round-1/CONSOLIDATION.md: write "
-        f"reviews/round-{n}/CONSOLIDATION.md (accepted and merged, decisions for HUMAN, rejected or "
-        f"deferred with reasons, traceability of every finding), and update spec.md to the next minor "
-        f"version (bump the version line and date). Keep open HUMAN decisions in one carried-forward "
-        f"list with their FB-D ids; HUMAN is not answering during the automated loop, so do not wait "
-        f"for decisions and do not decide them yourself. {final}\n\n"
-        + decisions_note(
+    return prompt_template(
+        "spec-review", "consolidation", NAME=NAME, REL_PROJECT=REL_PROJECT, version=spec_version(),
+        previous=n - 1, n=n, files=files, final=final, provenance=prov_lines,
+        decisions=decisions_note(
             f"Read {REL_PROJECT}/decisions.md: every decision listed there is settled by HUMAN. Apply it to spec.md "
             "(replace the matching 'Pending HUMAN decision' passage, adjust the affected sections) and remove it from "
-            "the carried-forward open list; follow its notes and do not invent detail HUMAN did not give. ")
-        + "Also add a CHANGELOG.md entry at the top (Agent: CLAUDE). Do not run git: the loop commits "
-        "and pushes for you. Only edit spec.md, README.md, CHANGELOG.md and the CONSOLIDATION.md file."
-        + prov_lines
-    )
+            "the carried-forward open list; follow its notes and do not invent detail HUMAN did not give. "))
 
 
-def do_review(agent: str, n: int, root: Path) -> dict:
+
+def do_review(agent: str, n: int, root: Path, stage: str = "review",
+              reviewers: list[str] | None = None) -> dict:
     """Run or resume one review; return its provenance record."""
-    path = round_dir(n) / f"{agent}.md"
+    reviewers = reviewers or [agent]
+    options = workflow()["phase"] == "options"
+    step = agent if stage == "review" else f"{agent}-{stage.upper()}"
+    validate = lambda text: validate_option_output(text, stage, agent, reviewers) if options else validate_review(text)
+    path = round_dir(n) / f"{step}.md"
     rel = str(path.relative_to(root))
     if path.exists():
-        err = validate_review(path.read_text(encoding="utf-8"))
+        err = validate(path.read_text(encoding="utf-8"))
         if err:
-            raise SystemExit(f"{rel} exists but is unfinished ({err}); inspect it, delete it to rerun")
+            raise SystemExit(f"{rel} exists but is unfinished ({err}); inspect it; preserve it and use a new round for a fresh debate")
         assert_clean(root, {rel, "CHANGELOG.md"})
         if is_pushed(root, rel):
             log(f"round {n}: {agent} review complete and pushed, skipping")
         else:
             log(f"round {n}: {agent} review complete but not pushed, resuming at commit/push")
-            commit_and_push(root, [rel, "CHANGELOG.md"], f"{agent}: {NAME} spec review round {n}")
+            commit_and_push(root, [rel, "CHANGELOG.md"], f"{agent}: {NAME} {stage} round {n}")
         return {"requested": "n/a", "reported": [], "verified": False, "note": "resumed, not rerun"}
     assert_clean(root)
     round_dir(n).mkdir(parents=True, exist_ok=True)
     log(f"round {n}: {agent} reviewing spec v{spec_version()}")
-    logfile = LOG_DIR / f"r{n}-{agent.lower()}.log"
-    prompt = review_prompt(agent, n)
+    logfile = LOG_DIR / f"r{n}-{step.lower()}.log"
+    prompt = option_prompt(agent, n, stage, reviewers) if options else review_prompt(agent, n)
     prov = {"requested": "default configuration", "reported": [], "verified": False,
             "note": "backend does not report the served model"}
-    with timed(n, agent) as t:
+    with timed(n, step) as t:
         if agent == "CHATGPT":
             usage = run_codex(prompt, root, logfile, STEP_TIMEOUT)
             t.note(**codex_banner(logfile))
@@ -777,14 +824,14 @@ def do_review(agent: str, n: int, root: Path) -> dict:
             raise SystemExit(f"no runner for reviewer {agent!r}")
     if not path.exists():
         raise SystemExit(f"{agent} did not write {path}; see {logfile}")
-    err = validate_review(path.read_text(encoding="utf-8"))
+    err = validate(path.read_text(encoding="utf-8"))
     if err:
         raise SystemExit(f"{agent} review is unfinished ({err}); see {logfile}")
     extra = unexpected_changes(root, {rel, "CHANGELOG.md"})
     if extra:
         raise SystemExit(f"{agent} changed files outside its review: {extra}")
-    (LOG_DIR / f"r{n}-{agent.lower()}.provenance.json").write_text(json.dumps(prov, indent=2), encoding="utf-8")
-    commit_and_push(root, [rel, "CHANGELOG.md"], f"{agent}: {NAME} spec review round {n}")
+    (LOG_DIR / f"r{n}-{step.lower()}.provenance.json").write_text(json.dumps(prov, indent=2), encoding="utf-8")
+    commit_and_push(root, [rel, "CHANGELOG.md"], f"{agent}: {NAME} {stage} round {n}")
     return prov
 
 
@@ -799,11 +846,25 @@ def spec_rels(root: Path) -> list[str]:
     return rels
 
 
+def validate_option_consolidation(path: Path) -> None:
+    text = path.read_text(encoding="utf-8")
+    for heading in ("Option comparison", "Debate assessment", "Preferred choice", "Decision for HUMAN", "After HUMAN chooses"):
+        if not re.search(r"^## " + re.escape(heading) + r"\s*$", text, re.M | re.I):
+            raise SystemExit(f"Incomplete option consolidation: missing {heading}")
+    if not text.rstrip().endswith("Result: complete") or not awaiting_choice(README.read_text(encoding="utf-8")):
+        raise SystemExit("Option consolidation must be complete and README must await HUMAN choice")
+
+
 def do_consolidation(n: int, reviewers: list[str], converged: bool, root: Path,
                      provenance: dict | None = None) -> None:
+    options = workflow()["phase"] == "options"
     path = round_dir(n) / "CONSOLIDATION.md"
     rel_all = [str(path.relative_to(root)), *spec_rels(root), str(README.relative_to(root)), "CHANGELOG.md"]
+    if options:
+        rel_all = [r for r in rel_all if r not in spec_rels(root)]
     if path.exists():
+        if options:
+            validate_option_consolidation(path)
         if is_pushed(root, rel_all[0]):
             log(f"round {n}: consolidation complete and pushed, skipping")
         else:
@@ -813,6 +874,7 @@ def do_consolidation(n: int, reviewers: list[str], converged: bool, root: Path,
         return
     assert_clean(root)
     before = spec_version()
+    original_spec = SPEC.read_bytes()
     log(f"round {n}: CLAUDE consolidating (spec v{before})")
     logfile = LOG_DIR / f"r{n}-claude.log"
     with timed(n, "claude") as t:
@@ -821,9 +883,13 @@ def do_consolidation(n: int, reviewers: list[str], converged: bool, root: Path,
                cost_usd=round(res.get("total_cost_usd", 0), 4), cost_basis="subscription-equivalent (claude.ai login)")
     if not path.exists():
         raise SystemExit(f"CLAUDE did not write {path}; see {logfile}")
-    if spec_version() == before:
+    if options:
+        if SPEC.read_bytes() != original_spec:
+            raise SystemExit("CLAUDE changed the proposal before HUMAN selected an option")
+        validate_option_consolidation(path)
+    if not options and spec_version() == before:
         raise SystemExit(f"CLAUDE did not bump the spec version (still v{before}); see {logfile}")
-    if not converged and current_round() != n + 1:
+    if not options and not converged and current_round() != n + 1:
         raise SystemExit(f"CLAUDE did not move README to round {n + 1}; see {logfile}")
     rel = list(rel_all)
     extra = unexpected_changes(root, set(rel))
@@ -963,12 +1029,21 @@ def main() -> None:
         preflight(root, reviewers, not opts.skip_consolidator)
         return
 
+    phase = workflow()["phase"]
+    if phase == "options" and len(reviewers) < 2:
+        raise SystemExit("An option debate requires at least two reviewers")
+    if awaiting_choice(README.read_text(encoding="utf-8")):
+        if phase == "options":
+            do_consolidation(current_round(), reviewers, False, root)
+        log("awaiting HUMAN choice; no further debate or specification work launched")
+        return
     ensure_branch(root)
     for _ in range(opts.max_rounds):
         n = current_round()
         provenance = {}
-        for agent in reviewers:
-            provenance[agent] = do_review(agent, n, root)
+        for step in debate_steps(reviewers, phase):
+            agent, _, suffix = step.partition("-")
+            provenance[step] = do_review(agent, n, root, suffix.lower() or "review", reviewers)
         totals = {"blocking": 0, "major": 0, "minor": 0}
         for agent in reviewers:
             for k, v in severity_counts(round_dir(n) / f"{agent}.md").items():
@@ -976,6 +1051,9 @@ def main() -> None:
         converged = totals["blocking"] == 0 and totals["major"] == 0
         log(f"round {n}: {totals['blocking']} blocking, {totals['major']} major, {totals['minor']} minor")
         do_consolidation(n, reviewers, converged, root, provenance)
+        if phase == "options":
+            log(f"option debate round {n} complete; awaiting HUMAN choice before full specifications")
+            return
         if converged:
             log(f"converged at round {n}: spec v{spec_version()}")
             return
