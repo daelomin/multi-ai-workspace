@@ -1,0 +1,10 @@
+{
+  "template": "option-debate",
+  "phase": "options",
+  "priorities": [
+    "Maximise user friendliness for declaring bots: assess the steps from choosing a template to a usable bot, including naming and customisation.",
+    "Minimise total costs: distinguish setup, hosting, inference/subscriptions, ongoing operations and maintenance; state assumptions and unknowns.",
+    "Maximise useful functionality and SKILLS.md support; verify actual skill-file formats and how skills are discovered, reused, configured and extended.",
+    "Provide an agent library of pre-declared agents with specific names, reusable as templates for named instances with custom outlook/appearance, procedures, goals, attitude and skills; distinguish template defaults from per-instance identity and memory."
+  ]
+}

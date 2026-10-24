@@ -574,3 +574,11 @@
 **Change:** Recorded FB-D5: offline/unverifiable-package behaviour degrades by risk (safety content always available, restrictions never cleared offline, playbooks with a staleness notice, withdrawn items shown as unverified, LLM explanations unavailable offline). The hard staleness limit is left as an open question for HUMAN. `spec.md` unchanged until the next consolidation.
 **Remaining:** FB-D4 and FB-D6 (legal) open. Round 3 not yet run.
 **Verification:** Document-only edit.
+
+
+## 2026-10-24 — JarvisBot changed to an option debate
+**Agent:** CHATGPT
+**Files:** `projects/jarvis/JarvisBot/README.md`, `projects/jarvis/JarvisBot/workflow.json`
+**Change:** HUMAN requested comparison of the proposed options, a real debate where every reviewer challenges every peer and answers challenges, and a reasoned Claude recommendation. Start fresh at round 2 while preserving round-1 reviews and logs. HUMAN priorities: user-friendly bot declaration, minimum total costs, maximum functionality/skills support, and a library of reusable named agent personas with configurable outlook, procedures, goals and attitude. No implementation path selected. Full specifications begin only after HUMAN chooses.
+**Verification:** Workflow JSON and README match the option-debate engine contract; proposal unchanged.
+**Remaining:** Run the debate, then HUMAN selects the preferred implementation.
