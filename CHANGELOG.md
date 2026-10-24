@@ -588,3 +588,9 @@
 **Agent:** CHATGPT
 **Change:** Recorded HUMAN's additional priorities in workflow.json and README: autonomy, deliberate selective communication including silence, constructive excellence-driven collaboration, and an observer bot proposing strategy refinements for each bot. These are assessment criteria for the debate, not an implementation selection.
 **Verification:** Updated while the engine was held at preflight, before any round-2 reviewer received a domain prompt.
+
+
+## 2026-10-24 — JarvisBot model portability and connector verification
+**Agent:** CHATGPT
+**Change:** Recorded HUMAN's primary goal: switch persistent bots across AI backends as credits run out, with task-specific good-enough evaluation and safe continuation. Added phone, WhatsApp Business, image/video specialist requirements and a per-option connector replication audit. Added dated primary-source context, with hosted-auth/tool-bridge distinctions and explicit untested status. Preserved the failed initial status-check logs. No architecture or model choice made for HUMAN.
+**Verification:** Primary documentation and source READMEs read; no candidate or connector locally tested. All model backends passed the earlier live preflight.
