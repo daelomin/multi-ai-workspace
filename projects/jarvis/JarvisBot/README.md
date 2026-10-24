@@ -58,3 +58,7 @@ PRIMARY GOAL: operate the same persistent bots across Codex, Claude, DeepSeek, G
 - Double-check Grokbot tool/connector replication using primary sources. For EVERY implementation option produce a service-by-service capability matrix identifying original Grokbot capability, concrete candidate connector/API, tools or actions covered, authentication and hosting dependency, native/reuse/custom/not supported/unverified status, setup/ongoing costs, and evidence/date. Distinguish preserving the UI or MCP tool bridge from possessing hosted connectors, OAuth registrations and tokens. Prioritise phone, WhatsApp Business, image/video generation and existing productivity integrations. Do not claim a parity percentage without a defined inventory and evidence.
 
 Read `assessment-context.md` for dated primary-source findings to verify and challenge. Compare original paths against these HUMAN requirements even where the input proposal is incomplete. No path is chosen.
+
+## Existing team baseline
+
+HUMAN supplied a screenshot of the current named bots, board rooms, shared pages and routines. See `assessment-context.md`; use these as migration/continuity examples, and revisit the newly added evidence during challenges and responses. Do not infer unseen personas or provider assignments.

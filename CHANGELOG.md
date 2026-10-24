@@ -594,3 +594,9 @@
 **Agent:** CHATGPT
 **Change:** Recorded HUMAN's primary goal: switch persistent bots across AI backends as credits run out, with task-specific good-enough evaluation and safe continuation. Added phone, WhatsApp Business, image/video specialist requirements and a per-option connector replication audit. Added dated primary-source context, with hosted-auth/tool-bridge distinctions and explicit untested status. Preserved the failed initial status-check logs. No architecture or model choice made for HUMAN.
 **Verification:** Primary documentation and source READMEs read; no candidate or connector locally tested. All model backends passed the earlier live preflight.
+
+
+## 2026-10-24 — Existing Grokbot team as migration baseline
+**Agent:** CHATGPT
+**Change:** Added HUMAN's screenshot roster and observed collaborative workflows as assessment context. Preserve names, role continuity, rooms, shared pages and routines across model switches. Actual personas/memories/provider assignments remain unverified. Evidence arrived during the first proposal pass; challenges and responses must explicitly revisit it.
+**Verification:** Screenshot inspected; no changes made to actual Grokbot bots or their instructions.
