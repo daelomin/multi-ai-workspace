@@ -62,3 +62,11 @@ Read `assessment-context.md` for dated primary-source findings to verify and cha
 ## Existing team baseline
 
 HUMAN supplied a screenshot of the current named bots, board rooms, shared pages and routines. See `assessment-context.md`; use these as migration/continuity examples, and revisit the newly added evidence during challenges and responses. Do not infer unseen personas or provider assignments.
+
+## UI, accountability and usage priorities
+
+- UI direction: use HUMAN's Grokbot screenshot as the visual reference: lean, efficient, familiar bot/room navigation, conversation and shared results. Add accountability and usage visibility through compact summaries with drill-down, without turning the primary workspace into a dense dashboard.
+- Task accountability: bots receiving or consuming another bot's work should rate the TASK outcome using evidence of how fully it resolved their issue, rework required, output quality and efficiency. Distinguish task ratings from bot reputation; show reviewer identity, criteria, reasons and linked deliverables/revisions. Compare mechanisms for disagreements, task difficulty/context, insufficient evidence and correction over time. Avoid rewarding chatter, self-ratings, mutual praise or cheap but unusable output.
+- Usage transparency: make token usage and cost attributable across discussions, tasks, spawned cloud agents, observer/peer review work, retries and provider switches. Compare per-bot/model/provider, per-room/discussion, per-task and parent/child totals with drill-down. Distinguish input/cached/output/reasoning tokens where actually reported; distinguish measured usage, estimates, subscription/credit usage and unavailable telemetry. Show child cloud-agent usage without double counting it in rolled-up parent totals. Make review/coordination overhead visible alongside delivery cost; never invent exact token counts or equate estimated dollar values with actual subscription billing.
+
+See assessment-context.md for peer-rating evidence and usage-accounting distinctions. Revisit this addition in the challenge and response passes.

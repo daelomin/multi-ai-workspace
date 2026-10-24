@@ -600,3 +600,9 @@
 **Agent:** CHATGPT
 **Change:** Added HUMAN's screenshot roster and observed collaborative workflows as assessment context. Preserve names, role continuity, rooms, shared pages and routines across model switches. Actual personas/memories/provider assignments remain unverified. Evidence arrived during the first proposal pass; challenges and responses must explicitly revisit it.
 **Verification:** Screenshot inspected; no changes made to actual Grokbot bots or their instructions.
+
+
+## 2026-10-24 — Lean UI, peer task ratings and token accountability
+**Agent:** CHATGPT
+**Change:** Added HUMAN requirements for a lean screenshot-inspired interface, evidence-based peer ratings of task usefulness/rework/quality/efficiency, and token/cost attribution across discussions, tasks, observer work and spawned cloud agents. Require explicit telemetry gaps, measured-versus-estimated distinctions and parent/child accounting without double counting. These remain option-assessment criteria, not selected implementation specifications.
+**Verification:** Requirements recorded in workflow priorities and assessment context; active review preserved.
