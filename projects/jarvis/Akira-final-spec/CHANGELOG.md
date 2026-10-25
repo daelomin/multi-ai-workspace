@@ -1,5 +1,11 @@
 # Akira final specification review activity
 
+## 2026-10-25 — Round 2 specification review
+
+Agent: CHATGPT
+
+Reviewed v0.4 after the round-1 reviews and consolidation, with settled decisions, all companion documents and eight JSON fixtures within the manifest scope. Recorded one major finding (backup command merges source directory trees) and three minor findings covering CPAT descendant overlap and route attribution, recovery-checklist coverage, and remaining fixture/schema mismatches. JSON parsing, schema-version presence and cost-subtotal arithmetic checked; rsync destination layout inspected with a read-only dry run. Review complete at `reviews/round-2/CHATGPT.md`; specification and other inputs unchanged. No git commands or runtime integrations executed.
+
 ## 2026-10-25 — Round 1 consolidation
 
 Agent: CLAUDE
