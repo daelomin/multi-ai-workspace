@@ -1,3 +1,5 @@
+> Operational paths reconciled for this registered loop on 2026-10-25; originals preserved in ignored migration logs. `loop.json` is authoritative.
+
 # HANDOFF — Akira specification review
 
 **From:** specification agent (AKIRA-SPEC-001 author)
@@ -13,11 +15,11 @@ A complete Akira production specification (v0.3, incorporating HUMAN decisions
 AKIRA-D4–D6 and the v1 skill catalogue) at:
 
 ```
-projects/jarvis/JarvisBot/akira/
+projects/jarvis/Akira-final-spec/
 ```
 
-The review input is **`akira/spec.md` v0.3** plus its companion documents in
-`akira/docs/` and fixtures in `akira/evals/fixtures/`. `akira/README.md` defines the
+The review input is **`spec.md` v0.3** plus its companion documents in
+`docs/` and fixtures in `evals/fixtures/`. `README.md` defines the
 reading order, the review instructions, the finding format and the stop rule.
 
 This is a fresh specification review. It is **not** a continuation of the option debate:
@@ -29,8 +31,8 @@ This is a fresh specification review. It is **not** a continuation of the option
 ## 2. Settled decision and authority
 
 **AKIRA-D1** (recorded in `projects/jarvis/JarvisBot/decisions.md` and
-`akira/decisions.md`): Akeru is the base, the product is Akira, the deliverable is a
-production specification and plan. `akira/decisions.md` also records AKIRA-D2 (no deletion without explicit naming),
+`decisions.md`): Akeru is the base, the product is Akira, the deliverable is a
+production specification and plan. `decisions.md` also records AKIRA-D2 (no deletion without explicit naming),
 AKIRA-D3 (no deployment, paid service, real customer contact or paid media job),
 AKIRA-D4 (Linux single node, always on), AKIRA-D5 (subscription logins permitted for
 personal use) and AKIRA-D6 (private deployment). Reviewers must not raise these as
@@ -55,20 +57,19 @@ blocking or major findings.
 
 ## 4. Preconditions for starting the review
 
-The loop launcher requires all of these. None has been done here:
+The loop launcher requires the following. This imported folder is committed, the branch is configured in loop.json, and preflight passed for this registered loop. A live round still requires an explicit one/full launch:
 
 1. **Commit the specification folder** and the CHANGELOG entry, so the worktree is clean.
-2. **Create/check out the review branch** (default `agent/loop/akira-review`). The
+2. **Create/check out the review branch** (default `agent/loop/akira-final-spec-review`). The
    launcher refuses a dirty tree and switches only to the configured branch.
 3. **Run the preflight** and fix every failing backend:
 
    ```bash
-   generic/run_review_loop.sh projects/jarvis/JarvisBot/akira Akira preflight
+   bash automation/run_review_loop.sh preflight
    ```
 
    The preflight checks `codex`, `claude`, `cursor-agent`, the Anthropic consolidator
-   profile and the DeepSeek key. It has **not** been run; it spends model calls and needs
-   those credentials. Do not claim it passed.
+   profile and the DeepSeek key. This registered loop passed preflight; subsequent probes use those credentials and make model calls.
 4. **Run the generic tests** if the loop engine was touched (it was not):
    `python3 -m unittest discover -s generic/tests`.
 
@@ -76,10 +77,10 @@ The loop launcher requires all of these. None has been done here:
 
 ```bash
 # one live round: CHATGPT, DEEPSEEK, GROK independently review, CLAUDE consolidates
-generic/run_review_loop.sh projects/jarvis/JarvisBot/akira Akira agent/loop/akira-review one
+bash automation/run_review_loop.sh one
 
 # or up to 5 rounds
-generic/run_review_loop.sh projects/jarvis/JarvisBot/akira Akira agent/loop/akira-review full
+bash automation/run_review_loop.sh full
 ```
 
 `automation/run_review_loop.sh` wraps the same command. The loop commits and pushes each
@@ -120,7 +121,7 @@ should distinguish "already acknowledged" from "new":
 
 ## 8. Files touched by this handoff
 
-New (all under `projects/jarvis/JarvisBot/akira/`): `spec.md`, `README.md`,
+New (all under `projects/jarvis/Akira-final-spec/`): `spec.md`, `README.md`,
 `decisions.md`, `HANDOFF.md`, `docs/01`–`docs/14`, `evals/fixtures/*`, `automation/*`,
 `reviews/round-1/` (empty, awaiting reviewers).
 

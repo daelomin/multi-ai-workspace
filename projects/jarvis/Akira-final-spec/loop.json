@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "id": "akira-final-spec",
+  "name": "akira-final-spec",
+  "project": "projects/jarvis/Akira-final-spec",
+  "branch": "agent/loop/akira-final-spec-review",
+  "template": "spec-review",
+  "changelog": "CHANGELOG.md",
+  "inputs": [
+    "spec.md",
+    "decisions.md",
+    "docs",
+    "evals",
+    "assets"
+  ],
+  "consolidation_paths": [
+    "spec.md",
+    "README.md",
+    "docs",
+    "evals",
+    "assets"
+  ]
+}

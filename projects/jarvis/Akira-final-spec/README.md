@@ -3,15 +3,13 @@
 **Round 1** — independent review of Akira v0.3, the production specification for the
 Akeru spin-off.
 
-**Workflow status:** ready for preflight, then a live round. HUMAN decisions AKIRA-D1
+**Workflow status:** preflight passed; ready for a live round. HUMAN decisions AKIRA-D1
 (Akeru base, product named Akira) and AKIRA-D4–D6 (Linux single node, subscription
 logins permitted, private deployment) are recorded. The review input is **`spec.md`
 v0.3**, with its companion documents in `docs/` and representative records in
 `evals/fixtures/`.
 
-Historical material is preserved and out of scope: the original options proposal
-(`../spec.md`), the round-1 reviews (`../reviews/round-1/`) and the complete round-2
-debate (`../reviews/round-2/`). Do not review the old proposal as Akira's specification,
+Historical material is preserved and out of scope: the original options proposal and completed debate in the separate `jarvisbot` worktree (`projects/jarvis/JarvisBot/`). Do not review the old proposal as Akira's specification,
 and do not rerun the option assessment.
 
 ---
@@ -21,11 +19,7 @@ and do not rerun the option assessment.
 **Round 1**: reviewers read the specification independently and write
 `reviews/round-1/<AGENT>.md`. Round 2+ reads the previous consolidation first.
 
-**Version note (2026-10-25).** CHATGPT's round-1 review was written against **v0.2**.
-**v0.3** adds the v1 skill catalogue (`docs/15-skills-v1.md`, `spec.md` AK-SKL-13/14),
-version headers and cross-references; it does not resolve CHATGPT's findings, which stay
-for consolidation. DEEPSEEK and GROK review **v0.3**; the consolidator must reconcile
-the version difference and say so in the consolidation.
+**Imported-source note (2026-10-25).** The source folder had a CHATGPT review of v0.2. That historical review is not present in this registered loop and is not a completed pass here. All reviewers in this loop independently review the imported v0.3 package. The preflight passed; no live round has started.
 
 ## Documents and reading order
 
@@ -137,20 +131,15 @@ consolidation.
 
 ## Running the loop
 
-From the repository root of the `jarvisbot` worktree:
+This folder's `loop.json` is authoritative. From this folder:
 
 ```bash
-# Preflight (probes the reviewer backends; no spec changes, no cost on the spec)
-generic/run_review_loop.sh projects/jarvis/JarvisBot/akira Akira preflight
-
-# One live round
-generic/run_review_loop.sh projects/jarvis/JarvisBot/akira Akira agent/loop/akira-review one
+bash automation/run_review_loop.sh preflight
+bash automation/run_review_loop.sh one
+bash automation/run_review_loop.sh full
 ```
 
-The launcher requires a clean tree, the loop branch checked out, and the backend binaries
-(`codex`, `claude`, `cursor-agent`). `automation/run_review_loop.sh` is a thin wrapper
-with these values. Do not run the loop against a dirty tree; do not hand-edit
-`reviews/round-N/` while it runs.
+The wrapper resolves the shared toolkit and reads the project path/name/branch from the manifest. Preflight only tests backends; a live round requires one or full. Reviewers append this project CHANGELOG.md; the consolidator may edit only the declared specification/companion paths. Unrelated root task queues are outside this loop's scope.
 
 ## Ownership and preservation
 
