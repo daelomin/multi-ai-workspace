@@ -1,6 +1,6 @@
 # 05 — Interface and API contracts
 
-**Status:** draft v0.6 · **Normative:** `spec.md` §6–§9 · **Schema detail:** `docs/04-data-model.md`
+**Status:** Final specification v0.7 · **Normative:** `spec.md` §6–§9 · **Schema detail:** `docs/04-data-model.md`
 
 Akira extends Akeru's typed WebSocket RPC and orchestration command set. It does not add
 an HTTP API for internal operations, and it does not let adapters call each other. The
@@ -19,7 +19,7 @@ receipt and dispatches nothing. All queries are projections and never mutate.
 | Command | Purpose | Key guards |
 |---|---|---|
 | `template.create` / `template.publish` / `template.deprecate` | author the library | published versions immutable; content hash computed server-side |
-| `persona.create-revision` | new persona revision from document or patch | schema validation; secrets scan; author recorded |
+| `persona.create-revision` | new persona revision from document or PersonaPatch[] (docs/04 §2) | base hash, path/type, revision order and field provenance validated; recomputed hash; secrets scan; author recorded |
 | `persona.activate` | point an instance/template at a revision | actor authorized on the target; diff recorded |
 | `bot.instantiate` | create instance from template (+ overrides) | credentials checked; isolation invariants; name uniqueness in room |
 | `bot.upgrade` | move instance to a newer template/persona | diff preview token required; working state untouched |
@@ -33,15 +33,15 @@ receipt and dispatches nothing. All queries are projections and never mutate.
 |---|---|---|
 | `task.create` | register intent + acceptance criteria | acceptance criteria non-empty for non-trivial tasks |
 | `task.triage` | attach TriageRecord revision | readiness + estimate present; records policy version |
-| `task.select-route` | choose RouteDecision | floor check; readiness rule; explicit override reason |
-| `task.start` | dispatch attempt | one active attempt; compatibility check |
+| `task.select-route` | choose RouteDecision | floor check; permission allowed (reject forbidden/unknown); readiness rule; explicit override reason |
+| `task.start` | dispatch attempt | one active attempt; floor/availability/permission revalidated; compatibility check; no unresolved dispatched/unknown/dead-attempt intent (docs/04 §8 invariant 4) |
 | `task.pause` / `task.resume` / `task.cancel` | lifecycle | reason; children handled |
 | `task.review` | accept / request rework / reject | criteria evidence |
 | `task.reopen` | reopen terminal task | authorized actor; new revision |
 | `route.preview` | show options and consequences before switching | does not dispatch |
 | `route.override` | per-bot/room/task/attempt override | scope + reason; visible in task |
 | `checkpoint.create` | explicit checkpoint | task revision matches |
-| `checkpoint.resume` | resume from checkpoint on a route | compatibility check; lost-state list |
+| `checkpoint.resume` | resume from checkpoint on a route | compatibility and permission check; lost-state list; no unresolved dispatched/unknown/dead-attempt intent (docs/04 §8 invariant 4) |
 
 ### 1.3 Collaboration
 
@@ -52,7 +52,7 @@ receipt and dispatches nothing. All queries are projections and never mutate.
 | `board.add` / `board.move` | durable items | item refs valid |
 | `decision.record` | decision with evidence, alternatives, dissent | required fields |
 | `handoff.create` | task handoff | acceptance criteria; assignee grant |
-| `turn.complete-silent` | end a turn with `silent` outcome | reason code from closed set; audit record |
+| `turn.complete-silent` | end a turn with `silent` outcome | reason code from closed set; reject every code on a directly addressed direct question; audit record |
 
 ### 1.4 Accountability
 
@@ -120,7 +120,11 @@ interface StartTurnInput {
 3. Tool calls are mapped to `ToolDescriptor` ids; an unmapped tool call fails the attempt
    with `failed_tool_contract`, never with a silent no-op.
 4. The adapter must emit a terminal event for every turn (completed, failed with class,
-   cancelled, interrupted) or the ingestion watchdog marks the attempt interrupted.
+   cancelled, interrupted). The 90-second SilenceWatchdog is a liveness notification
+   only and does not end a live turn. Ingestion records `interrupted` when it establishes
+   that the session/stream ended without a terminal event (or startup finds no live
+   session), with checkpoint and task blocked/awaiting_input. Silence duration alone is
+   not that evidence. Reconcile unresolved actions before any new attempt (F-07/T-03/T-14).
 5. The adapter must not log prompts, completions or secrets by default; diagnostic
    logging is opt-in and redacted.
 
@@ -133,7 +137,7 @@ ProviderCapabilities {
   models: { id; contextWindow; maxOutput; input: ("text"|"image"|"file")[];
             output: ("text"|"json"|"image")[]; reasoning?: {kind; levels[]};
             tools: { supported: boolean; parallel: boolean; dialect: string };
-            skills: "native" | "prompt-injected" | "none"; streaming: boolean;
+            skills: "native" | "projected" | "prompt-injected" | "none"; streaming: boolean;
             usageReporting: "per-turn" | "aggregate" | "none" }[];
   limits?: { window; used; resetsAt; source: "provider-reported" };
   knownGaps: string[];                            // e.g. "custom base URL rejected"
@@ -146,6 +150,8 @@ ProviderCapabilities {
 ## 3. Skill adapter contract
 
 ```ts
+// SupportLevel: closed derived label defined in docs/04 §2.
+// Floor decisions use SkillSupportEntry + CapabilityFloor predicate, not label ordering.
 interface SkillAdapter {
   discover(): Promise<DiscoveredSkill[]>;         // route-native or empty with reason
   project(skill: SkillPackage): Promise<ProjectionResult>;  // copy/inject + verify resources
@@ -202,6 +208,13 @@ interface ConnectorAdapter {
   reconcile(action: ActionRecord): Promise<ReconcileResult>;  // for unknown outcomes
 }
 
+interface ActionContext {
+  actionId: string; taskId: string; attemptId: string;
+  credentialRef: string; logicalActionKey: string;
+  providerIdempotencyKey?: string | null; linkedActionId?: string | null;
+  requestHash: string;                  // executor checks durable call-key registry
+}
+
 interface ActionResult {
   state: "confirmed" | "failed" | "unknown";
   externalId?: string; evidence?: Link; cost?: UsageRecord; retrySafe: boolean;
@@ -216,6 +229,11 @@ action stays `intent`, and an `intent` whose attempt is not live is reconciled, 
 resent, unless the executor can prove `execute` was never started. Recovery appends
 `unknown` for a possibly sent legacy `intent`, or `cancelled` with never-started proof
 (docs/04 §4.4); it never invokes `execute` as part of that state repair.
+
+**Action identity.** `logicalActionKey` survives retries. `providerIdempotencyKey` is
+sent only when the provider supports it; linked retries and scoped registry uniqueness
+follow docs/04 §4.4. A duplicate state-event append never triggers another execute call;
+`retrySafe` never clears the unresolved-action guard.
 
 **Rules.** `retrySafe` is a property of the operation semantics, not of the error. A
 connector that cannot prove non-acceptance returns `unknown`; the executor never retries
@@ -232,7 +250,7 @@ connector that cannot prove non-acceptance returns `unknown`; the executor never
 | `quota_exhausted` | plan limit, credit balance zero | no | no | wait / switch account / switch route |
 | `rate_limited` | 429, concurrency cap | yes with backoff | infrastructure-only | wait |
 | `auth_missing` | not signed in, key absent | no | no | connect account |
-| `auth_expired` | revoked refresh token, 401 | no | no (unless another verified account) | reconnect |
+| `auth_expired` | revoked refresh token, 401 | no | no; operator repair/switch for a new request | reconnect |
 | `entitlement` | plan does not include model/feature | no | no | choose another model/plan |
 | `capability_gap` | no tool calling, context too small, no skills | no | **no** | re-triage/escalate |
 | `tool_contract` | unsupported tool schema, invalid call | once after repair | no | adapter fix or reroute |
@@ -240,6 +258,9 @@ connector that cannot prove non-acceptance returns `unknown`; the executor never
 | `network` | DNS, TLS, timeout before acceptance | yes | infrastructure-only | retry |
 | `safety_block` | approval rejected, policy block | no | no | human decision |
 | `unknown` | unclassified | no | no | inspect, escalate |
+
+The fallback column gives defaults; only failed_quota has an explicit
+`always-adequate` exception, per docs/04 §4.2. A backup account is not an auth exception.
 
 The taxonomy is closed and shared by attempts, UI and routing. A provider-specific error
 is mapped into one class; unmapped errors become `unknown` with the raw code retained.
@@ -269,6 +290,18 @@ is no retry or fallback, and the task waits for reconciliation (AK-RTE-12, AK-TS
   guessing.
 
 ---
+
+**v0.7 draft-shape migration note.** These are pre-implementation contract corrections,
+not a claim of deployed schema compatibility. Earlier draft floor strings decode to the
+corresponding mechanism/verification predicate; missing route permission decodes unknown
+and blocks new dispatch until checked. Earlier action `idempotencyKey` is preserved as
+legacy evidence: derive the logical task/intent mapping and provider-key support from
+stored evidence, never assume they are the same or redispatch during migration. Older
+single-currency category rows can expand to one subtotal only when their provenance is
+known; mixed provenance must be recomputed from ledger records. Usage source mappings
+and revision chains follow docs/04 §5/§7; ambiguous histories require reconciliation.
+Fixtures retain draft schemaVersion 1.0; implementation must version/gate production
+contracts before adoption, as the rules above require. Preserve every historical record.
 
 ## 8. Security interface rules
 

@@ -1,6 +1,6 @@
 # 04 — Canonical data model, state machines and records
 
-**Status:** draft v0.6 · **Normative:** `spec.md` §5–§12 · **Representative JSON:** `evals/fixtures/`.
+**Status:** Final specification v0.7 · **Normative:** `spec.md` §5–§12 · **Representative JSON:** `evals/fixtures/`.
 
 ---
 
@@ -73,6 +73,14 @@ PersonaDocument {
   language: { primary: string; allowed: string[] };
 }
 
+PersonaPatch {
+  path: string;                        // RFC 6901 pointer to a PersonaDocument field
+  op: "set" | "remove"; value?: unknown; // value required for set, absent for remove
+  basePersonaHash: string;             // pinned base document before overrides
+  provenance: "template" | "instance" | "human";
+  authoredBy: actor; revision: integer; createdAt: ISO;
+}
+
 PersonaRevision {
   id: per_…; botTemplateId?: tpl_…; botId?: bot_…;
   revision: integer; contentHash: "sha256:…";
@@ -102,7 +110,17 @@ BotInstance {                            // Akeru OrchestrationBot + additions
 **Rules.** A template version is immutable after `published`; editing produces a new
 version. An instance retains its pinned template version until an explicit upgrade.
 Persona overrides are field-level patches with provenance, so the effective document is
-recomputable. Credentials are **not** in these records: an instance references
+recomputable. Start from the pinned template/base document, apply template-layer
+patches, then instance patches, then explicit HUMAN patches, in increasing revision
+order within each layer. Revisions are unique per
+layer in a composition; duplicate revisions or mismatched base hashes reject, never
+sort by timestamp. `set` replaces a field or adds an optional field; `remove` removes
+only optional fields. Arrays are replaced whole; array-index/root patches, unknown
+paths, invalid types and removal of required fields reject. HUMAN provenance requires
+a HUMAN actor; other provenance cannot change HUMAN-owned fields. Retain every patch
+and each field's winning provenance, validate and hash the effective document. A template
+upgrade requires explicit rebase/diff against the new base hash, never silent replay.
+Credentials are **not** in these records: an instance references
 `credentialRef`s resolved from the secret store (`docs/12-operations.md` §3).
 
 ### Goal
@@ -160,6 +178,9 @@ SkillSupportEntry {
   note?: string;                        // e.g. "no injection test run yet"
 }
 ```
+
+`SupportLevel = "native-verified" | "native-unverified" | "projected-verified" |
+"projected-unverified" | "prompt-injected" | "unsupported"`.
 
 The support level (`native-verified`, `native-unverified`, `projected-verified`,
 `projected-unverified`, `prompt-injected`, `unsupported`; AK-SKL-04) is derived from
@@ -246,6 +267,13 @@ RouteSnapshot {
   instanceId: string; accountLabel?: string;
   authClass: "subscription-oauth"|"api-key"|"local"|"none";
   options: object; provenance: "verified"|"assumed";
+  transportPermission: "verified"|"assumed-for-personal-use"|"forbidden"|"unknown";
+}
+CapabilityFloor {
+  requiredTools: string[]; minimumContext: integer; requiredReliability: string;
+  requiredSkills: skl_…[];
+  requiredSkillSupport: { allowedMechanisms: ("native"|"projected"|"prompt-injected")[];
+                          requireVerified: boolean };
 }
 RouteOption = RouteDecision.candidates[number];  // same shape in TriageRecord.proposedRoutes
 
@@ -257,7 +285,8 @@ RouteDecision {
   candidates: { routeKey: string;
                 authClass: "subscription-oauth"|"api-key"|"local"|"none";   // docs/05 §2.1
                 options: object; provenance: "verified"|"assumed";
-                meetsFloor: boolean;     // capability only: tools, context, skill support >= requiredSkillSupport,
+                transportPermission: "verified"|"assumed-for-personal-use"|"forbidden"|"unknown";
+                meetsFloor: boolean;     // capability only: tools, context, skill predicate below,
                                          // reliability. Never cleared by quota/auth/availability.
                 skillSupport: { skillId: skl_…; mechanism; verified: boolean; evidence? }[];
                                          // the SkillSupportEntry (§2) per required skill: the input
@@ -294,13 +323,24 @@ TaskCheckpoint {
 
 ## 4. State machines
 
+**Skill-floor predicate.** Every required skill needs an entry with a mechanism in
+`allowedMechanisms`, and valid current verification evidence when `requireVerified` is
+true. `unsupported` never passes; labels have no total ordering. A native floor is
+`{allowedMechanisms:["native"], requireVerified:true}`; a verified projected floor uses
+`["projected"]`; T3 native-or-projected uses `["native","projected"]` and verification.
+Projected-verified passes the projected floor and fails the native floor. Tools, context
+and reliability remain separate checks. Permission is separate from `meetsFloor`:
+`forbidden`/`unknown` reject selection/dispatch even when capable. Copy permission from
+the descriptor to candidates and RouteSnapshot; revalidate at start/resume and preserve
+the attempt's snapshot.
+
 ### 4.1 Task
 
 | From | Event | To | Guard |
 |---|---|---|---|
 | proposed | accept | triaged | acceptance criteria exist |
-| triaged | route selected | ready | route meets floor (the floor check alone rejects below-floor routes, for every readiness outcome); if readiness is `not-ready`, the chosen candidate's `role` must not be `specification-led` (an `advanced` route that meets the floor may proceed with the risks attached) |
-| ready | attempt dispatched (`task.start`) | running | route meets floor **and** is available; compatibility check passed |
+| triaged | route selected | ready | permission allowed; route meets floor (the floor check alone rejects below-floor routes, for every readiness outcome); if readiness is `not-ready`, the chosen candidate's `role` must not be `specification-led` (an `advanced` route that meets the floor may proceed with the risks attached) |
+| ready | attempt dispatched (`task.start`) | running | route meets floor **and** is available; permission allowed; compatibility and unresolved-action checks passed |
 | running | needs input | awaiting_input | open question created |
 | running | dependency/external block | blocked | blocker recorded with owner |
 | running | pause (human or policy) | paused | reason |
@@ -308,8 +348,8 @@ TaskCheckpoint {
 | blocked | blocker resolved | ready | blocker reference closed; unresolved-action check passed; route check re-run |
 | paused | explicit resume (`task.resume`) | ready | reason recorded; quota-paused tasks need an available adequate route or an operator choice; new checkpoint created |
 | running | attempt ended `completed` | review | artifacts + acceptance evidence |
-| running | attempt ended `failed_rate_limit`/`failed_network` (no dispatched external action) | ready | infrastructure fallback permitted by policy and the alternate route meets the floor; otherwise `blocked` |
-| running | attempt ended `failed_quota` | paused | quota reason and recommended action; no fallback |
+| running | attempt ended `failed_rate_limit`/`failed_network` (no `dispatched`, `unknown` or unresolved dead-attempt `intent` action) | ready | infrastructure fallback permitted by policy and the alternate route meets the floor; otherwise `blocked` |
+| running | attempt ended `failed_quota` | paused by default; ready only under explicit `always-adequate` | quota reason/options; recorded policy basis, adequate available permitted alternate and all unresolved-action guards required |
 | running | attempt ended `failed_capability`/`failed_tool_contract`/`failed_context_overflow`/`failed_safety_block` | triaged | re-triage required; no automatic fallback |
 | running | attempt ended `failed_auth` | blocked | repair action: reconnect or switch account |
 | running | attempt ended `failed_unknown`/`interrupted` | blocked or awaiting_input | resumable checkpoint written; any `dispatched`/`unknown` action reconciled first |
@@ -336,8 +376,20 @@ an event with actor and timestamp.
 
 Mapping to route policy: only `failed_rate_limit` and `failed_network` are eligible for
 automatic infrastructure fallback by default, and only when no external action is
-`dispatched` or `unknown` (a 429 or timeout after a send is `interrupted`/`failed_unknown`). `failed_quota` pauses and asks. Capability,
+`dispatched`, `unknown` or unresolved dead-attempt `intent` (a 429 or timeout after a send is `interrupted`/`failed_unknown`). `failed_quota` pauses and asks unless the explicit quota policy below applies. Capability,
 tool-contract and safety failures never fall back automatically; they re-triage.
+
+**Fallback policy procedure.** `none`: no automatic fallback. `infrastructure-only`
+(default): only failed_rate_limit/failed_network, with backoff as applicable.
+`always-adequate`: those classes plus failed_quota, the explicit quota exception, not
+permission for every failure. Auth/entitlement block for operator repair;
+capability/tool-contract/context/safety re-triage; unknown/interrupted wait for recovery;
+completed/cancelled never trigger fallback. Every policy preserves floor, readiness,
+permission, availability, compatibility, approvals, pause/quarantine and unresolved-action
+guards (`dispatched`, `unknown`, dead-attempt `intent`). No eligible alternate means
+quota stays paused with options. Account takeover follows the same procedure, never an
+adapter retry. Each fallback records policyVersion/basis, a visible RouteDecision and a
+new attempt; the old outcome is retained.
 
 **Error class → attempt outcome.** The error taxonomy (`docs/05` §6) and the outcome set
 are two closed vocabularies related by this single mapping; fault-matrix expectations and
@@ -373,7 +425,7 @@ automatic fallback until the action is reconciled (§4.4).
 
 **Availability is not adequacy.** A quota-exhausted, auth-blocked or rate-limited route is
 recorded `meetsFloor: true` with `available` set accordingly; the task pauses (or falls
-back only for infrastructure classes). It is never escalated or re-triaged because of
+back only for infrastructure classes by default, or explicit quota policy). It is never escalated or re-triaged because of
 availability alone.
 
 ### 4.3 Readiness
@@ -435,10 +487,36 @@ never started permits `cancelled` instead. A read-back confirmation then follows
 normal `unknown → confirmed` evidence path; no recovery transition invokes the connector
 write. A failed read-back alone does not prove non-acceptance.
 
+```ts
+ActionRecord {
+  schemaVersion: string; id: act_…; taskId: task_…; attemptId: att_…;
+  connector: string; credentialRef: string; operation: string; requestHash: string; target: string;
+  logicalActionKey: string;             // stable task + intent across retries
+  providerIdempotencyKey?: string | null; // only if provider supports it
+  linkedActionId?: act_… | null;        // predecessor on a new retry action
+  state: "intent"|"dispatched"|"confirmed"|"failed"|"unknown"|"cancelled";
+  externalId?: string | null; reconciliation?: object;
+  blockedDependents: string[]; createdBy: actor; createdAt; updatedAt;
+}
+```
+
+State events append under an action id; ActionRecord is their current projection.
+Allow only one unresolved action per `(taskId, logicalActionKey)`. A confirmed logical
+intent cannot dispatch again; changed business intent needs a new logical key. After
+evidence-backed failure (or proven-never-sent cancellation), an authorized retry gets a
+new action id, `linkedActionId`, the same logical key and request hash. Changed payload
+requires new intent/approval. Provider-key scope is `(connector, credentialRef,
+providerIdempotencyKey)` (reference only, never secret). A durable call-key registry maps
+that tuple to logical key + hash; multiple events/linked retries may reference it, so it
+is not a unique index on every append-only row. Reuse requires documented provider
+semantics/validity and the same hash; colliding logical keys/hashes reject. If reuse is
+forbidden, a linked retry gets a fresh provider key but the same logical key. Unsupported
+providers omit/null the provider key; no dedupe guarantee is invented. No key authorizes
+retry while an action is unresolved.
+
 **Rule:** `unknown → failed` requires evidence (read-back, error proving no acceptance),
-never a timeout alone. A new action with the same logical intent reuses the idempotency
-key only if the provider semantics permit it; otherwise it is a new key and the ledger
-records the link.
+never a timeout alone. Linked retries follow the separate logical/provider-key rules above;
+repeated not-found reads or elapsed time alone never authorize retry.
 
 ### 4.5 Observer proposal
 
@@ -464,7 +542,9 @@ an actor with the `destructive` scope. There is no timer-based transition.
 
 ```ts
 UsageRecord {
-  id: use_…; idempotencyKey: string;      // unique per owner + source
+  id: use_…; idempotencyKey: string;      // globally namespaced logical usage identity
+  source: { namespace: string; key: string }; // immutable source, independent of owner
+  revision: integer;                    // starts at 1; unique per logical usage key
   owner: { kind: "bot"|"task"|"room"|"observer"|"connector"; id };
   attribution: { botId?; taskId?; attemptId?; roomId?; threadId?; turnId?;
                  parentTaskId?; parentUsageId? };
@@ -476,7 +556,7 @@ UsageRecord {
   tokens?: { uncachedInput: integer|null; cachedInput: integer|null;
              cacheCreation: integer|null; output: integer|null;
              reasoning?: integer|null; unavailableReason?: string };
-  units?: { kind: "call"|"minute"|"message"|"image"|"video-second"|"job"; count: number };
+  units?: { kind: "call"|"minute"|"message"|"image"|"video-second"|"job"|"sandbox-hour"|"host-month"; count: number };
   cost?: ExactMoney & { provenance: CostProvenance;   // §1 exact fixed point
            priceTableVersion?: string; providerChargeId?: string };
   state: "reserved"|"reported"|"corrected"|"released"|"unavailable";
@@ -487,26 +567,43 @@ UsageRecord {
 **Cost summary** (derived, never stored as truth):
 
 ```ts
+CostSubtotal { currency: string; providerReportedMinor: integer|null;
+               priceTableEstimateMinor: integer|null; subscriptionEquivalentMinor: integer|null }
+UsageCoverage { reported: integer; estimated: integer; subscription: integer; unknown: integer }
+CostBreakdown { subtotals: CostSubtotal[]; coverage: UsageCoverage }
 CostSummary { schemaVersion: string;
-              subtotals: { currency: string;               // one row per currency; never merged
-                           providerReportedMinor: integer | null;
-                           priceTableEstimateMinor: integer | null;
-                           subscriptionEquivalentMinor: integer | null }[];
+              subtotals: CostSubtotal[]; // one row per currency; never merged
               combinedEstimate?: Money & { label: "combined economic estimate, not spend" };
-              coverage: { reported: integer; estimated: integer; subscription: integer; unknown: integer };
-              byCategory?: Record<category, { amountMinor: integer|null; currency: string;
-                                              provenance: CostProvenance|"mixed" }> }
+              coverage: UsageCoverage;
+              byCategory?: Partial<Record<category, CostBreakdown>>;
+              failedAttempts?: CostBreakdown } // required in task drill-down only
 ```
 
 `byCategory` is present in the cost-summary query response (task drill-down) and may be
 omitted in summaries embedded in projections such as `Task.cost`; when present it is
-consistent with the subtotals.
+consistent per currency/provenance, with display rounding residuals labelled (§1).
+`failedAttempts` is the required query-only delivery sub-line in docs/09 §8; embedded
+Task.cost summaries may omit it, as they may omit byCategory.
 
 The subtotals are authoritative; `combinedEstimate` is optional, labelled, and must be
 shown with its subtotals. `coverage` counts cost-bearing records per bucket and the
 buckets sum to the cost-bearing records. A correction record is a superseding effective
 snapshot of all token and cost fields now known; queries take the effective revision once
 per logical usage record (`docs/09-accounting.md` §7).
+
+**Usage identity/effective revisions.** `idempotencyKey` is the canonical JSON encoding
+of `[source.namespace, source.key]`, without an owner dimension. Namespace is a persisted
+globally unique source-origin id shared by copies/exports of that source; independent
+origins get distinct ids. The key names one billable event/reservation, not settlement
+delivery. Its mapping survives migration/export for every owner kind; ownership or
+attribution correction preserves it. Initial revision is 1; settlement/correction/release
+increments revision and `supersedes` the previous record id with a full snapshot under
+the same key. Enforce unique `(idempotencyKey, revision)` and one successor per record;
+duplicate receipts return the existing revision and conflicting successors reject for
+reconciliation. Select the latest non-superseded revision once: reported/corrected count;
+reserved/unavailable count under their measurement and unknown labels; released counts
+neither tokens, cost nor coverage. Unknown money stays null, never zero. Superseded
+revisions are audit-only.
 
 **Non-token costs** use the same table with `units`, so telephony minutes, template
 messages, image renders and sandbox time are attributed without pretending to be tokens.
@@ -519,9 +616,9 @@ messages, image renders and sandbox time are attributed without pretending to be
 |---|---|---|
 | BotTemplate, PersonaRevision, BotInstance, Goal, Procedure, SkillPackage, Room | events + projections, `projection_*` tables | new tables; content-addressed documents on disk for skill bundles/persona body if large |
 | Task, Attempt, TriageRecord, RouteDecision, TaskCheckpoint | events + projections | checkpoints also written as JSON files for portability; hash recorded |
-| ActionRecord | append-only table + projection for open actions | index on `(task_id, state)`, unique `(connector, idempotency_key)` |
+| ActionRecord | append-only table + projection for open actions | index on `(task_id, state)`; logical-action guard and provider call-key registry per §4.4, not event-row provider-key uniqueness |
 | Rating, Dispute, ObserverProposal | events + projections | revisions append |
-| UsageRecord | append-only table | extend `akeru_bot_usage_entries` or a new table keyed by `idempotencyKey`; see §7 |
+| UsageRecord | append-only table | extend `akeru_bot_usage_entries` or a new table unique on `(idempotencyKey, revision)` plus chain guards (§5); see §7 |
 | Artifact | files + metadata table | content hash, kind, producer, license, retention class |
 | AuditRecord | append-only table | actor, action, target, before/after hash, request id |
 
@@ -531,7 +628,11 @@ messages, image renders and sandbox time are attributed without pretending to be
   `parent_entry_id`, `instance_id`, `account_label`, `measurement`, `currency`,
   `cost_coefficient`, `cost_scale`, `price_table_version`, `units_kind`, `units_count`, `supersedes_id`.
   Existing rows remain valid with nulls, preserving the `UNIQUE(bot_id, source_key)`
-  semantics for old writers. Legacy `category` values are mapped by the deterministic
+  semantics for old writers. Backfill a persisted origin namespace and canonical JSON
+  source key from `(bot_id, source_key)`; old-writer inserts resolve through this map to
+  the same logical key, never a parallel charge. New sources use their stable event key
+  for all owner kinds. Add source/idempotency_key/revision and chain constraints (§5)
+  while retaining legacy uniqueness. Legacy `category` values are mapped by the deterministic
   table in `docs/09-accounting.md` §3 (delegated→delegation, reflector→observer,
   extraction/recall→other, unknown→other with the original value kept in `notes`); a
   migration test asserts each pre-migration row keeps one valid category and is counted

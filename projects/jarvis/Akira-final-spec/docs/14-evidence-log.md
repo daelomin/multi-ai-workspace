@@ -1,6 +1,6 @@
 # 14 — Evidence log: what was inspected and how
 
-**Status:** draft v0.3
+**Status:** Final specification v0.7
 
 **Purpose:** make every `V` claim reproducible by another engineer, and record what was
 *not* done so nobody mistakes inspection for verification.
@@ -119,7 +119,7 @@ grep -rn … (source/doc searches)
 Vendor pages: Gmail scopes page fetched (HTTP 200; scopes listed), Twilio Call resource
 and Meta WhatsApp send page fetched (HTTP 200; Meta `wamid` confirmed; Twilio idempotency
 field **not** established because the page is JS-rendered). No pricing was fetched for
-this draft; cost bases are marked unknown where not read.
+this specification; cost bases are marked unknown where not read.
 
 ---
 

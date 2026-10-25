@@ -1,6 +1,6 @@
 # 12 — Security, deployment, operations and recovery runbooks
 
-**Status:** draft v0.6 · **Normative:** `spec.md` §15, §17 · **Estimates and SLOs are proposals, not HUMAN-approved.**
+**Status:** Final specification v0.7 · **Normative:** `spec.md` §15, §17 · **Estimates and SLOs are proposals, not HUMAN-approved.**
 
 Nothing in this document authorizes execution against real data. Runbooks are written to
 be followed on a staging environment first; commands that delete anything are explicitly
@@ -279,7 +279,8 @@ record the lost time and cost.
 
 ### 7.2 Credit exhaustion
 
-Pause the task with `quota_exhausted`; list adequate routes and accounts. The operator
+By default pause with `quota_exhausted`; list adequate routes/accounts. Only a recorded
+`always-adequate` policy permits quota fallback through docs/04 §4.2 guards. Otherwise the operator
 chooses wait, switch route, or switch account. Resume from checkpoint; record the switch
 as a route decision, not an adequacy change.
 
@@ -384,7 +385,7 @@ restore time above RTO. Those are ADR-10 migration triggers.
 VPS: €10–40/month. Block storage/backups: €5–25/month. Domain/TLS: €0–20/year. Inference,
 telephony, messaging and media are usage-based and must be taken from the ledger and
 current vendor prices (`docs/09`), not from this table. No vendor quote was obtained for
-this draft.
+this specification.
 
 ---
 

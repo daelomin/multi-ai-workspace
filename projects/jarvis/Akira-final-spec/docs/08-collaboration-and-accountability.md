@@ -1,6 +1,6 @@
 # 08 — Collaboration, silence, ratings, observer and inspectable records
 
-**Status:** draft v0.6 · **Normative:** `spec.md` §10, §11, §15 · **Schema:** `docs/04-data-model.md`.
+**Status:** Final specification v0.7 · **Normative:** `spec.md` §10, §11, §15 · **Schema:** `docs/04-data-model.md`.
 
 ---
 
@@ -80,14 +80,19 @@ any evidence (what was checked), then emits nothing to the room.
 
 ### 3.2 Silence reason codes (closed set)
 
+**Global guard, before every row below:** a directly addressed direct question rejects
+all silence codes, including quiet_hours/policy_hold and legacy aliases. The bot must
+answer, ask or escalate within its grants; this never authorizes a prohibited action.
+The allowed-when column is additional to this guard.
+
 | Code | Meaning | Allowed when |
 |---|---|---|
-| `no_new_work` | message needs no action and adds no information | always |
+| `no_new_work` | message needs no action and adds no information | global guard passes |
 | `already_answered` | a newer message or another bot answered the same point | answer is verifiably equivalent or better |
 | `duplicate` | same content/topic within the dedupe window | dedupe key matches |
 | `waiting_dependency` | bot is blocked and has nothing actionable | blocker recorded on a task |
-| `quiet_hours` | room policy (the "quiet hours" half of the last AK-COL-05 clause) | policy in force |
-| `policy_hold` | room rule says only lead/assigned bots speak (the "explicit room rule" clause of AK-COL-05) | rule matches |
+| `quiet_hours` | room policy (the "quiet hours" half of the last AK-COL-05 clause) | policy in force and global guard passes |
+| `policy_hold` | room rule says only lead/assigned bots speak (the "explicit room rule" clause of AK-COL-05) | rule matches and global guard passes |
 | `no_evidence` | bot is **not addressed** and would have to speculate (the "not addressed and no evidence to add" clause of AK-COL-05) | guard: rejected if the bot was directly addressed (mention, assignment or direct question); it says so internally, not in chat |
 
 The seven codes map onto the six AK-COL-05 clauses: every code belongs to exactly one

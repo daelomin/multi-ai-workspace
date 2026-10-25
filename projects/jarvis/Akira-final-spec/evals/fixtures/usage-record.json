@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0",
   "id": "use_T142_2",
-  "idempotencyKey": "task_T142/attempt_T142_2/turn-1",
+  "idempotencyKey": "[\"synthetic-akira-example-origin\",\"task_T142/attempt_T142_2/turn-1\"]",
   "owner": {
     "kind": "task",
     "id": "task_T142"
@@ -25,7 +25,8 @@
     "accountLabel": "Max 20x",
     "authClass": "subscription-oauth",
     "options": {},
-    "provenance": "assumed"
+    "provenance": "assumed",
+    "transportPermission": "assumed-for-personal-use"
   },
   "category": "turn",
   "measurement": "provider-reported",
@@ -50,5 +51,10 @@
   "createdAt": "2026-10-24T18:05:00.000Z",
   "settledAt": "2026-10-24T18:27:38.000Z",
   "supersedes": null,
-  "notes": "Reasoning is a subset of output; cached input is disjoint from uncached input."
+  "notes": "Reasoning is a subset of output; cached input is disjoint from uncached input.",
+  "source": {
+    "namespace": "synthetic-akira-example-origin",
+    "key": "task_T142/attempt_T142_2/turn-1"
+  },
+  "revision": 1
 }

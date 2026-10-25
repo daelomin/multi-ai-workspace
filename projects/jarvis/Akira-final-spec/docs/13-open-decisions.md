@@ -1,6 +1,6 @@
 # 13 — Unresolved decisions register
 
-**Status:** draft v0.3. Every item is a question this specification does not answer, or
+**Status:** Final specification v0.7. Every item is a question this specification does not answer, or
 one that HUMAN has now answered and that is kept for traceability. Resolved items state
 the decision.
 
@@ -16,7 +16,7 @@ A reversible default is not an approval. When HUMAN answers, the answer is recor
 | U1 | What host runs Akira, and is it always on? | Linux VPS; home server; macOS; laptop-only | **Resolved 2026-10-25: AKIRA-D4** — Linux, single node, always on | No | A later host change is a deployment decision; it changes WhatsApp/webhook and availability design |
 | U2 | May subscription logins (ChatGPT/Claude/Grok/Kimi) be used through Akira's runtime? | Personal-use acceptance; API keys only; per-vendor review | **Resolved 2026-10-25: AKIRA-D5** — yes, for the operator's personal work; route-level permission recorded | No | A vendor prohibition disables that route (recorded) and reverts it to API keys; no architecture change |
 | U3 | Is Akira private/internal or to be published? | Private fork; internal distribution; public release | **Resolved 2026-10-25: AKIRA-D6** — private, internal only | No | Publication would be a new HUMAN decision with license/trademark/distribution review |
-| U4 | What budgets, spend caps, concurrency caps and approval thresholds apply? | No cap; per-task cap; monthly cap; per-route cap | No caps; proposed defaults are labelled and configurable (AK-TRG-15) | No (spec proceeds) | Values set guardrails; low caps force stricter routing/triage and may change the cheapest adequate route |
+| U4 | What budgets, spend caps, concurrency caps, approval thresholds and service-objective targets (availability, RPO/RTO, channel failure notice time) apply? | No cap; per-task/monthly/per-route cap; approve or replace docs/12 §2 SLO proposals | No HUMAN-set caps/targets; defaults labelled/configurable (AK-TRG-15); SLOs in docs/12 §2 are proposals only | No (spec proceeds) | Values set guardrails; low caps force stricter routing/triage and may change the cheapest adequate route |
 | U5 | Which WhatsApp Business administration operations are actually needed? | Messaging only; profile+numbers+templates; full account ops | Messaging now; admin adapter scoped to profile/numbers/templates | No | Drives Meta app permissions, onboarding time and cost; full account review is not automatable |
 | U6 | How should ratings aggregate into reputation? | Evidence-weighted mean; median+confidence; task-class normalised | Derived view, model configurable, no weights fixed | No | The chosen model changes reputation displays, not task data; needed before ratings inform routing |
 | U7 | Which vendors for telephony, WhatsApp BSP vs direct, images, video? | Twilio/Meta direct; BSP; xAI/OpenAI/local; video providers | Contracts defined; first adapters candidates only | No (stub-first) | Vendor onboarding time and cost; contract stays stable |
@@ -28,7 +28,7 @@ A reversible default is not an approval. When HUMAN answers, the answer is recor
 | U13 | What does "phone calls" need: outbound only, inbound, recording, transcription? | Outbound scripted; +inbound; +recording | Outbound first; recording requires policy config | No | Telephony adapter scope, cost, consent obligations |
 | U14 | How long may a task run before it needs a human checkpoint? | No limit; per-class deadline; spend-based | Deadlines optional per task; defaults proposed | No | Affects triage estimates, supervision and cost guards |
 | U15 | Should Akira adopt Akeru's analytics? | Off; anonymous counters on | Off | No | Privacy posture; no functional impact |
-| U16 | May route selection rank candidates across auth classes (API vs subscription) using a labelled API-equivalent comparison unit? (added v0.4, from review round 1) | Within one auth class only; cross-class ranking via the comparison unit; operator chooses | Off: rank within an auth class, cross-class choice is the operator's (`docs/09` §1.7) | No | Enabling it changes automatic route choice only; accounting and records are unchanged |
+| U16 | May route selection rank candidates across auth classes (API vs subscription) using a labelled API-equivalent comparison unit? (added v0.4, from review round 1) | Within one auth class only; cross-class ranking via the comparison unit; operator chooses | Off: rank within an auth class, cross-class choice is the operator's (`docs/09` §1 item 7) | No | Enabling it changes automatic route choice only; accounting and records are unchanged |
 
 ---
 

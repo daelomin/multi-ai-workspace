@@ -1,131 +1,55 @@
-> Operational paths reconciled for this registered loop on 2026-10-25; originals preserved in ignored migration logs. `loop.json` is authoritative.
+# HANDOFF — Akira final specification v0.7
 
-# HANDOFF — Akira specification review
+**From:** completed multi-AI specification review
+**To:** HUMAN and the implementation agent
+**Date:** 2026-10-25
+**Status:** Final specification v0.7 — review complete; implementation pending
 
-**From:** specification agent (AKIRA-SPEC-001 author)
-**To:** the next agent / HUMAN running the repository's `spec-review` workflow
-**Date:** 2026-10-24
-**Status:** draft complete, review not started
+## Baseline and review outcome
 
----
+`spec.md` v0.7 (AKIRA-SPEC-001), all fifteen companion documents in `docs/`, and
+representative records in `evals/fixtures/` form the final implementation baseline.
+`README.md` gives the reading order. `loop.json` is authoritative for project paths
+and tooling configuration.
 
-## 1. What is being handed over
+Review converged at round 4: CHATGPT reported 3 minor findings, DEEPSEEK 7 and GROK 7;
+there were no blocking or major findings. All 17 findings were consolidated into v0.7.
+The dispositions and remaining HUMAN decisions are recorded in
+`reviews/round-4/CONSOLIDATION.md`. This was the last review round.
 
-A complete Akira production specification (v0.3, incorporating HUMAN decisions
-AKIRA-D4–D6 and the v1 skill catalogue) at:
+The selected base is Akeru Bot at revision
+`524eb68a293c4b6a38acf722ab4232cfe5e22625`. The historical JarvisBot options proposal
+and all completed review rounds remain preserved; the base choice is settled.
 
-```
-projects/jarvis/Akira-final-spec/
-```
+## Implementation handoff
 
-The review input is **`spec.md` v0.3** plus its companion documents in
-`docs/` and fixtures in `evals/fixtures/`. `README.md` defines the
-reading order, the review instructions, the finding format and the stop rule.
+Start with `spec.md`, `decisions.md` and `docs/11-backlog.md`. Use
+`docs/03-architecture.md`, `docs/04-data-model.md` and `docs/05-interfaces.md` for
+boundaries and contracts, and `docs/10-tests-and-acceptance.md` for requirement
+traceability, the fifteen mandatory scenarios and fault tests.
 
-This is a fresh specification review. It is **not** a continuation of the option debate:
+All 209 requirements are specified. They are not runtime-verified. Implementation,
+integration checks, performance measurements, staging acceptance and production
+release evidence remain implementation work. `docs/14-evidence-log.md` distinguishes
+source inspection from unproven capabilities; fixtures are representative examples.
 
-- the historical proposal `projects/jarvis/JarvisBot/spec.md` stays untouched;
-- `reviews/round-1/` and `reviews/round-2/` stay untouched;
-- nothing in the debate is re-litigated; AKIRA-D1 settles the base.
+AKIRA-D1–D6 remain settled as recorded in `decisions.md`. U4–U16 remain explicit
+policy, deployment or migration inputs in `docs/13-open-decisions.md` and the final
+consolidation. Proposed thresholds, budgets and SLOs retain their labels. Finalizing
+the document does not silently resolve those decisions or pass implementation gates.
 
-## 2. Settled decision and authority
+Draft persona content and unactivated observer proposals keep their lifecycle states.
+The specification's final status does not turn unseen source instructions, planned
+skill fixtures or unverified integrations into verified artifacts.
 
-**AKIRA-D1** (recorded in `projects/jarvis/JarvisBot/decisions.md` and
-`decisions.md`): Akeru is the base, the product is Akira, the deliverable is a
-production specification and plan. `decisions.md` also records AKIRA-D2 (no deletion without explicit naming),
-AKIRA-D3 (no deployment, paid service, real customer contact or paid media job),
-AKIRA-D4 (Linux single node, always on), AKIRA-D5 (subscription logins permitted for
-personal use) and AKIRA-D6 (private deployment). Reviewers must not raise these as
-blocking or major findings.
+## Review tooling and preservation
 
-## 3. What the specification contains
+Consolidation is configured for CHATGPT `gpt-6.1-sol`, medium reasoning, for this loop
+only. Consolidator preflight is skipped; reviewer preflight checks CHATGPT, DEEPSEEK
+and GROK. DeepSeek uses its own API profile through Claude Code; the Anthropic
+consolidator account is not required. No additional review round is scheduled.
 
-- normative requirements across identity/library, routes, triage, tasks/continuation,
-  skills, collaboration/silence, ratings/observer, accounting, specialists, connectors,
-  UX, security and operations;
-- an inspected-source baseline of Akeru at
-  `524eb68a293c4b6a38acf722ab4232cfe5e22625`, with reuse/extend/replace/build decisions,
-  licensing/provenance and an explicit "not inspected" list;
-- canonical schemas and state machines, interface contracts, UX flows, integration
-  matrices, acceptance scenarios and fault injection, a phased backlog with a vertical
-  slice, operations runbooks, and an unresolved-decisions register;
-- twelve mandatory acceptance scenarios, including the same bot moving
-  Codex → Claude → DeepSeek → Grok and back, quota exhaustion mid-task, lost
-  acknowledgement after a stub write, skill execution after switching, template
-  isolation, justified silence, disputed ratings, observer evaluation, no-double-count
-  accounting, early triage, full export/restore, and deletion safety.
-
-## 4. Preconditions for starting the review
-
-The loop launcher requires the following. This imported folder is committed, the branch is configured in loop.json, and preflight passed for this registered loop. A live round still requires an explicit one/full launch:
-
-1. **Commit the specification folder** and the CHANGELOG entry, so the worktree is clean.
-2. **Create/check out the review branch** (default `agent/loop/akira-final-spec-review`). The
-   launcher refuses a dirty tree and switches only to the configured branch.
-3. **Run the preflight** and fix every failing backend:
-
-   ```bash
-   bash automation/run_review_loop.sh preflight
-   ```
-
-   The preflight checks `codex`, `claude`, `cursor-agent`, the Anthropic consolidator
-   profile and the DeepSeek key. This registered loop passed preflight; subsequent probes use those credentials and make model calls.
-4. **Run the generic tests** if the loop engine was touched (it was not):
-   `python3 -m unittest discover -s generic/tests`.
-
-## 5. Starting the review (explicitly authorized, no implementation)
-
-```bash
-# one live round: CHATGPT, DEEPSEEK, GROK independently review, CLAUDE consolidates
-bash automation/run_review_loop.sh one
-
-# or up to 5 rounds
-bash automation/run_review_loop.sh full
-```
-
-`automation/run_review_loop.sh` wraps the same command. The loop commits and pushes each
-review as `<AGENT>: …`; it stops when a round has no `blocking`/`major` finding.
-
-**Not authorized by this handoff:** implementing any phase, installing or deploying
-Akeru/Akira, buying services, contacting real people, calling real numbers, paid media,
-or deleting data. The specification's own AKIRA-D3 applies to the next agent too.
-
-## 6. What to check before accepting the review result
-
-- The reviews reference requirement IDs and documents, not just general impressions.
-- Blocking/major findings are genuinely blocking; minor findings are not hidden majors.
-- The consolidation applies accepted changes to `spec.md`/docs (not just to the
-  consolidation), bumps the version, and updates the README round.
-- Every mandatory scenario is still covered after edits, and the traceability matrix is
-  consistent.
-- AKIRA-D1/D2/D3 remain intact; no proposal re-opens the base choice or adds a silent
-  deletion or external-contact path.
-- The "unresolved decisions" register is updated, not bypassed, when a reviewer raises a
-  question only HUMAN can answer.
-
-## 7. Known weaknesses a reviewer should expect to find
-
-These are stated honestly rather than hidden; finding them again is fine, but a reviewer
-should distinguish "already acknowledged" from "new":
-
-- Effort ranges are estimates without historical velocity (±50% stated).
-- Several integration rows (Twilio idempotency, WhatsApp template costs, vendor pricing,
-  video provider capabilities) are `U`; no live verification was done.
-- The Mastra-routed Claude skill path and Codex `$name` execution are unverified and
-  explicitly assigned to tests.
-- The rating aggregation and routing thresholds are policy surfaces without HUMAN values;
-  defaults are labelled proposed.
-- The single-node SQLite assumption is bounded by a workload model, not benchmarked.
-- Migration content (personas, memory, shared pages) is draft-by-design; the specification
-  never invents the original instructions.
-
-## 8. Files touched by this handoff
-
-New (all under `projects/jarvis/Akira-final-spec/`): `spec.md`, `README.md`,
-`decisions.md`, `HANDOFF.md`, `docs/01`–`docs/14`, `evals/fixtures/*`, `automation/*`,
-`reviews/round-1/` (empty, awaiting reviewers).
-
-Changed outside the folder: one append-only `CHANGELOG.md` entry at the repository root.
-
-Nothing else was modified, moved, deleted or reset. No git commit or push was performed by
-the specification agent.
+The portable wrapper remains available at `automation/run_review_loop.sh`. Review
+logs, findings, consolidations and previous versions remain in project/Git history.
+The earlier handoff is also preserved in the ignored finalization snapshot under
+`automation/logs/`. No artifact is deleted, pruned or reset.

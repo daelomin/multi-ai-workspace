@@ -1,6 +1,6 @@
 # 02 — Akeru baseline: inspected source, reuse and gap matrix
 
-**Status:** draft v0.3 · **Revision inspected:** `524eb68a293c4b6a38acf722ab4232cfe5e22625` (2026-10-23T21:06:41Z), which was also the remote `HEAD` on 2026-10-24.
+**Status:** Final specification v0.7 · **Revision inspected:** `524eb68a293c4b6a38acf722ab4232cfe5e22625` (2026-10-23T21:06:41Z), which was also the remote `HEAD` on 2026-10-24.
 **Method:** source tarball downloaded from `codeload.github.com/opencoredev/akeru-bot` at that SHA and inspected statically. No install, build, test, login, connector, archive, delete or paid call was performed. Every `V` claim below is a file/symbol read in that tree, not a reproduced behaviour.
 
 ---

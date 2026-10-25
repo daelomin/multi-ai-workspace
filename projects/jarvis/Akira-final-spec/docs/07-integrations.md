@@ -1,6 +1,6 @@
 # 07 — Integration matrices: routes, skills, connectors, specialists
 
-**Status:** draft v0.3 · **Normative:** `spec.md` §6, §9, §13, §14.
+**Status:** Final specification v0.7 · **Normative:** `spec.md` §6, §9, §13, §14.
 **Evidence date:** 2026-10-24 unless stated. Nothing below was executed. `V` = inspected file/source, `D` = upstream documentation, `M` = maintainer-reported, `R` = reasoning, `U` = unknown.
 
 ---
@@ -134,7 +134,7 @@ is a runtime contract. The concrete v1 packages, statuses and fixtures are in
 ## 5. Specialist capability contracts
 
 Each contract is independent of vendor. A vendor adapter fills it in; the spec does not
-select a vendor without current primary-source evidence (`docs/13-open-decisions.md` U8).
+select a vendor without current primary-source evidence (`docs/13-open-decisions.md` U7).
 
 ### 5.1 Telephony (PSTN)
 

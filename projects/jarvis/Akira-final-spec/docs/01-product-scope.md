@@ -1,6 +1,6 @@
 # 01 — Product scope, users and workflows
 
-**Status:** draft v0.3 · **Normative requirements:** `spec.md` §4, §15 · **Evidence labels:** V/D/M/R/A/U as defined in `spec.md` §0.
+**Status:** Final specification v0.7 · **Normative requirements:** `spec.md` §4, §15 · **Evidence labels:** V/D/M/R/A/U as defined in `spec.md` §0.
 
 This document explains what Akira is for, who uses it, and what a working day looks
 like. Requirements live in `spec.md`; this document supplies the product reasoning
@@ -110,8 +110,9 @@ The instance is isolated from the template and from every other instance from st
 
 - **User-initiated:** per bot (future tasks), per task (next attempt), or per attempt
   (this turn). Consequence preview shows what changes (skills support, quota, cost).
-- **Policy-initiated:** only for classified infrastructure failures and only to a route
-  that meets the floor. Visible, logged, reversible.
+- **Policy-initiated:** infrastructure failures by default; quota only under an explicit
+  `always-adequate` policy (docs/04 §4.2). All eligibility and unresolved-action guards
+  apply. Visible, logged, reversible.
 - **Credit exhaustion:** task pauses with a quota reason and options. Resume on another
   adequate route uses the checkpoint; no re-explanation, no identity change.
 
@@ -180,7 +181,7 @@ Measured from the ledger and task records, not from sentiment:
 | Observer hit rate | Accepted refinements that improve held-out outcomes / evaluated proposals | Observer value, not activity |
 
 Initial targets are deliberately omitted: HUMAN has supplied no budgets or thresholds
-(`docs/13-open-decisions.md` U6). The measures and their data sources are fixed now so
+(`docs/13-open-decisions.md` U4). The measures and their data sources are fixed now so
 baselines can be established during the vertical slice.
 
 ---

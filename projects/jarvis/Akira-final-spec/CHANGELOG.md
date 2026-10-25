@@ -1,5 +1,34 @@
 # Akira final specification review activity
 
+## 2026-10-25 — Finalize v0.7 publication status
+
+Agent: CHATGPT
+
+At HUMAN’s request, marked v0.7 as the final specification and implementation baseline
+following round-4 convergence. Aligned all companion document headers, README, final
+consolidation and implementation handoff; retained review tooling as reference.
+Preserved open decisions, runtime acceptance gates, proposal/persona lifecycle states,
+prior versions and all existing final-round changes. Corrected CHATGPT served-model
+provenance to match its banner-only record. No implementation or new review was run.
+
+
+## 2026-10-25 — Final round 4 consolidation; review converged on v0.7
+
+Agent: CHATGPT
+
+Consolidated all 17 minor findings (CHATGPT 3, DEEPSEEK 7, GROK 7), with full disposition
+and provenance in reviews/round-4/CONSOLIDATION.md; GROK served model remains unverified.
+Bumped spec v0.6 → v0.7, dated 2026-10-25, and recorded final convergence in README.
+Aligned companion action/usage identity and retry contracts, fallback policies, skill
+predicates, route permission snapshots, persona patches, silence/watchdog rules and
+accounting units, category breakdowns, failed-attempt sub-line and CPAT edge cases.
+Updated representative JSON and acceptance/compatibility contracts. Rechecked settled
+AKIRA-D1–D6; no pending passage remained. Carried U4–U16 in one current list without
+answering them; U4 now explicitly includes existing proposed SLO targets. Static
+fixture/document, arithmetic and traceability checks passed; runtime acceptance remains
+implementation work. No git, deletion, deployment, live integration, paid job or further
+review round was run. Activity is confined to this project; historical artifacts remain.
+
 ## 2026-10-25 — Round 4 specification review
 
 Agent: GROK

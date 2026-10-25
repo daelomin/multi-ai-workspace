@@ -7,7 +7,6 @@
   "operation": "message.send",
   "requestHash": "sha256:1c9d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d",
   "target": "recipient:team@example.invalid",
-  "idempotencyKey": "gmail/T142/send-1",
   "state": "unknown",
   "externalId": null,
   "reconciliation": {
@@ -15,10 +14,16 @@
     "checkedAt": "2026-10-24T19:20:12.000Z",
     "result": "not-found",
     "attempts": 1,
-    "note": "Provider may still accept late; do not retry until a second read or 24h."
+    "note": "Provider may still accept late. A second read or 24h is only a follow-up/escalation schedule; repeated not-found or elapsed time leaves unknown. Retry requires affirmative acceptance/non-acceptance evidence or documented HUMAN reconciliation establishing the prior effect."
   },
-  "blockedDependents": ["task_T142:notify-reviewer"],
+  "blockedDependents": [
+    "task_T142:notify-reviewer"
+  ],
   "createdBy": "bot_RAJIV",
   "createdAt": "2026-10-24T19:20:02.000Z",
-  "updatedAt": "2026-10-24T19:20:12.000Z"
+  "updatedAt": "2026-10-24T19:20:12.000Z",
+  "logicalActionKey": "gmail/T142/send-1",
+  "providerIdempotencyKey": null,
+  "linkedActionId": null,
+  "credentialRef": "synthetic:gmail-test-account"
 }

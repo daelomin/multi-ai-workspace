@@ -1,6 +1,6 @@
 # 15 — Akira v1 skill catalogue and `SKILLS.md`
 
-**Status:** draft v0.6 · **Normative:** `spec.md` AK-SKL-01..14 · **Schema:** `docs/04-data-model.md` §2.
+**Status:** Final specification v0.7 · **Normative:** `spec.md` AK-SKL-01..14 · **Schema:** `docs/04-data-model.md` §2.
 
 This document answers one question: **which skills ship in Akira v1, and what does
 `SKILLS.md` contain?**
@@ -12,7 +12,7 @@ may be marked available (`docs/10-tests-and-acceptance.md` T-04).
 **Fixture status:** the `fixtures/skill-<name>/` paths in the tables are the planned
 locations under `evals/fixtures/`. Only the `sheet-ops` package example exists today
 (`evals/fixtures/skill-package.json`); the other fixture directories are created with
-their skill in Phase 4 and must not be presented as present in this draft.
+their skill in Phase 4 and must not be presented as present in this specification.
 
 ---
 

@@ -159,7 +159,8 @@
         "estimateBasis": "price table 2026-10-01",
         "note": "native skills, verified",
         "role": "advanced",
-        "options": {}
+        "options": {},
+        "transportPermission": "assumed-for-personal-use"
       },
       {
         "routeKey": "deepseek/deepseek-chat",
@@ -185,7 +186,8 @@
         "estimateBasis": "price table 2026-10-01",
         "note": "below floor: skills are prompt-injected (not native-verified); tool transcript pending",
         "role": "specification-led",
-        "options": {}
+        "options": {},
+        "transportPermission": "unknown"
       }
     ],
     "decision": {

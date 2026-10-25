@@ -11,7 +11,12 @@
       "web.publish"
     ],
     "minimumContext": 64000,
-    "requiredSkillSupport": "native-verified",
+    "requiredSkillSupport": {
+      "allowedMechanisms": [
+        "native"
+      ],
+      "requireVerified": true
+    },
     "requiredReliability": "tool-transcript-verified",
     "requiredSkills": [
       "skl_SHEET_OPS"
@@ -46,7 +51,8 @@
       "estimateBasis": "price table 2026-10-01",
       "note": "native skills, verified",
       "role": "advanced",
-      "options": {}
+      "options": {},
+      "transportPermission": "assumed-for-personal-use"
     },
     {
       "routeKey": "deepseek/deepseek-chat",
@@ -72,7 +78,8 @@
       "estimateBasis": "price table 2026-10-01",
       "note": "below floor: skills are prompt-injected (not native-verified); tool transcript pending",
       "role": "specification-led",
-      "options": {}
+      "options": {},
+      "transportPermission": "unknown"
     },
     {
       "routeKey": "codex/gpt-5.1-codex",
@@ -97,7 +104,8 @@
       "estimateBasis": "subscription-equivalent",
       "note": "Below native-verified skill floor: native support remains unverified; quota also exhausted. Overlap with Claude does not assign a default specification-led role.",
       "role": "advanced",
-      "options": {}
+      "options": {},
+      "transportPermission": "assumed-for-personal-use"
     }
   ],
   "chosen": {

@@ -1,6 +1,6 @@
 # 09 — Token, cost and credit accounting
 
-**Status:** draft v0.6 · **Normative:** `spec.md` §12 · **Schema:** `docs/04-data-model.md` §5.
+**Status:** Final specification v0.7 · **Normative:** `spec.md` §12 · **Schema:** `docs/04-data-model.md` §5.
 
 The accounting system exists to answer three questions without lying:
 
@@ -60,7 +60,7 @@ The accounting system exists to answer three questions without lying:
 owner        bot | task | room | observer | connector
 attribution  botId, taskId, attemptId, roomId, threadId, turnId,
              parentTaskId, parentUsageId
-route        harness, driver, provider, model, instanceId, accountLabel, authClass, options, provenance
+route        harness, driver, provider, model, instanceId, accountLabel, authClass, options, provenance, transportPermission
 category     turn | tool | delegation | routine | review | coordination | observer
              | media | other
 measurement  provider-reported | estimated | subscription-equivalent | unknown
@@ -144,7 +144,7 @@ Coverage counts cost-bearing records per bucket (`reported`, `estimated`,
 The buckets sum to the cost-bearing records; a subscription record is neither "reported"
 nor lost.
 - **Failed-attempt cost:** $0.31 (attempt #1) — visible, included in delivery cost, not
-  hidden in a separate "waste" bucket that nobody reconciles.
+  a required query sub-line of delivery (§8), never added again to delivery/total.
 - **Cost per accepted task** (this task): $3.50. If T-142 had been rejected, the $3.12
   (or $3.50 with child) would still count in the denominator's numerator for the class.
 
@@ -215,6 +215,15 @@ the routing policy treats the route as availability-unknown, not as free.
 
 ## 7. Reconciliation
 
+Use docs/04 §5's global logical key and append-only revision chain for every owner kind.
+A settlement MUST supersede its reservation (same key, new revision, full snapshot),
+including unavailable-to-reported corrections. Queries select the latest non-superseded
+revision once. `released` contributes no tokens, cost or coverage. `reserved` and
+`unavailable` contribute known values once under their measurement/provenance label;
+unknown cost is null and counts in unknown coverage, never a fabricated zero. A provider
+report replaces the estimate; it is never a second usage event. Duplicate delivery
+returns the existing revision; conflicting successors need reconciliation.
+
 | Situation | Handling |
 |---|---|
 | Provider usage arrives after the turn | append a `correction` record that supersedes the estimate; do not edit |
@@ -234,13 +243,29 @@ attempts that ended. Discrepancies create an operator alert, not a silent fix.
 
 | View | Shows | Must not |
 |---|---|---|
-| Task | exclusive, inclusive, overhead, failed attempts, per-category, per-attempt | hide child cost or failed spend |
+| Task | exclusive, inclusive, overhead, failed-attempt delivery sub-line, per-currency/per-provenance category breakdown with coverage, per-attempt | hide child cost or failed spend |
 | Bot | own turns, tasks it executed, reviews it gave/received, reputation context | conflate reviews given with work done |
 | Room | merged tasks and messages cost | double count a task mentioned twice |
-| Route | cost per accepted task, latency, failure rate | compare subscription-equivalent to API dollars as if equal (rank within an auth class, or use the labelled routing comparison unit, §1.7) |
+| Route | cost per accepted task, latency, failure rate | compare subscription-equivalent to API dollars as if equal (rank within an auth class, or use the labelled routing comparison unit, §1 item 7) |
 | Account | provider-reported meter, last refresh, staleness | infer a balance |
 | Observer | its own cost and evaluations | omit cost from the proposals it makes |
 | Team/day | total exclusive, coverage %, unknown count | present an incomplete total as complete |
+
+**Failed-attempt sub-line (query, not ledger truth).** For the same task/scope as the
+delivery view, select effective usage records in delivery categories whose
+`attribution.attemptId` resolves to outcome `failed_*` or `interrupted`. Sum by currency
+and provenance with coverage; this is `CostSummary.failedAttempts`, required on task
+drill-down, optional in embedded `Task.cost`. It is contained in delivery, never added
+to delivery or exclusive/inclusive again. Failed overhead remains overhead and is visible
+in per-attempt detail. Cancelled work with usage has its own per-attempt outcome view;
+cancelled-before-usage adds no cost. Rework is shown per attempt and enters this sub-line
+only if that attempt failed/interrupted. Missing attempt attribution is labelled
+unclassified, never silently assumed successful. The worked example yields $0.31 within
+$2.67 delivery; the task fixture intentionally embeds summaries without the query fields.
+
+`byCategory` uses the same per-currency, per-provenance subtotal and coverage shapes as
+the top-level summary. USD and EUR turn records both remain visible; sum exact records
+before rounding, and label any category-to-top-level display rounding residual (§5).
 
 Coverage is a first-class number: `coverage = (reported + estimated + subscription) /
 (reported + estimated + subscription + unknown)` over cost-bearing records, with the
@@ -269,6 +294,10 @@ an accepted child task is counted through its root only, never as a second accep
 (an accepted child under a root that is not accepted adds cost to the numerator and
 nothing to the denominator).
 Reported per cost provenance (§4a); the combined estimate is labelled as such.
+
+If the accepted-root denominator is zero, CPAT is `n/a`; display incurred cost and
+sample size separately. Do not coerce it to zero/infinity or feed it as a numeric
+cost observation to routing calibration (including a failed-only route).
 
 **Route attribution.** A cost record is attributed to the route of the attempt that
 produced it (`attribution.attemptId` → attempt route). A task that switched routes
@@ -326,7 +355,12 @@ conversion is invented for them.
 2. The process crashes between provider completion and settlement → reservation
    reconciled on startup (Akeru's reservation lifecycle is the base).
 3. Two servers (dev + prod) write to different databases → no cross-database sum; the
-   export/merge path must dedupe by `idempotencyKey`.
+   export/merge path preserves source namespace/key, record ids and revision chains,
+   dedupes by `(idempotencyKey, revision)` and then selects one effective revision per
+   logical key (docs/04 §5). Same key/revision with conflicting payloads or divergent
+   successors rejects/quarantines the merge for reconciliation, never double-counts.
+   Owner changes do not create another logical charge; independent source namespaces
+   cannot collide. Legacy rows use the stable source map in docs/04 §7.
 4. A model is renamed mid-price-table → route key retains model id; price table version
    records which rate applied.
 5. A route is removed → historical records keep their route snapshot; routing cannot use

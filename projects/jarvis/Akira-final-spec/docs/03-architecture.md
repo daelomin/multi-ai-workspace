@@ -1,6 +1,6 @@
 # 03 — Architecture and decision records
 
-**Status:** draft v0.3 · **Normative:** `spec.md` §3, §5–§8 · **Base revision:** Akeru `524eb68a` · **Evidence labels** per `spec.md` §0.
+**Status:** Final specification v0.7 · **Normative:** `spec.md` §3, §5–§8 · **Base revision:** Akeru `524eb68a` · **Evidence labels** per `spec.md` §0.
 
 ---
 
@@ -254,7 +254,7 @@ capacity strategy.
 
 ### ADR-09 — Specialist integrations behind capability contracts; vendor chosen later
 
-**Status:** adopted-for-spec; vendor selection pending (`docs/13-open-decisions.md` U8).
+**Status:** adopted-for-spec; vendor selection pending (`docs/13-open-decisions.md` U7).
 
 **Context.** HUMAN needs PSTN calls, WhatsApp Business management, images and movies.
 Akeru has WhatsApp DM, subscription images and in-client voice only (V/D).
@@ -397,7 +397,7 @@ items and decisions. It references bot threads rather than owning a second trans
 | Room | Max active bot-to-bot exchanges per topic window; publish gate enforces |
 | Connector account | Serialized per account; rate-limit token bucket |
 | Memory scope | One writer per file scope, cross-process lock (Akeru) |
-| Ledger | Append-only, idempotent by `(owner, source_key)`; corrections append |
+| Ledger | Append-only, global source namespace/key identity and revision chain (docs/04 §5); corrections append |
 
 Lock acquisition is keyed and leased; stale locks expire and are logged, never deleted
 by hand.

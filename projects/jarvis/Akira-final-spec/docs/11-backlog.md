@@ -1,6 +1,6 @@
 # 11 — Phased implementation backlog
 
-**Status:** draft v0.4 · **Normative scope:** `spec.md` (complete target) · **Estimates:** ranges, ±50%, no historical velocity data.
+**Status:** Final specification v0.7 · **Normative scope:** `spec.md` (complete target) · **Estimates:** ranges, ±50%, no historical velocity data.
 
 The plan specifies the complete target and defers features explicitly. It does not
 silently drop anything: deferred items are listed in §8 with the trigger that would pull
@@ -127,7 +127,7 @@ queries and views).
 4. Fallback policy and failure taxonomy mapping; quota pause path.
 5. Route rationale UI; switch consequences; provenance on attempts.
 
-**Exit criteria.** T-10 passes; a quota failure pauses rather than downgrades; a below-
+**Exit criteria.** T-10 passes; a quota failure pauses by default; explicit quota fallback preserves all guards (docs/04 §4.2); a below-
 floor route cannot be selected by policy or UI; every attempt has route provenance;
 estimates are compared with actuals and stored.
 

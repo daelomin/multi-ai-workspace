@@ -1,6 +1,6 @@
 # 10 — Tests, acceptance scenarios and traceability
 
-**Status:** draft v0.6 · **Normative:** `spec.md` §18 and every requirement it references.
+**Status:** Final specification v0.7 · **Normative:** `spec.md` §18 and every requirement it references.
 **Nothing in this document has been executed.** It defines what must pass, with which
 fixtures and evidence, before a requirement is called done.
 
@@ -49,7 +49,7 @@ attempt without route provenance; a duplicate bot.
 
 ### T-02 — Forced credit exhaustion mid-task
 
-**Steps.** Start a task on a route whose account is scripted to return `quota_exhausted`
+**Steps.** Use the default infrastructure-only policy. Start a task on a route whose account is scripted to return `quota_exhausted`
 after the first read-only tool call (no external write; an unresolved write instead
 uses the external-effect guard and T-03). Observe the pause; answer "switch route" to an adequate
 alternate; resume.
@@ -66,6 +66,16 @@ after a checkpoint; resume surfaces a `Task.revision`/`contentHash` mismatch aga
 **Fail signals.** Automatic fallback to a cheaper model; task marked failed instead of
 paused; lost artifacts; resume re-executes a completed external action; resume against a
 changed task definition with no mismatch reported.
+
+**Policy/permission cases (T-02).** With backups configured, quota still pauses and
+auth still blocks under the default; an operator switch creates a new request/attempt.
+Only explicit `always-adequate` allows quota fallback, with basis recorded and an
+adequate available permitted alternate. `none` never auto-falls back; infrastructure-only
+handles only rate/network. Auth/capability/safety/unknown never auto-fall back under any
+of these policies. Test all three against unresolved dispatched/unknown/dead-attempt
+intent: every retry/fallback/start/resume is rejected. Selection/start/resume reject
+forbidden/unknown permission even for a floor-meeting route; attempt snapshot retains
+the allowed permission used.
 
 ### T-03 — Restart after a stub write was accepted but not acknowledged
 
@@ -88,6 +98,18 @@ proves the call never started, the action is cancelled with that proof recorded.
 
 **Fail signals.** Duplicate message; retry while unknown; task marked done; silent
 resolution with no evidence.
+
+**Additional T-03 contracts.** Repeated not-found reads plus a clock advanced beyond
+24 hours leave the action unknown and block another write; only affirmative evidence or
+stored HUMAN reconciliation establishing the effect permits resolution. After proven
+non-acceptance, a linked retry retains logicalActionKey/hash and gets a new action id;
+provider-key reuse follows documented support/validity, and a changed payload/key
+collision rejects. Exercise a provider requiring a fresh key and one with no key support.
+Multiple state events with the same provider key append without violating uniqueness;
+concurrent unresolved actions for one logical intent reject. No key bypasses unknown.
+For a lost session with no terminal event, record interrupted, a resumable checkpoint and
+task blocked/awaiting_input; the 90-second notification alone leaves a live attempt running
+(F-07). T-14 repeats that lost-session case under quarantine with no dispatch.
 
 ### T-04 — Skill execution after switching
 
@@ -114,6 +136,13 @@ record. Deleting/archiving A does not affect B (and never deletes B's data).
 
 **Fail signals.** Shared memory path; copied secret; usage attributed to the wrong bot.
 
+**Persona patch contract (T-05 / AK-IDE-04).** Recompute from the pinned base hash,
+template-layer patches, instance patches and explicit HUMAN patches in revision order; every route gets the same
+effective document/hash and winning field provenance. Same-field HUMAN patches win over
+instance patches; later revisions win within a layer. Reject duplicate layer revisions,
+stale base hashes, invalid paths/types, required-field removal and non-HUMAN use of HUMAN
+provenance/ownership. Template upgrade requires explicit patch rebase.
+
 ### T-06 — Justified silent turn
 
 **Steps.** Post a message in a room that is already answered by a newer message; address
@@ -126,6 +155,11 @@ say" message. A second duplicate within the window is suppressed.
 
 **Fail signals.** Empty/placeholder message; missing audit; silence on a direct question;
 repeated notifications.
+
+**Direct-address table cases (T-06).** For each of the seven canonical codes and the
+legacy alias, a directly addressed direct question rejects silence, including during
+quiet hours/policy_hold. Answer/ask/escalate remains subject to grants; a policy hold
+cannot authorize an external action. Unaddressed valid cases still complete silently.
 
 ### T-07 — Peer-disputed rating and correction
 
@@ -182,6 +216,31 @@ and counts once.
 **Fail signals.** Any total off by the child or overhead; duplicate settlement; hidden
 failed cost.
 
+**Accounting edge contracts (T-09).**
+
+- Synthetic infrastructure records: `{units:{kind:"sandbox-hour",count:2},
+  cost:{coefficient:"50",scale:2,currency:"USD",provenance:"price-table estimate"}}`
+  at USD 0.25/hour and `{units:{kind:"host-month",count:1},
+  cost:{coefficient:"1000",scale:2,currency:"USD",provenance:"price-table estimate"}}`
+  at USD 10/month are valid UsageRecords with configured rate provenance and no tokens.
+  Together they contribute USD 10.50 in the other category, with no token conversion.
+- Two turn records, USD 1 and EUR 1, produce both currency rows in byCategory.turn and
+  the top-level summary, with provenance/coverage preserved and no implicit conversion.
+  Category-to-summary comparison uses exact records and labelled rounding residuals.
+- Failed-attempt delivery sub-line is USD 0.31 within USD 2.67 delivery; adding it again
+  fails. Test failed overhead, interrupted delivery, cancelled-with-usage, cancelled-before-
+  usage, successful rework and missing attempt attribution against docs/09 §8's filter.
+- Reserve estimated USD 0.50, then report USD 0.40 superseding it: only USD 0.40 and
+  the settlement tokens count, not USD 0.90. Reserve then release: no tokens/cost/coverage.
+  Reserved/unavailable with unknown amount count once in unknown coverage, never as zero.
+- For each owner kind, duplicate settlement and export/import count once. Same source
+  under changed ownership keeps its key; two independent namespaces with the same local
+  source key remain distinct. Legacy bot/source mapping and copied-database merge retain
+  the same logical charge. Conflicting same-key/revision payloads or divergent chains
+  reject for reconciliation, never sum both.
+- A failed-only route with incurred cost and zero accepted roots displays CPAT n/a, cost
+  and sample size; calibration receives no numeric CPAT. Cover an empty cohort too.
+
 ### T-10 — Early triage of a complex integration
 
 **Steps.** Submit the WhatsApp template/sender integration task. Observe triage before
@@ -203,6 +262,14 @@ completion.
 
 **Fail signals.** Dispatch before triage; invented precision; no re-triage after new
 evidence; estimate never compared with actual.
+
+**Floor/permission contract (T-10).** The same projected-verified skill passes a
+projected floor and fails a native floor; T3 permits verified native or projected.
+Unsupported, missing entries and missing/stale verification fail their predicates.
+ProviderCapabilities can report projected; SupportLevel is derived, never compared as
+an ordered string. A capable route with forbidden/unknown permission remains incapable
+of selection/start/resume while meetsFloor remains true. Test permitted snapshots on the
+selected attempt and permission revocation between selection and start.
 
 ### T-11 — Full export and restore of the working team
 
@@ -314,12 +381,12 @@ and another result; each is then asserted separately.
 | ID | Fault | Injection point | Result kind | Expected result | Expected recovery |
 |---|---|---|---|---|---|
 | F-01 | 401/expired token | provider adapter probe | attempt outcome | `failed_auth` (class `auth_expired`) | block, ask reconnect, no fallback by default |
-| F-02 | 429 with Retry-After | adapter | attempt outcome | `failed_rate_limit` if no action is `dispatched`/`unknown`; otherwise `interrupted` (stream severed) or `failed_unknown` (terminal 429, acceptance not established) | backoff, then infrastructure fallback if configured and no unresolved action; with an unresolved action: no retry or fallback until reconciled (both sub-cases tested) |
+| F-02 | 429 with Retry-After | adapter | attempt outcome | `failed_rate_limit` if no action is `dispatched`/`unknown`/unresolved dead-attempt `intent`; otherwise `interrupted` (stream severed) or `failed_unknown` (terminal 429, acceptance not established) | backoff, then infrastructure fallback if configured and no unresolved action; with an unresolved action: no retry or fallback until reconciled (both sub-cases tested) |
 | F-03 | 5xx mid-stream | adapter stream | attempt outcome | `failed_network` before any external action; `interrupted` when stream ends without terminal event after send; `failed_unknown` for terminal error with acceptance unestablished | no duplicate effects; external-effect cases wait for reconciliation; all branches tested |
-| F-04 | Quota zero | adapter/probe | attempt outcome | `failed_quota` | pause + options |
+| F-04 | Quota zero | adapter/probe | attempt outcome | `failed_quota` | default pause + options; explicit always-adequate branch uses all T-02 guards |
 | F-05 | Tool schema mismatch | adapter tool mapping | attempt outcome | `failed_tool_contract` | repair or reroute, one retry |
 | F-06 | Context overflow | provider | attempt outcome | `failed_context_overflow` | compaction, scope split |
-| F-07 | Provider silent 90 s | runtime ingestion | watchdog | operator inbox activity, no terminal failure | operator decides; not auto-failed |
+| F-07 | Provider silent 90 s; separately lose session without terminal event | runtime ingestion | watchdog; attempt outcome (lost-session branch only) | live session: operator inbox notification, attempt still running; lost session: interrupted + resumable checkpoint, task blocked/awaiting_input | no timeout-only termination; lost-session branch reconciles unresolved actions before new attempt; T-03/T-14 |
 | F-08 | Crash between dispatch and ack | executor + process kill | attempt outcome; action state | attempt `interrupted`; action `dispatched` or `unknown`, then `confirmed` only with evidence | reconciliation, no blind retry |
 | F-09 | Duplicate webhook | channel/WhatsApp stub | delivery state | idempotent ignore | no double task/reply |
 | F-10 | Lost chat result after completion | restart before delivery | delivery state | pending → delivered once | ack in same persisted step |
@@ -356,7 +423,7 @@ All fixtures carry `schemaVersion` (`docs/05` §7). Fixtures are validated again
 published shapes (`docs/04`: summary/proposal `Money` as `amountMinor` + currency,
 usage `ExactMoney` as coefficient + scale + currency, `SkillSupportEntry`, checkpoint
 `taskRevision`, `RouteSnapshot`, and candidates including `authClass`, options, provenance,
-per-required-skill `skillSupport`, `role` and role basis; `docs/08` ObserverProposal money
+per-required-skill `skillSupport`, predicate-based `requiredSkillSupport`, `transportPermission`, `role` and role basis; action logical/provider keys and predecessor link; usage source namespace/key and revision chain; `docs/08` ObserverProposal money
 and cost delta) as well as JSON syntax; the executable
 validator is implementation work (P0/P1) and must reject a shape mismatch. Fixtures are
 validated for semantic
