@@ -60,6 +60,8 @@ def load(project: Path) -> dict:
     cfg = data.get('consolidator', {'backend': 'CLAUDE'})
     if not isinstance(cfg, dict) or cfg.get('backend') not in ('CLAUDE', 'CHATGPT'):
         raise ValueError('consolidator backend must be CLAUDE or CHATGPT')
+    if 'preflight' in cfg and not isinstance(cfg['preflight'], bool):
+        raise ValueError('consolidator preflight must be a boolean')
     if cfg['backend'] == 'CHATGPT':
         if not isinstance(cfg.get('model'), str) or not re.fullmatch(r'[A-Za-z0-9_.-]+', cfg['model']):
             raise ValueError('CHATGPT consolidator requires a model identifier')

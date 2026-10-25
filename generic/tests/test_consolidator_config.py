@@ -84,3 +84,16 @@ class ConsolidatorConfig(unittest.TestCase):
                 timing=json.loads((root/'logs/r4-claude.timing.json').read_text())
                 self.assertEqual(timing['actor'], 'CHATGPT')
                 self.assertEqual(timing['model'], CFG['model'])
+
+    def test_disabled_consolidator_probe_keeps_reviewer_probe(self):
+        cfg={**CFG, 'preflight':False}
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(lp, 'load', return_value={'consolidator':cfg}), \
+             mock.patch.object(rl, 'LOG_DIR', Path(d)), mock.patch.object(rl, 'current_round', return_value=4), \
+             mock.patch.object(rl, 'spec_version', return_value='0.6'), mock.patch.object(rl.shutil, 'which', return_value='/bin/tool'), \
+             mock.patch.object(rl, 'run_claude') as claude, mock.patch.object(rl, 'probe_write') as probe:
+            rl.preflight(Path(d), ['CHATGPT'], True)
+            claude.assert_not_called()
+            self.assertEqual([call.args[1] for call in probe.call_args_list], ['CHATGPT'])
+            state=json.loads((Path(d)/'preflight.json').read_text())
+            self.assertEqual(list(state['probes']), ['CHATGPT'])
+            self.assertTrue(state['passed'])

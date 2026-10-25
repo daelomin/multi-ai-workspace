@@ -1000,9 +1000,8 @@ def probe_write(root: Path, name: str, runner) -> None:
 
 
 def preflight(root: Path, reviewers: list[str], with_consolidator: bool) -> None:
+    with_consolidator = with_consolidator and consolidator_config().get("preflight", True)
     tools = ["git"]
-    if "CHATGPT" in reviewers:
-        tools.append("codex")
     chatgpt_consolidator = with_consolidator and consolidator_config()["backend"] == "CHATGPT"
     if "CHATGPT" in reviewers or chatgpt_consolidator:
         tools.append("codex")
