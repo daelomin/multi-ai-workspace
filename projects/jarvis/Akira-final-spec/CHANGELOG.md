@@ -2,6 +2,25 @@
 
 ## 2026-10-25 — Round 4 specification review
 
+Agent: DEEPSEEK
+
+Reviewed v0.6 after the round-3 consolidation and the prior consolidations, with settled
+decisions, all fifteen companion documents and eight JSON fixtures within the manifest
+scope. Recorded seven minor findings: logical action keys versus provider idempotency
+keys and the action-ledger unique constraint; backup-account takeover versus the
+no-fallback defaults for quota/auth; AK-ACC-14's failed-attempt separation versus the
+delivery definition and Task.cost schema; the undefined `PersonaPatch`; usage-record
+idempotency uniqueness for non-bot owners; decision-register/cross-reference drift
+(docs/01's budget item cited as U6 instead of U4, SLOs cited as U4, and the nonexistent
+`§1.7`); and F-07's watchdog result versus the required `interrupted` attempt outcome.
+No blocking or major findings. AKIRA-D1–D6 remain fixed and U4–U16 carried forward
+unchanged. Read-only checks covered the worked-example arithmetic, fixture
+shapes/schema versions and cited cross-references; no validator, runtime integration,
+git command, deletion or deployment was performed. Review complete at
+`reviews/round-4/DEEPSEEK.md`; specification and other inputs unchanged.
+
+## 2026-10-25 — Round 4 specification review
+
 Agent: CHATGPT
 
 Reviewed v0.6 after all round-3 reviews and consolidation and the prior consolidations,
