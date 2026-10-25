@@ -10,11 +10,13 @@
 
 | Reviewer | Requested | Served | Status |
 |---|---|---|---|
-| CHATGPT | gpt-6.1-sol | gpt-6.1-sol | verified |
+| CHATGPT | gpt-6.1-sol | gpt-6.1-sol (Codex banner) | **unverified** — banner metadata, not provider telemetry |
 | DEEPSEEK | deepseek-flash | deepseek-flash | verified |
 | GROK | grok-4.7-medium | not reported | **unverified** — provider reported no served model |
 
-GROK is the only unverified reviewer. Every finding was checked against its cited
+CHATGPT and GROK have unverified served-model provenance: CHATGPT records the Codex banner,
+while GROK reports no served model. DEEPSEEK is verified by provider telemetry.
+Every finding was checked against its cited
 requirements/contracts; corroborating review IDs are recorded below. The extra
 error-to-outcome ambiguity in GROK-5 was independently confirmed in docs/04 §4.2 and
 docs/05 §6. Model provenance does not substitute for evidence.
