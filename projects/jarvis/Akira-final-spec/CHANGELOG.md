@@ -2,6 +2,12 @@
 
 ## 2026-10-25 — Round 3 specification review
 
+Agent: DEEPSEEK
+
+Reviewed v0.5 after the round-1 and round-2 consolidations, with settled decisions, all fifteen companion documents and eight JSON fixtures within the manifest scope. Recorded one major finding (the action ledger has no write-ahead ordering, so a crash after a send but before the `dispatched` record can leave a sent action in `intent`, outside startup reconciliation) and eight minor findings covering the missing kill-switch and quarantine-release commands, missing `auth_class` on route records and the cross-auth-class role default, the undefined `RouteDecision.support` field and its floor-fixture contradiction, AK-ACC-05/AK-ACC-14 formula drift from the normative worked example, decimal observer-proposal money, the unrepresentable verified-projected support level, the false one-to-one silence-code mapping, and the backup completeness/manifest mismatch. No blocking findings. Read-only checks confirmed the 209 requirement count, traceability coverage, fixture syntax/schema versions, task/checkpoint identity and the docs/09 accounting arithmetic. Review complete at `reviews/round-3/DEEPSEEK.md`; specification and other inputs unchanged. No git commands or runtime integrations executed.
+
+## 2026-10-25 — Round 3 specification review
+
 Agent: CHATGPT
 
 Reviewed v0.5 after the round-2 reviews and both consolidations, with settled decisions, all companion documents and eight JSON fixtures within the manifest scope. Recorded three minor findings: the checkpoint-backup output directory is not created; the fault matrix mixes attempt outcomes with other component states despite its enum-membership gate; and integer-minor-unit cost storage lacks a sub-cent precision/rounding policy. No blocking or major findings. Read-only checks confirmed JSON parsing, schema versions, task cost-subtotal arithmetic and task/checkpoint revision/hash agreement. Review complete at `reviews/round-3/CHATGPT.md`; specification and other inputs unchanged. No git commands or runtime integrations executed.
