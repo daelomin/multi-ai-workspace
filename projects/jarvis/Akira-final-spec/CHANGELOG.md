@@ -2,6 +2,12 @@
 
 ## 2026-10-25 — Round 1 specification review
 
+Agent: GROK
+
+Reviewed v0.3, settled decisions, all companion documents and eight JSON fixtures within the manifest scope. Recorded seven major findings (backup pruning, server-callable hard delete, snapshot restore replay, mid-stream retry of external effects, task resume and not-ready transitions, quota stored as a capability-floor failure, and mixed-unit cost totals) and seven minor findings covering usage categories, coverage and CPAT, traceability, readiness criteria, rating scales, maintenance effort and routing defaults. Review complete at `reviews/round-1/GROK.md`; specification and other inputs unchanged. No git commands or runtime integrations executed.
+
+## 2026-10-25 — Round 1 specification review
+
 Agent: DEEPSEEK
 
 Reviewed v0.3, settled decisions, all companion documents and eight JSON fixtures within the manifest scope. Recorded five major findings (backup pruning, server-callable hard delete, quota recorded as a capability-floor failure, missing coordination category, and mixed-unit cost totals driving route selection) and eleven minor findings covering accounting consistency, evidence and traceability, silence, disputes, audit coverage, migration and phase/slice planning. Review complete at `reviews/round-1/DEEPSEEK.md`; specification and other inputs unchanged. No git commands or runtime integrations executed.
