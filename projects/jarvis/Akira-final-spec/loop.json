@@ -19,5 +19,10 @@
     "docs",
     "evals",
     "assets"
-  ]
+  ],
+  "consolidator": {
+    "backend": "CHATGPT",
+    "model": "gpt-6.1-sol",
+    "effort": "medium"
+  }
 }
