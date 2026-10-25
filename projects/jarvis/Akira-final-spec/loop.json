@@ -23,6 +23,7 @@
   "consolidator": {
     "backend": "CHATGPT",
     "model": "gpt-6.1-sol",
-    "effort": "medium"
+    "effort": "medium",
+    "preflight": false
   }
 }
