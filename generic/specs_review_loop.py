@@ -29,6 +29,7 @@ import json
 import os
 import re
 import shlex
+import signal
 import shutil
 import subprocess
 import sys
@@ -68,6 +69,7 @@ CURSOR_REVIEW_MODEL = os.environ.get("CURSOR_REVIEW_MODEL", "auto")
 CURSOR_AGENT_BIN = os.environ.get(
     "CURSOR_AGENT_BIN", shutil.which("cursor-agent") or shutil.which("agent") or "cursor-agent"
 )
+CODEX_PREFLIGHT_TIMEOUT = int(os.environ.get("CODEX_PREFLIGHT_TIMEOUT", "900"))
 STEP_TIMEOUT = int(os.environ.get("REVIEW_STEP_TIMEOUT", str(90 * 60)))
 CODEX_EXTRA_ARGS = shlex.split(
     os.environ.get("CODEX_EXTRA_ARGS",
@@ -250,10 +252,40 @@ def log(msg: str) -> None:
 
 
 def run(cmd: list[str], cwd: Path | None = None, env: dict | None = None,
-        check: bool = True, capture: bool = True, timeout: int | None = None) -> subprocess.CompletedProcess:
+        check: bool = True, capture: bool = True, timeout: int | None = None,
+        output_log: Path | None = None) -> subprocess.CompletedProcess:
     # stdin=DEVNULL: `codex exec` waits for piped stdin to EOF, which hangs an unattended run.
-    res = subprocess.run(cmd, cwd=cwd, env=env, text=True, timeout=timeout,
-                         capture_output=capture, stdin=subprocess.DEVNULL)
+    if output_log is not None:
+        # Isolate the CLI wrapper AND its Rust child. Killing just the wrapper leaves
+        # a timed-out agent running and spending credits in the background.
+        with output_log.open("w", encoding="utf-8") as stream:
+            stream.write("$ codex exec\n--- live output\n"); stream.flush()
+            proc = subprocess.Popen(cmd, cwd=cwd, env=env, text=True,
+                                    stdin=subprocess.DEVNULL, stdout=stream,
+                                    stderr=subprocess.STDOUT, start_new_session=True)
+            try:
+                code = proc.wait(timeout=timeout)
+            except BaseException as exc:
+                for sig in (signal.SIGTERM, signal.SIGKILL):
+                    try:
+                        os.killpg(proc.pid, sig)
+                    except ProcessLookupError:
+                        pass
+                    if sig == signal.SIGTERM:
+                        try:
+                            proc.wait(timeout=2)
+                        except subprocess.TimeoutExpired:
+                            pass
+                proc.wait()
+                stream.flush()
+                if isinstance(exc, subprocess.TimeoutExpired):
+                    exc.output = output_log.read_text(encoding="utf-8")
+                    exc.stderr = ""
+                raise
+        res = subprocess.CompletedProcess(cmd, code, output_log.read_text(encoding="utf-8"), "")
+    else:
+        res = subprocess.run(cmd, cwd=cwd, env=env, text=True, timeout=timeout,
+                             capture_output=capture, stdin=subprocess.DEVNULL)
     if check and res.returncode != 0:
         raise SystemExit(f"command failed ({res.returncode}): {' '.join(cmd)}\n"
                          f"{res.stdout or ''}\n{res.stderr or ''}")
@@ -734,7 +766,7 @@ def log_codex_usage(usage: dict | None) -> None:
 def run_codex(prompt: str, root: Path, logfile: Path, timeout: int, *, model: str | None = None, effort: str | None = None) -> dict | None:
     args = codex_args(prompt, root, logfile.with_suffix(".last.md"), model=model, effort=effort)
     try:
-        res = run(args, cwd=root, check=False, timeout=timeout)
+        res = run(args, cwd=root, check=False, timeout=timeout, output_log=logfile)
     except subprocess.TimeoutExpired as exc:
         logfile.write_text(f"$ codex exec\nTIMEOUT after {timeout}s\n--- stdout\n{exc.stdout or ''}\n"
                            f"--- stderr\n{exc.stderr or ''}\n", encoding="utf-8")
@@ -982,20 +1014,17 @@ def do_consolidation(n: int, reviewers: list[str], converged: bool, root: Path,
 
 def probe_write(root: Path, name: str, runner) -> None:
     """Prove a backend can *write* a file headless, not just answer. The orchestrator checks
-    the content and cleans up; the model never deletes its own evidence."""
+    the content. Keep evidence on success and failure; never delete probe artifacts."""
     nonce = f"{name}-{int(time.time())}-{os.getpid()}"
     pdir = LOG_DIR / f"probe-{nonce}"
     pdir.mkdir(parents=True)
     target = pdir / "probe.txt"
     logfile = LOG_DIR / f"preflight-{name.lower()}.log"
-    try:
-        rel = target.relative_to(root)
-        runner(f"Create the file {rel} containing exactly the text {nonce} and nothing else. "
-               f"Do not touch any other file. Then stop.", logfile)
-        if not target.exists() or target.read_text(encoding="utf-8").strip() != nonce:
-            raise SystemExit(f"{name} probe did not write the expected file; see {logfile}")
-    finally:
-        shutil.rmtree(pdir, ignore_errors=True)
+    rel = target.relative_to(root)
+    runner(f"Create the file {rel} containing exactly the text {nonce} and nothing else. "
+           f"Do not touch any other file. Then stop.", logfile)
+    if not target.exists() or target.read_text(encoding="utf-8").strip() != nonce:
+        raise SystemExit(f"{name} probe did not write the expected file; see {logfile}")
     log(f"{name} write probe ok")
 
 
@@ -1026,11 +1055,11 @@ def preflight(root: Path, reviewers: list[str], with_consolidator: bool) -> None
         probes.append(("DEEPSEEK", lambda: run_claude("DEEPSEEK", probe, root, LOG_DIR / "preflight-deepseek.log", 300)))
     if chatgpt_consolidator:
         probes.append(("CHATGPT-CONSOLIDATOR", lambda: probe_write(
-            root, "CHATGPT-CONSOLIDATOR", lambda p, lf: run_consolidator_codex(p, root, lf, 300))))
+            root, "CHATGPT-CONSOLIDATOR", lambda p, lf: run_consolidator_codex(p, root, lf, CODEX_PREFLIGHT_TIMEOUT))))
     elif with_consolidator:
         probes.append(("ANTHROPIC", lambda: run_claude("ANTHROPIC", probe, root, LOG_DIR / "preflight-claude.log", 300)))
     if "CHATGPT" in reviewers:
-        probes.append(("CHATGPT", lambda: probe_write(root, "CHATGPT", lambda p, lf: run_codex(p, root, lf, 300))))
+        probes.append(("CHATGPT", lambda: probe_write(root, "CHATGPT", lambda p, lf: run_codex(p, root, lf, CODEX_PREFLIGHT_TIMEOUT))))
     if "GROK" in reviewers:
         probes.append(("GROK", lambda: probe_write(root, "GROK", lambda p, lf: run_cursor_agent(p, root, lf, 300, GROK_MODEL))))
     if "CURSOR" in reviewers:
