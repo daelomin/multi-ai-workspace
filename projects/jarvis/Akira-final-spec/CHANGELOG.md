@@ -2,6 +2,25 @@
 
 ## 2026-10-25 — Round 4 specification review
 
+Agent: GROK
+
+Reviewed v0.6 after the round-3 consolidation and the prior consolidations, with settled
+decisions, all fifteen companion documents and eight JSON fixtures within the manifest
+scope. Recorded seven minor findings: the skill floor is not a decidable predicate
+(`CapabilityFloor` / `SupportLevel` undefined, and the probe skills enum omits
+`projected`); a direct question is both forbidden and allowed as silence; `transportPermission`
+is absent from the recorded route; `always-adequate` has no decision procedure against the
+quota transition; usage roll-ups do not say which record states are effective; cost-per-accepted-task
+is undefined when a route has no accepted root; and `task.start` plus F-02 omit the
+dead-attempt `intent` guard. No blocking or major findings. The round-3 write-ahead
+ordering was checked and not reopened. AKIRA-D1–D6 remain fixed and U4–U16 carried forward
+unchanged. Read-only checks covered 209 unique requirement headings, fixture JSON and
+schema versions, and the worked-example arithmetic; no validator, runtime integration,
+git command, deletion or deployment was performed. Review complete at
+`reviews/round-4/GROK.md`; specification and other inputs unchanged.
+
+## 2026-10-25 — Round 4 specification review
+
 Agent: DEEPSEEK
 
 Reviewed v0.6 after the round-3 consolidation and the prior consolidations, with settled
