@@ -2,6 +2,12 @@
 
 ## 2026-10-25 — Round 2 specification review
 
+Agent: DEEPSEEK
+
+Reviewed v0.4 after the round-1 consolidation, with settled decisions, all companion documents and eight JSON fixtures within the manifest scope. Recorded one major finding (the backup procedure collects only the database and three file trees, omitting configuration, secrets, content-addressed skill/template files and checkpoint refs, and names the database snapshot only to the day) and five minor findings covering the unmapped failure/attempt-outcome vocabularies, the missing task-revision link for checkpoint mismatch detection, the undefined `Money` representation in cost schemas and fixtures, the absent unauthorized-action incident runbook, and inconsistent connector effort bases. Records read as text; no validator, git command or runtime integration executed. Review complete at `reviews/round-2/DEEPSEEK.md`; specification and other inputs unchanged.
+
+## 2026-10-25 — Round 2 specification review
+
 Agent: CHATGPT
 
 Reviewed v0.4 after the round-1 reviews and consolidation, with settled decisions, all companion documents and eight JSON fixtures within the manifest scope. Recorded one major finding (backup command merges source directory trees) and three minor findings covering CPAT descendant overlap and route attribution, recovery-checklist coverage, and remaining fixture/schema mismatches. JSON parsing, schema-version presence and cost-subtotal arithmetic checked; rsync destination layout inspected with a read-only dry run. Review complete at `reviews/round-2/CHATGPT.md`; specification and other inputs unchanged. No git commands or runtime integrations executed.
