@@ -11,8 +11,8 @@ TypeScript/Effect and agent runtimes. Ranges reflect unknown Akeru adaptation co
 optimism.
 
 **Totals (planning, ±50%, no measured velocity).** Core to beta — P0–P6, P9, P10 —
-**35–50 ew**. Specialists plus the first three connectors: **12–28 ew**. Full target:
-**47–78 ew**. The vertical slice (§13) is 6–9 ew of that core.
+**35–50 ew**. Specialists (P7, 6–10 ew) plus the first three connectors (P8, 5.6–10.4 ew,
+§10): **≈12–21 ew**. Full target: **≈47–71 ew**. The vertical slice (§13) is 6–9 ew of that core.
 
 ---
 
@@ -217,7 +217,14 @@ parallel, with no production commitment.
 
 ## 10. Phase 8 — Connectors
 
-**Effort:** 2–6 ew per service (see `docs/07` §6.2); **Depends on:** P2, P7 interface.
+**Effort:** ≈1.4–4 ew per service; **Depends on:** P2, P7 interface.
+
+**Basis (one basis with `docs/07` §6.2).** Per service = the adapter-only person-days in
+`docs/07` §6.2 (2–10 d, i.e. 0.4–2 ew at 5 d/ew) **plus** 1–2 ew of integration work the
+adapter estimate excludes: auth custody, per-bot grants, health check, action-ledger
+integration, docs and workflow-verification tests (planning placeholder, ±50%, re-estimate
+at P8 start). First three connectors: adapters 13–22 d (2.6–4.4 ew) + 3 × 1–2 ew =
+**5.6–10.4 ew**.
 
 **Work.** Per service: adapter + manifest, auth custody, health check, action ledger
 integration, per-bot grants, tests, docs. Priority order (by team value): Gmail,

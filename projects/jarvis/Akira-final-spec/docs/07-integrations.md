@@ -227,7 +227,10 @@ licensing. Akeru has no video capability (V); this is a build, not an extension.
 ### 6.2 Required service matrix
 
 Effort is an engineering estimate (person-days, 1 senior engineer, ±50%) for a
-first-party adapter with tests, not a vendor onboarding time. Cost basis is stated only
+first-party adapter with tests, not a vendor onboarding time. It is the **adapter-only
+subset** of the connector effort in `docs/11` §10, which adds 1–2 ew per service for auth
+custody, per-bot grants, health check, ledger integration, docs and workflow
+verification. Cost basis is stated only
 where a primary source was read; otherwise U.
 
 | Service | Read actions | Write actions | Concrete path | Auth / custody | Effort | Cost basis | Status |

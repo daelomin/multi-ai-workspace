@@ -157,9 +157,10 @@ the skill's validation fixture and confirm resource access; a support level with
 matching `verify` evidence record is downgraded to `*-unverified`. Projection is
 idempotent and content-hashed, so re-projecting does not duplicate or mutate.
 
-**Verification is orthogonal to mechanism.** Each per-route support entry carries the
-support level (the mechanism: native, projected, prompt-injected, unsupported) and a
-`verified` flag backed by a `supportEvidence` record (route, model, date, evidence). The
+**Verification is orthogonal to mechanism.** Each per-route support entry is a
+`SkillSupportEntry` (`docs/04` §2): the mechanism (native, projected, prompt-injected,
+unsupported) and a `verified` flag; its `evidence` record (route, model, date, evidence)
+is required when `verified` is true and absent otherwise. The
 flag applies to every mechanism, including `prompt-injected`: a prompt-injected route
 with no evidence record is rendered "prompt-injected (unverified)" and counts as
 unverified for the floor and for `SKILLS.md`. The downgrade rule is total: no evidence
@@ -230,6 +231,10 @@ connector that cannot prove non-acceptance returns `unknown`; the executor never
 
 The taxonomy is closed and shared by attempts, UI and routing. A provider-specific error
 is mapped into one class; unmapped errors become `unknown` with the raw code retained.
+Each class maps to exactly one attempt outcome (`docs/04` §4.2 mapping table). The
+**Retry** and **Fallback** columns apply only when no external action of the attempt is
+`dispatched` or `unknown`; otherwise the outcome is `interrupted`/`failed_unknown`, there
+is no retry or fallback, and the task waits for reconciliation (AK-RTE-12, AK-TSK-11).
 
 ---
 

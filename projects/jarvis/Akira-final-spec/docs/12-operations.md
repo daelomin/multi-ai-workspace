@@ -136,18 +136,35 @@ Logs are optional and retained short; they are not part of restore correctness.
 ```bash
 # Stop the service (consistent snapshot), or use VACUUM INTO while running.
 systemctl --user stop akira-bot.service
-# Snapshot the database
-sqlite3 "$STATE/state.sqlite" "VACUUM INTO '/backup/state-$(date +%F).sqlite'"
-# Copy files into a fresh, uniquely named generation directory. No deletion flags:
-# the backup never removes anything from earlier generations.
-GEN="/backup/files/$(date +%FT%H%M%S)"
+# One timestamp (to the second) names the whole generation, database snapshot included.
+TS="$(date +%FT%H%M%S)"
+GEN="/backup/files/$TS"
 mkdir "$GEN"   # fails if it already exists; never reuse a generation
-rsync -a "$STATE"/{attachments,artifacts,memory}/ "$GEN"/
-# Encrypt the backup set (separate key), then checksum and store off-host
+# $CONFIG_DIR, $REGISTRY_DIR and $WORKSPACES are the deployment-layout paths (§2).
+# 1. Database snapshot, same generation name (VACUUM INTO fails if the target exists)
+sqlite3 "$STATE/state.sqlite" "VACUUM INTO '$GEN/state.sqlite'"
+# 2-3. File trees: each tree keeps its own directory under the generation (no trailing
+#      slashes on the sources), so equal relative names in different trees never collide.
+#      No deletion flags: the backup never removes anything from earlier generations.
+rsync -a "$STATE/attachments" "$STATE/artifacts" "$STATE/memory" "$GEN/"
+# 4. Secrets: encrypted with the separate backup key into $GEN/secrets.enc (never plaintext)
+# 5. Configuration: settings.json, routing policy, price tables, upstream.yaml + patch list,
+#    service unit
+rsync -a "$CONFIG_DIR" "$GEN/"
+# 6. Content-addressed template/skill/procedure files (or their export bundle)
+rsync -a "$REGISTRY_DIR" "$GEN/"
+# 7. Checkpoint refs: list the refs and bundle the objects per active workspace
+for W in "$WORKSPACES"/*; do
+  git -C "$W" for-each-ref refs/t3/checkpoints > "$GEN/checkpoint-refs/$(basename "$W").refs"
+  git -C "$W" bundle create "$GEN/checkpoint-refs/$(basename "$W").bundle" --glob='refs/t3/checkpoints/*'
+done
+# Manifest: one entry and one checksum per item above; verify, encrypt, store off-host
+( cd "$GEN" && find . -type f ! -name MANIFEST.sha256 -exec sha256sum {} + > MANIFEST.sha256 )
 ```
 
-A backup is complete only when the manifest lists every item, the checksums verify, and a
-restore drill has passed within the last quarter.
+A backup is complete only when the manifest has an entry and a checksum for each of the
+seven items above (an absent item is listed as absent, with the reason, not skipped), the
+checksums verify, and a restore drill has passed within the last quarter.
 
 **Append-only rule (AKIRA-D2, AK-OPS-11).** Each run writes a new generation; earlier
 generations and dated database snapshots are preserved. Removing any generation is a
@@ -157,7 +174,10 @@ named purge) does not remove its copy from earlier generations.
 
 **Backup test (T-13).** On synthetic state: back up; remove a source file; back up again;
 assert the file is still present in the earlier generation and the second generation does
-not contain it.
+not contain it. Also assert, on synthetic state holding a file with the same relative name
+(`same/note.txt`) in `attachments/`, `artifacts/` and `memory/` with different contents,
+that the generation holds three distinct paths and hashes; that two runs on the same day
+produce two database snapshots; and that all seven items are present in the manifest.
 
 ### 5.3 Restore
 
@@ -178,12 +198,17 @@ writers never act at once. Then:
 
 1. Record the recovery point (snapshot time) and the uncertain interval (snapshot time →
    failure time).
-2. For every task that was `ready`, `running`, `blocked` or `awaiting_input` at the
-   recovery point, and every routine due in the interval, reconcile against preserved
-   post-snapshot evidence (original database/logs if recoverable) and external state
-   (read-back, idempotency lookup, channel history).
+2. For every task, routine and channel delivery that could have acted in the interval,
+   **whatever its status at the recovery point** (including `paused`, `done`, `failed`
+   and `cancelled` tasks, which can resume or reopen, and work created after the snapshot
+   that exists only in preserved post-snapshot evidence or external state), reconcile
+   against that evidence (original database/logs if recoverable) and external state
+   (read-back, idempotency lookup, channel history). Preserved evidence narrows the set;
+   absent evidence keeps the work quarantined. Absence from a snapshot status list is not
+   a release.
 3. A task whose prior effects cannot be established stays `blocked` for HUMAN
-   reconciliation; it is never replayed.
+   reconciliation; it is never replayed. While quarantine is on, startup reconciliation
+   (AK-TSK-14) may only mark or block: it must not dispatch, start a routine or send.
 4. Only then are dispatch, routines and outbound delivery released, per task, with the
    release recorded.
 
@@ -240,7 +265,7 @@ as a route decision, not an adequacy change.
 ### 7.3 Credential revocation
 
 Reconnect in Settings; affected sessions stop; next turn starts a new session. No task
-state is lost; attempts recorded as `auth_expired`.
+state is lost; attempts recorded as `failed_auth` (error class `auth_expired`).
 
 ### 7.4 Database corruption
 
@@ -277,6 +302,17 @@ the database was damaged.
 AKIRA-D2 governs. If an accidental purge occurred: stop writes, restore from the
 pre-purge backup (purge writes a backup first by design), audit the actor, and record the
 incident. Do not attempt a partial manual reconstruction without the backup.
+
+### 7.10 Unauthorized action
+
+A bot or actor acted outside its grant, used a scope it should not have, or made an
+external write that policy did not allow. Contain first: stop dispatch for the affected
+bot or connector (engage the kill switch when the scope is unclear). Preserve the event,
+action-ledger and audit records and the affected artifact hashes; do not edit or delete
+them. Revoke the credential or grant that allowed it. Reconcile any `dispatched` or
+`unknown` external effect before dispatch restarts (§7.5). Notify the operator, record
+the incident (actor, grant, action ids, cause) and review the grant that was too wide
+(AK-CON-08). Resume only by explicit operator release.
 
 ---
 

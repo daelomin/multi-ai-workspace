@@ -17,8 +17,12 @@
   (`human:<id>`, `bot:<id>`, `system`, `observer:<id>`, `connector:<id>`).
 - **Enums** are closed and versioned. An unknown value received from a newer peer is
   preserved as `unknown` with the raw value, never coerced (§`docs/05-interfaces.md` §7).
-- **Money** is stored as minor units plus currency; a USD estimate is a separate field
-  with `estimate` provenance, never overwriting a provider-reported charge.
+- **Money** is one shape everywhere: `Money { amountMinor: integer; currency: string }`
+  (minor units, e.g. cents). `MoneyRange { lowMinor: integer; highMinor: integer;
+  currency: string }`. Inside a structure that already carries a `currency` (a
+  `CostSummary` subtotal row), fields are named `…Minor` and share that currency. Decimals
+  are a display format only, never stored. A USD estimate is a separate field with
+  `estimate` provenance, never overwriting a provider-reported charge.
 - **Tokens** are integers ≥ 0 or `null` with an `unavailable_reason`.
 - **Append-only** records (events, attempts, actions, usage, ratings revisions, audit)
   are never updated in place; corrections are new records that supersede.
@@ -132,11 +136,22 @@ SkillPackage {
   requires: { tools: string[]; connectors: ConnectorId[]; runtime: string[] };
   validation: { command?: string; fixture?: string; expected: string };
   provenance: "authored" | "vendored" | "imported"; sourceUrl?: string;
-  support: { [routeKey: string]: "native-verified" | "native-unverified" |
-             "projected-unverified" | "prompt-injected" | "unsupported" };
-  supportEvidence: { routeKey: string; verifiedAt: ISO; model: string; evidence: Link }[];
+  support: { [routeKey: string]: SkillSupportEntry };
+}
+
+SkillSupportEntry {
+  mechanism: "native" | "projected" | "prompt-injected" | "unsupported";
+  verified: boolean;                    // orthogonal to mechanism, incl. prompt-injected
+  evidence?: { verifiedAt: ISO; model: string; evidence: Link };  // required iff verified
+  note?: string;                        // e.g. "no injection test run yet"
 }
 ```
+
+The rendered support level (`native-verified`, `native-unverified`, `projected-unverified`,
+`prompt-injected`, `unsupported`; AK-SKL-04) is derived from `mechanism` and `verified`;
+a verified `projected` or `prompt-injected` entry renders as such with its evidence.
+`evidence` is required when `verified` is true and absent otherwise: an unverified entry
+never carries a fabricated verification timestamp.
 
 ### Room and board
 
@@ -166,6 +181,10 @@ BoardItem {
 ```ts
 Task {
   id: task_…; title: string; requester: actor;
+  revision: integer;                    // monotonic; +1 on any change to the fields hashed below
+  contentHash: string;                  // sha256 over the task definition: title, intent,
+                                        // assignee, acceptanceCriteria (statement + validation),
+                                        // dependencies, priority, deadline
   assignee: bot_…; roomId?: room_…; parentTaskId?: task_…; delegationId?: del_…;
   intent: string; acceptanceCriteria: AcceptanceCriterion[];
   status: TaskStatus;                   // §4.1
@@ -215,7 +234,8 @@ RouteDecision {
                 available: "available"|"quota_exhausted"|"auth"|"rate_limited"|"unknown";
                 availabilitySource?: string;   // e.g. provider meter, last error, timestamp
                 estimatedCost: MoneyRange; costUnit: "provider-charge"|"price-table"|"subscription-equivalent";
-                estimateBasis: string; support: "verified"|"assumed"|"unknown"; note?: string }[];
+                estimateBasis: string; support: "verified"|"assumed"|"unknown"; note?: string;
+                role: "specification-led" | "advanced" }[];   // see §4.1 and §4.3
   chosen: { routeKey: string; reason: string; alternativesRejected: string[] };
   fallbackPolicy: "none" | "infrastructure-only" | "always-adequate";  // default infrastructure-only
   policyVersion: string; decidedBy: actor; createdAt;
@@ -223,7 +243,9 @@ RouteDecision {
 
 TaskCheckpoint {
   id: chk_…; taskId: task_…; attemptId?: att_…; revision: integer;
-  taskRevision: { title; acceptanceCriteria; triageRevision };
+  taskRevision: { taskId: task_…; revision: integer; contentHash: string; triageRevision: integer };
+                                        // resume/reconcile compare revision + contentHash with the
+                                        // live Task and surface any mismatch before dispatch
   plan: { stepId; statement; status }[];
   decisions: { decisionId; statement; evidence: Link[]; alternatives: string[] }[];
   openQuestions: { question; assignedTo: actor; blocking: boolean }[];
@@ -246,7 +268,7 @@ TaskCheckpoint {
 | From | Event | To | Guard |
 |---|---|---|---|
 | proposed | accept | triaged | acceptance criteria exist |
-| triaged | route selected | ready | route meets floor; if readiness is `not-ready`, the route must not be specification-led/below-floor (an advanced route that meets the floor may proceed with the risks attached) |
+| triaged | route selected | ready | route meets floor (the floor check alone rejects below-floor routes, for every readiness outcome); if readiness is `not-ready`, the chosen candidate's `role` must not be `specification-led` (an `advanced` route that meets the floor may proceed with the risks attached) |
 | ready | attempt dispatched (`task.start`) | running | route meets floor **and** is available; compatibility check passed |
 | running | needs input | awaiting_input | open question created |
 | running | dependency/external block | blocked | blocker recorded with owner |
@@ -260,12 +282,15 @@ TaskCheckpoint {
 | running | attempt ended `failed_capability`/`failed_tool_contract`/`failed_context_overflow`/`failed_safety_block` | triaged | re-triage required; no automatic fallback |
 | running | attempt ended `failed_auth` | blocked | repair action: reconnect or switch account |
 | running | attempt ended `failed_unknown`/`interrupted` | blocked or awaiting_input | resumable checkpoint written; any `dispatched`/`unknown` action reconciled first |
-| running | attempt ended `cancelled` | ready, paused or cancelled | as chosen by the canceller; reason recorded |
+| running | attempt ended `cancelled` | ready, paused or cancelled | as chosen by the canceller; reason recorded; to `ready`, any `dispatched`/`unknown` action is reconciled first, otherwise the task goes to `blocked` or `paused` |
 | review | accepted | done | all criteria met or waived with reason |
 | review | rework requested | ready | new attempt planned, reason recorded |
 | review | rejected | failed | reason; reopenable |
 | any non-terminal | cancel | cancelled | reason; children cancelled |
 | done/failed/cancelled | reopen | triaged | actor authorized; new revision |
+
+A new attempt (`task.start`) on a task with any `dispatched` or `unknown` action is
+rejected until that action is reconciled, whatever edge led to `ready`.
 
 **Invariants:** one active attempt; no `done` without acceptance evidence; no transition
 from `blocked` to `running` without resolving the blocker reference; every transition is
@@ -278,8 +303,31 @@ an event with actor and timestamp.
 `failed_safety_block` · `failed_unknown` · `cancelled` · `interrupted` (restart).
 
 Mapping to route policy: only `failed_rate_limit` and `failed_network` are eligible for
-automatic infrastructure fallback by default. `failed_quota` pauses and asks. Capability,
+automatic infrastructure fallback by default, and only when no external action is
+`dispatched` or `unknown` (a 429 or timeout after a send is `interrupted`/`failed_unknown`). `failed_quota` pauses and asks. Capability,
 tool-contract and safety failures never fall back automatically; they re-triage.
+
+**Error class → attempt outcome.** The error taxonomy (`docs/05` §6) and the outcome set
+are two closed vocabularies related by this single mapping; fault-matrix expectations and
+runbooks use the **outcome** names.
+
+| Error class (`docs/05` §6) | Attempt outcome |
+|---|---|
+| `quota_exhausted` | `failed_quota` |
+| `rate_limited` | `failed_rate_limit` |
+| `auth_missing`, `auth_expired` | `failed_auth` |
+| `entitlement` | `failed_auth` (repair: choose another model/plan; detail names the entitlement) |
+| `capability_gap` | `failed_capability` |
+| `tool_contract` | `failed_tool_contract` |
+| `context_overflow` | `failed_context_overflow` |
+| `network` | `failed_network` |
+| `safety_block` | `failed_safety_block` |
+| `unknown` | `failed_unknown` |
+| any class, when an action was `dispatched`/`unknown` | `interrupted` or `failed_unknown` (external-effect guard below) |
+
+A restart that finds a running attempt with no live session records `interrupted`
+(AK-TSK-14), never a bare "failed". A contract test asserts that every expected outcome
+in the fault matrix is a member of the closed set above.
 
 **External-effect guard.** `failed_network` is reserved for failures with no dispatched
 external action (DNS/TLS/timeout before acceptance, or a transport failure before any tool
@@ -313,6 +361,16 @@ nine criteria above ("dependencies" and "interfaces" are separate criteria).
 
 A `not-ready` result blocks only the *specification-led downgrade* path (cheap implementer
 from the document). It does not block an advanced model from doing the work.
+
+**Route role (decision procedure).** Every candidate carries `role: "specification-led" |
+"advanced"`, evaluated by the `triaged → ready` guard. The role is a route-policy
+attribute (data, versioned with the policy, recorded on the candidate at decision time).
+Proposed default, not HUMAN-approved: when more than one candidate meets the floor, the
+lowest-expected-cost one is `specification-led` and every other floor-meeting candidate is
+`advanced`; a sole floor-meeting candidate is `advanced`. `not-ready` rejects candidates
+whose role is `specification-led`; a below-floor candidate is rejected by the floor check
+alone, whatever the readiness outcome (its `role` comes from the route policy and is
+irrelevant to the guard). `ready` and `ready-with-risks` accept either role.
 
 ### 4.4 Action ledger
 
@@ -377,14 +435,19 @@ UsageRecord {
 
 ```ts
 CostSummary { schemaVersion: string;
-              subtotals: { currency: string;
-                           providerReported: Money | null;
-                           priceTableEstimate: Money | null;
-                           subscriptionEquivalent: Money | null }[];   // one row per currency; never merged
-              combinedEstimate?: { amount: Money; currency: string; label: "combined economic estimate, not spend" };
+              subtotals: { currency: string;               // one row per currency; never merged
+                           providerReportedMinor: integer | null;
+                           priceTableEstimateMinor: integer | null;
+                           subscriptionEquivalentMinor: integer | null }[];
+              combinedEstimate?: Money & { label: "combined economic estimate, not spend" };
               coverage: { reported: integer; estimated: integer; subscription: integer; unknown: integer };
-              byCategory: Record<category, { amount: Money|null; provenance: CostProvenance|"mixed" }> }
+              byCategory?: Record<category, { amountMinor: integer|null; currency: string;
+                                              provenance: CostProvenance|"mixed" }> }
 ```
+
+`byCategory` is present in the cost-summary query response (task drill-down) and may be
+omitted in summaries embedded in projections such as `Task.cost`; when present it is
+consistent with the subtotals.
 
 The subtotals are authoritative; `combinedEstimate` is optional, labelled, and must be
 shown with its subtotals. `coverage` counts cost-bearing records per bucket and the

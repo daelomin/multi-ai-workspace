@@ -29,15 +29,11 @@
   "provenance": "authored",
   "sourceUrl": null,
   "support": {
-    "codex/gpt-5.1-codex": "native-unverified",
-    "claude/sonnet-4.7": "native-verified",
-    "grok/grok-4.7": "projected-unverified",
-    "deepseek/deepseek-chat": "prompt-injected",
-    "kimi/kimi-k2": "prompt-injected",
-    "opencode-go/default": "prompt-injected"
-  },
-  "supportEvidence": [
-    { "routeKey": "claude/sonnet-4.7", "verified": true, "verifiedAt": "2026-10-24T17:40:00.000Z", "model": "sonnet-4.7", "evidence": "skill transcript: read A1:C20, wrote B2, cited range" },
-    { "routeKey": "deepseek/deepseek-chat", "verified": false, "note": "prompt-injected; no injection test run yet (unverified)" }
-  ]
+    "codex/gpt-5.1-codex": { "mechanism": "native", "verified": false },
+    "claude/sonnet-4.7": { "mechanism": "native", "verified": true, "evidence": { "verifiedAt": "2026-10-24T17:40:00.000Z", "model": "sonnet-4.7", "evidence": "skill transcript: read A1:C20, wrote B2, cited range" } },
+    "grok/grok-4.7": { "mechanism": "projected", "verified": false },
+    "deepseek/deepseek-chat": { "mechanism": "prompt-injected", "verified": false, "note": "no injection test run yet (unverified)" },
+    "kimi/kimi-k2": { "mechanism": "prompt-injected", "verified": false },
+    "opencode-go/default": { "mechanism": "prompt-injected", "verified": false }
+  }
 }

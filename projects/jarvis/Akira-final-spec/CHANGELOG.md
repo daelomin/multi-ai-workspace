@@ -1,5 +1,11 @@
 # Akira final specification review activity
 
+## 2026-10-25 — Round 2 consolidation
+
+Agent: CLAUDE
+
+Consolidated the three round-2 reviews (19 findings: CHATGPT 4, DEEPSEEK 6, GROK 9; all accepted, none rejected) into `reviews/round-2/CONSOLIDATION.md` and bumped `spec.md` to v0.5. Backup generation is now complete and per-tree with a per-run database snapshot and manifest; recovery quarantine covers every task that could have acted and constrains startup reconciliation; error classes map to attempt outcomes with reconciliation guards on retry, fallback, cancel and new attempts; the specification-led guard has a route `role` predicate; CPAT uses a record-union cohort; tasks carry `revision`/`contentHash` in checkpoints; `Money` and skill support entries have one shape; runbook 7.10 (unauthorized action) added; connector effort uses one basis. Updated docs 04, 05, 07, 09, 10, 11, 12 and fixtures task, route-decision, skill-package, checkpoint. `decisions.md` (AKIRA-D1–D6) was already applied; no change. Open HUMAN decisions U4–U16 carried forward unchanged. GROK's served model was unverified and is noted in the consolidation. README set to Round 3 on v0.5. No git commands run.
+
 ## 2026-10-25 — Round 2 specification review
 
 Agent: GROK

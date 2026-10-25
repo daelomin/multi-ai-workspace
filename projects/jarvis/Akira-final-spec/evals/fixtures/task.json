@@ -2,6 +2,8 @@
   "schemaVersion": "1.0",
   "id": "task_T142",
   "title": "Fuel Atlas page v2",
+  "revision": 3,
+  "contentHash": "sha256:c3f1a2b4d5e60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9",
   "requester": "bot_NATALIA",
   "assignee": "bot_RAJIV",
   "roomId": "room_TECH_BOARD",
@@ -22,7 +24,7 @@
     "taskClass": "data-publish",
     "complexity": { "ambiguity": 1, "integrations": 2, "contextSize": 2, "validationDifficulty": 2, "expectedRework": 1, "irreversibility": 2 },
     "flags": [],
-    "estimate": { "effortHours": { "low": 2, "high": 4 }, "cost": { "low": 1.5, "high": 4.0, "currency": "USD" }, "confidence": 0.6, "basis": "2 similar publish tasks in the last 30 days" },
+    "estimate": { "effortHours": { "low": 2, "high": 4 }, "cost": { "lowMinor": 150, "highMinor": 400, "currency": "USD" }, "confidence": 0.6, "basis": "2 similar publish tasks in the last 30 days" },
     "readiness": {
       "outcome": "ready",
       "criteria": {
@@ -39,8 +41,8 @@
       "risks": []
     },
     "proposedRoutes": [
-      { "routeKey": "claude/sonnet-4.7", "meetsFloor": true, "available": "available", "estimatedCost": { "low": 1.2, "high": 2.4, "currency": "USD" }, "costUnit": "subscription-equivalent", "estimateBasis": "price table 2026-10-01", "support": "verified" },
-      { "routeKey": "deepseek/deepseek-chat", "meetsFloor": false, "available": "available", "estimatedCost": { "low": 0.3, "high": 0.7, "currency": "USD" }, "costUnit": "price-table", "estimateBasis": "price table 2026-10-01", "support": "unknown", "note": "below floor: skills prompt-injected" }
+      { "routeKey": "claude/sonnet-4.7", "meetsFloor": true, "available": "available", "estimatedCost": { "lowMinor": 120, "highMinor": 240, "currency": "USD" }, "costUnit": "subscription-equivalent", "estimateBasis": "price table 2026-10-01", "support": "verified", "role": "advanced" },
+      { "routeKey": "deepseek/deepseek-chat", "meetsFloor": false, "available": "available", "estimatedCost": { "lowMinor": 30, "highMinor": 70, "currency": "USD" }, "costUnit": "price-table", "estimateBasis": "price table 2026-10-01", "support": "unknown", "note": "below floor: skills prompt-injected", "role": "specification-led" }
     ],
     "decision": { "routeKey": "claude/sonnet-4.7", "reason": "native skill support for sheet-ops; cost difference small for this task class", "policyVersion": "balanced-2026.10" },
     "discovery": null,
@@ -62,21 +64,21 @@
   "cost": {
     "exclusive": {
       "schemaVersion": "1.0",
-      "subtotals": [{ "currency": "USD", "providerReported": 0.82, "priceTableEstimate": 0.46, "subscriptionEquivalent": 1.84 }],
-      "combinedEstimate": { "amount": 3.12, "currency": "USD", "label": "combined economic estimate, not spend" },
+      "subtotals": [{ "currency": "USD", "providerReportedMinor": 82, "priceTableEstimateMinor": 46, "subscriptionEquivalentMinor": 184 }],
+      "combinedEstimate": { "amountMinor": 312, "currency": "USD", "label": "combined economic estimate, not spend" },
       "coverage": { "reported": 3, "estimated": 2, "subscription": 1, "unknown": 0 }
     },
     "inclusive": {
       "schemaVersion": "1.0",
-      "subtotals": [{ "currency": "USD", "providerReported": 0.82, "priceTableEstimate": 0.84, "subscriptionEquivalent": 1.84 }],
-      "combinedEstimate": { "amount": 3.50, "currency": "USD", "label": "combined economic estimate, not spend" },
+      "subtotals": [{ "currency": "USD", "providerReportedMinor": 82, "priceTableEstimateMinor": 84, "subscriptionEquivalentMinor": 184 }],
+      "combinedEstimate": { "amountMinor": 350, "currency": "USD", "label": "combined economic estimate, not spend" },
       "coverage": { "reported": 3, "estimated": 3, "subscription": 1, "unknown": 0 }
     },
     "overhead": {
       "schemaVersion": "1.0",
       "definition": "review + coordination + observer",
-      "subtotals": [{ "currency": "USD", "providerReported": 0.30, "priceTableEstimate": 0.15, "subscriptionEquivalent": null }],
-      "combinedEstimate": { "amount": 0.45, "currency": "USD", "label": "combined economic estimate, not spend" },
+      "subtotals": [{ "currency": "USD", "providerReportedMinor": 30, "priceTableEstimateMinor": 15, "subscriptionEquivalentMinor": null }],
+      "combinedEstimate": { "amountMinor": 45, "currency": "USD", "label": "combined economic estimate, not spend" },
       "coverage": { "reported": 2, "estimated": 1, "subscription": 0, "unknown": 0 }
     }
   },

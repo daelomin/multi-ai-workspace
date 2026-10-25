@@ -248,14 +248,26 @@ Example: 3 reported, 2 estimated, 1 subscription, 0 unknown → 6/6; adding 2 un
 
 ```
 CPAT(route, taskClass) =
-  ( Σ inclusive attributable cost of all tasks of the class, any category,
-    including failed attempts, rework, child work and overhead )
-  ÷ number of distinct accepted tasks of the class
+  ( Σ over the UNION of effective usage records of the cohort, each record once,
+    any category, including failed attempts, rework, child work and overhead )
+  ÷ number of distinct accepted tasks in the same cohort
 ```
 
-The numerator is each task's inclusive total, so overhead records are counted once (they
-are already inside the exclusive total; do not add them again). Reported per cost
-provenance (§4a); the combined estimate is labelled as such.
+**Cohort.** The cohort is the set of *root* tasks (no `parentTaskId`) of the class; a child
+task's records belong to its root's cohort through the parent link, whatever the child's
+own class. The numerator is the union of the effective usage-record ids of the cohort's
+roots and all their descendants, each counted once. It is never a sum of per-task inclusive
+totals, which overlap whenever a parent and child both appear (§4 check 2). Overhead
+records are in that union once. The denominator counts the same roots that were accepted.
+Reported per cost provenance (§4a); the combined estimate is labelled as such.
+
+**Route attribution.** A cost record is attributed to the route of the attempt that
+produced it (`attribution.attemptId` → attempt route). A task that switched routes
+therefore contributes each attempt's cost to that attempt's route; the accepted task counts
+once in the denominator of the route of the *delivering* attempt (the one whose outcome was
+accepted), and not at all in the denominator of routes whose attempts failed (their cost
+stays in those routes' numerators, so failed routes are not flattered). A task-class
+CPAT with no route filter uses the whole cohort.
 
 - Rejected/abandoned tasks stay in the numerator (their cost was real) and out of the
   denominator.

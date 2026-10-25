@@ -1,7 +1,7 @@
 # Akira — production specification
 
 **Document ID:** AKIRA-SPEC-001
-**Version:** 0.4 (v0.2 recorded HUMAN decisions AKIRA-D4–D6; v0.3 added the v1 skill catalogue; v0.4 consolidates review round 1: append-only backup, guarded hard delete, recovery quarantine, availability vs capability, unit-separated accounting, task recovery transitions)
+**Version:** 0.5 (v0.2 recorded HUMAN decisions AKIRA-D4–D6; v0.3 added the v1 skill catalogue; v0.4 consolidated review round 1: append-only backup, guarded hard delete, recovery quarantine, availability vs capability, unit-separated accounting, task recovery transitions; v0.5 consolidates review round 2: complete per-tree backup generation, quarantine-safe startup reconciliation, error-to-outcome mapping and reconciliation guards, route role predicate, task revision in checkpoints, CPAT cohort, single Money/skill-support shapes, unauthorized-action runbook, one connector effort basis)
 **Date:** 2026-10-25
 **Status:** draft, not approved, not implemented
 **Base:** Akeru Bot `opencoredev/akeru-bot` at `524eb68a293c4b6a38acf722ab4232cfe5e22625` (2026-10-23T21:06:41Z)
@@ -500,7 +500,10 @@ the policy explicitly says so (MUST). A fallback that lowers capability below th
 is a policy violation, not a convenience. A failure after an external action was
 dispatched (ledger state `dispatched` or `unknown`) — for example a 5xx after a tool
 request was sent — is `interrupted` or `failed_unknown`, never `failed_network`, and is
-ineligible for automatic fallback until the action is reconciled (MUST; AK-TSK-11).
+ineligible for automatic fallback until the action is reconciled (MUST; AK-TSK-11). The
+same guard governs retry and fallback for every other error class (a 429 after a send is
+not retried or rerouted). The error taxonomy and the attempt-outcome set are related by
+one mapping table (`docs/04-data-model.md` §4.2).
 
 **AK-RTE-13.** Credit exhaustion MUST be a distinct terminal condition for the attempt:
 the task pauses with a monetary/quota reason and a recommended action (wait, switch
@@ -594,7 +597,11 @@ carrying an evidence link; a `pass` with no evidence link is invalid.
 **AK-TRG-07.** Readiness MUST be a scored checklist with per-criterion evidence links,
 returning `ready`, `ready-with-risks` (named risks accepted by policy or HUMAN) or
 `not-ready` (MUST). "Not ready" prohibits the specification-led downgrade path; it does
-not prohibit advanced-model execution.
+not prohibit advanced-model execution. "Specification-led" and "advanced" are a `role`
+attribute on each route candidate, set by the versioned route policy (proposed default:
+the lowest-cost floor-meeting candidate is specification-led, other floor-meeting
+candidates are advanced; `docs/04-data-model.md` §4.3). Below-floor candidates are
+rejected by the floor check for every readiness outcome.
 
 **AK-TRG-08.** The readiness result MUST travel with the task and be validated again by
 the executing bot's admission check; an implementer that finds an unresolved interface
@@ -661,7 +668,10 @@ transition table (`docs/04-data-model.md` §4.1) MUST define every recovery edge
 (answer recorded, blocker resolved, `task.resume`), and each attempt-outcome class has a
 defined next state (quota → `paused`; capability/tool-contract/safety → re-triage;
 interrupted/unknown → `blocked` or `awaiting_input` after reconciliation). A `not-ready`
-readiness result blocks only specification-led or below-floor routes (AK-TRG-07).
+readiness result blocks only candidates whose route-policy `role` is `specification-led`
+(AK-TRG-07); a below-floor route is rejected by the floor check alone. A cancelled or
+`interrupted` attempt with a `dispatched`/`unknown` action cannot return the task to
+`ready`, and no new attempt may start, until that action is reconciled.
 
 **AK-TSK-02.** A task MUST carry: requester, assignee bot, acceptance criteria, route
 decision reference, priority, deadline (optional), dependencies, artifacts, review
@@ -683,7 +693,8 @@ the canceller (MUST).
 ### 8.2 Checkpoints
 
 **AK-TSK-06.** A checkpoint MUST capture the durable, portable state needed to continue
-elsewhere: task definition revision, acceptance criteria, plan with step status, decisions
+elsewhere: task definition revision (the task's monotonic `revision` and content hash, so
+a changed criterion, assignee or dependency is detectable), acceptance criteria, plan with step status, decisions
 made (with evidence), open questions, artifact references and hashes, memory deltas,
 skill/procedure versions, action-ledger watermark, and next-step intent (MUST). It MUST
 be sufficient for a different provider to continue without the previous session (MUST).
@@ -728,9 +739,11 @@ not to a retry (MUST).
 ### 8.4 Recovery, concurrency and reconciliation
 
 **AK-TSK-14.** On server start, Akira MUST reconcile: running attempts with no live
-session (mark failed with a resumable checkpoint), queued work never dispatched
+session (record `interrupted` with a resumable checkpoint), queued work never dispatched
 (dispatch or mark), action-ledger entries in `dispatched`/`unknown` (verify), and
-checkpoint/task version mismatches (surface, do not guess) (MUST). Akeru's
+checkpoint/task version mismatches (compare `revision` and content hash; surface, do not
+guess) (MUST). While recovery quarantine is on (AK-OPS-15) this pass may only mark or
+block: it MUST NOT dispatch, start a routine or send (MUST NOT). Akeru's
 `reconcileDelegations` startup pattern is reused as the model.
 
 **AK-TSK-15.** Restart MUST NOT lose or duplicate a chat result, and MUST NOT silently
@@ -1056,8 +1069,11 @@ and MUST label measured, estimated, subscription and unavailable values distinct
 
 **AK-ACC-14.** A task's cost summary MUST separate delivery cost from review/
 coordination/observer overhead and from failed attempts (MUST). Cost-per-accepted-task
-is the complete attributable cost divided by the number of distinct accepted tasks;
-rework adds cost, not accepted tasks. Coverage is `(reported + estimated + subscription)
+is the cost of the union of effective usage records of a stated cohort (root tasks and
+their descendants, each record once, never a sum of overlapping inclusive totals) divided
+by the number of distinct accepted tasks in that cohort; rework adds cost, not accepted
+tasks, and each attempt's cost belongs to that attempt's route
+(`docs/09-accounting.md` §9). Coverage is `(reported + estimated + subscription)
 / (reported + estimated + subscription + unknown)` over cost-bearing records, `n/a` when
 there are none.
 
@@ -1355,13 +1371,17 @@ matrix, known limitations, and the Akeru revision it is based on (MUST).
 **AK-OPS-15.** A restored or rolled-back server MUST start in recovery quarantine:
 autonomous dispatch, routines, outbound channel delivery and external writes disabled;
 the original environment stopped or fenced; the recovery point and the uncertain interval
-recorded. Tasks and routines that could have acted in that interval are reconciled
+recorded. Every task, routine and channel delivery that could have acted in that interval,
+whatever its status at the recovery point (including paused or terminal tasks and work
+that exists only after the snapshot), is reconciled
 against preserved post-snapshot evidence or external state before release; where a prior
 effect cannot be established the task stays blocked for HUMAN reconciliation and is never
 replayed (MUST; `docs/12-operations.md` §5.3). A restore drill keeps these disabled.
 
 **AK-OPS-16.** Backups MUST be append-only: each run writes a new uniquely named
-generation and uses no deletion flag; earlier generations and database snapshots are
+generation (database snapshot included, named by the same per-run timestamp) holding the
+complete restore set of AK-OPS-04 with each source tree under its own path and a manifest
+with one checksummed entry per item, and uses no deletion flag; earlier generations and database snapshots are
 preserved. Removing a backup generation is a separate operation requiring a HUMAN message
 naming the items (MUST; AKIRA-D2; `docs/12-operations.md` §5.2).
 
@@ -1474,5 +1494,5 @@ non-blocking choices (U4–U16). Host, subscription transport and distribution a
 
 ---
 
-*End of specification. Version 0.4 — draft after review round 1. Nothing in this document has
+*End of specification. Version 0.5 — draft after review round 2. Nothing in this document has
 been verified by execution; evidence labels state what was inspected and what was not.*
