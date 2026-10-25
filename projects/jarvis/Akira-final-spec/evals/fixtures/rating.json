@@ -1,0 +1,22 @@
+{
+  "id": "rat_R77",
+  "taskId": "task_T142",
+  "taskRevision": 3,
+  "reviewer": "bot_NATALIA",
+  "relationship": "consumer",
+  "criteria": {
+    "resolution": 4,
+    "quality": 5,
+    "rework": "minor",
+    "efficiency": 3,
+    "handoff": 5
+  },
+  "reasons": "Page is correct and the dataset is linked. Rework was needed because the first attempt hit a provider quota, not because of the work; efficiency reflects the extra attempt. One manual cell check was required.",
+  "evidence": ["art_page_1", "art_dataset_1", "task_T142#ac2", "att_T142_1"],
+  "unresolvedIssues": [],
+  "difficulty": { "taskClass": "data-publish", "complexityScore": 9 },
+  "revision": 1,
+  "supersedes": null,
+  "dispute": "dsp_77",
+  "createdAt": "2026-10-24T19:02:10.000Z"
+}

@@ -1,0 +1,28 @@
+{
+  "id": "prp_P12",
+  "target": { "kind": "procedure", "id": "proc_WEEKLY_SCORECARD", "version": 3 },
+  "diagnosis": "3 of 5 ratings on scorecard tasks cite 'scores without evidence links'; rework ratio 22% for this task class.",
+  "evidence": ["rat_R70", "rat_R73", "rat_R77", "task_T130", "task_T136"],
+  "change": "Add an explicit evidence-link check before publishing scores.",
+  "diff": "step verify-scores: add acceptance example 'every score row links to at least one artifact or task'",
+  "expectedBenefit": [
+    { "metric": "rework_ratio", "direction": "decrease", "rationale": "reviewers can verify without asking" },
+    { "metric": "resolution_rating", "direction": "increase", "rationale": "fewer follow-up fixes" }
+  ],
+  "expectedCost": [
+    { "tokens": 0, "money": 0, "risk": "one extra validation step per run" },
+    { "tokens": 42000, "money": 1.2, "risk": "evaluation runs" }
+  ],
+  "evaluation": {
+    "method": "shadow",
+    "sampleSize": 6,
+    "results": { "accepted": 4, "rejected": 2, "baselineAccepted": 3, "costDeltaPerTask": 0.34, "latencyDeltaPct": 4 },
+    "accepted": true
+  },
+  "status": "awaiting_review",
+  "proposedBy": "observer",
+  "approvedBy": null,
+  "activatedAt": null,
+  "rollbackTo": 3,
+  "createdAt": "2026-10-24T20:10:00.000Z"
+}

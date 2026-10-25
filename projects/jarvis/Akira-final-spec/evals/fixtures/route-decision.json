@@ -1,0 +1,29 @@
+{
+  "id": "rtd_T142_2",
+  "taskId": "task_T142",
+  "attemptNumber": 2,
+  "taskClass": "data-publish",
+  "capabilityFloor": {
+    "requiredTools": ["sheet.read", "file.write", "web.publish"],
+    "minimumContext": 64000,
+    "requiredSkillSupport": "native-verified",
+    "requiredReliability": "tool-transcript-verified"
+  },
+  "candidates": [
+    { "routeKey": "claude/sonnet-4.7", "meetsFloor": true, "estimatedCost": { "low": 1.2, "high": 2.4, "currency": "USD" }, "estimateBasis": "price table 2026-10-01", "support": "verified", "note": "native skills" },
+    { "routeKey": "deepseek/deepseek-chat", "meetsFloor": true, "estimatedCost": { "low": 0.3, "high": 0.7, "currency": "USD" }, "estimateBasis": "price table 2026-10-01", "support": "unknown", "note": "skills prompt-injected; tool transcript pending" },
+    { "routeKey": "codex/gpt-5.1-codex", "meetsFloor": false, "estimatedCost": { "low": 1.0, "high": 2.0, "currency": "USD" }, "estimateBasis": "subscription-equivalent", "support": "assumed", "note": "account quota exhausted at decision time" }
+  ],
+  "chosen": {
+    "routeKey": "claude/sonnet-4.7",
+    "reason": "Only verified route whose account has quota; native skill support; cost within the estimate band.",
+    "alternativesRejected": [
+      "deepseek: support unknown for this skill until the injection test passes",
+      "codex: quota exhausted (failure class: quota_exhausted, not capability)"
+    ]
+  },
+  "fallbackPolicy": "infrastructure-only",
+  "policyVersion": "balanced-2026.10",
+  "decidedBy": "policy:balanced-2026.10",
+  "createdAt": "2026-10-24T18:02:44.000Z"
+}

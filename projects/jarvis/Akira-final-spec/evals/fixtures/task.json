@@ -1,0 +1,59 @@
+{
+  "id": "task_T142",
+  "title": "Fuel Atlas page v2",
+  "requester": "bot_NATALIA",
+  "assignee": "bot_RAJIV",
+  "roomId": "room_TECH_BOARD",
+  "parentTaskId": null,
+  "delegationId": null,
+  "intent": "Publish the updated Fuel Atlas page with the corrected stop-rate dataset.",
+  "acceptanceCriteria": [
+    { "id": "ac1", "statement": "Page loads with the new dataset", "validation": "artifact page.html downloaded and opened in the screenshot test", "status": "met", "evidence": ["art_page_1"] },
+    { "id": "ac2", "statement": "Stop rates match the reviewed dataset", "validation": "assert 12 sample cells against dataset.csv", "status": "met", "evidence": ["art_dataset_1"] },
+    { "id": "ac3", "statement": "Board item links the page and the rating", "validation": "board item resolves both links", "status": "met", "evidence": ["item_T142"] }
+  ],
+  "status": "review",
+  "priority": "normal",
+  "deadline": null,
+  "dependencies": [],
+  "triage": {
+    "revision": 2,
+    "taskClass": "data-publish",
+    "complexity": { "ambiguity": 1, "integrations": 2, "contextSize": 2, "validationDifficulty": 2, "expectedRework": 1, "irreversibility": 2 },
+    "flags": [],
+    "estimate": { "effortHours": { "low": 2, "high": 4 }, "cost": { "low": 1.5, "high": 4.0, "currency": "USD" }, "confidence": 0.6, "basis": "2 similar publish tasks in the last 30 days" },
+    "readiness": {
+      "outcome": "ready",
+      "criteria": { "outcome": "pass", "scopeAndExclusions": "pass", "dependencies": "pass", "interfaces": "pass", "constraints": "pass", "boundedSubtasks": "pass", "acceptanceExamples": "pass", "independentValidation": "pass", "unknownsResolved": "pass" },
+      "risks": []
+    },
+    "proposedRoutes": [
+      { "routeKey": "claude/sonnet-4.7", "meetsFloor": true, "estimatedCost": { "low": 1.2, "high": 2.4, "currency": "USD" }, "estimateBasis": "price table 2026-10-01", "support": "verified" },
+      { "routeKey": "deepseek/deepseek-chat", "meetsFloor": true, "estimatedCost": { "low": 0.3, "high": 0.7, "currency": "USD" }, "estimateBasis": "price table 2026-10-01", "support": "unknown", "note": "skills prompt-injected" }
+    ],
+    "decision": { "routeKey": "claude/sonnet-4.7", "reason": "native skill support for sheet-ops; cost difference small for this task class", "policyVersion": "balanced-2026.10" },
+    "discovery": null,
+    "createdAt": "2026-10-24T14:02:11.000Z",
+    "supersedes": 1
+  },
+  "routeDecisionId": "rtd_T142_2",
+  "checkpointIds": ["chk_T142_A1", "chk_T142_A2"],
+  "progress": [
+    { "stepId": "plan", "status": "done" },
+    { "stepId": "fetch-dataset", "status": "done" },
+    { "stepId": "render-page", "status": "done" },
+    { "stepId": "verify", "status": "done" },
+    { "stepId": "publish", "status": "done" }
+  ],
+  "artifacts": ["art_page_1", "art_dataset_1"],
+  "reviewIds": ["rat_R77"],
+  "attemptIds": ["att_T142_1", "att_T142_2", "att_T142_3"],
+  "cost": {
+    "exclusive": { "amount": 3.12, "currency": "USD", "provenance": "mixed", "coverage": { "reported": 3, "estimated": 3, "unknown": 0 } },
+    "inclusive": { "amount": 3.50, "currency": "USD", "provenance": "mixed", "coverage": { "reported": 3, "estimated": 4, "unknown": 0 } },
+    "overhead": { "amount": 0.45, "currency": "USD", "provenance": "estimated", "coverage": { "reported": 2, "estimated": 1, "unknown": 0 } }
+  },
+  "createdAt": "2026-10-24T14:02:11.000Z",
+  "updatedAt": "2026-10-24T18:41:02.000Z",
+  "closedAt": null
+}

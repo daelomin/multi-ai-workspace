@@ -1,0 +1,46 @@
+{
+  "id": "use_T142_2",
+  "idempotencyKey": "task_T142/attempt_T142_2/turn-1",
+  "owner": { "kind": "task", "id": "task_T142" },
+  "attribution": {
+    "botId": "bot_RAJIV",
+    "taskId": "task_T142",
+    "attemptId": "att_T142_2",
+    "roomId": "room_TECH_BOARD",
+    "threadId": "thread_T142",
+    "turnId": "turn_T142_2",
+    "parentTaskId": null,
+    "parentUsageId": null
+  },
+  "route": {
+    "harness": "mastra",
+    "driver": "claudeAgent",
+    "provider": "anthropic",
+    "model": "sonnet-4.7",
+    "instanceId": "claude-main",
+    "accountLabel": "Max 20x"
+  },
+  "category": "turn",
+  "measurement": "provider-reported",
+  "tokens": {
+    "uncachedInput": 30000,
+    "cachedInput": 11000,
+    "cacheCreation": 0,
+    "output": 6100,
+    "reasoning": 1200,
+    "unavailableReason": null
+  },
+  "units": null,
+  "cost": {
+    "amountMinor": 184,
+    "currency": "USD",
+    "provenance": "subscription-equivalent",
+    "priceTableVersion": "2026-10-01",
+    "providerChargeId": null
+  },
+  "state": "reported",
+  "createdAt": "2026-10-24T18:05:00.000Z",
+  "settledAt": "2026-10-24T18:27:38.000Z",
+  "supersedes": null,
+  "notes": "Reasoning is a subset of output; cached input is disjoint from uncached input."
+}

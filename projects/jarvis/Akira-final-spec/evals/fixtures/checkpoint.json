@@ -1,0 +1,38 @@
+{
+  "id": "chk_T142_A2",
+  "taskId": "task_T142",
+  "attemptId": "att_T142_2",
+  "revision": 4,
+  "taskRevision": {
+    "title": "Fuel Atlas page v2",
+    "acceptanceCriteria": ["ac1", "ac2", "ac3"],
+    "triageRevision": 2
+  },
+  "plan": [
+    { "stepId": "plan", "statement": "Confirm dataset revision and page template", "status": "done" },
+    { "stepId": "fetch-dataset", "statement": "Fetch reviewed dataset from Sheets", "status": "done" },
+    { "stepId": "render-page", "statement": "Render page with the new dataset", "status": "done" },
+    { "stepId": "verify", "statement": "Verify 12 sample cells and page load", "status": "done" },
+    { "stepId": "publish", "statement": "Publish page and update board item", "status": "done" }
+  ],
+  "decisions": [
+    { "decisionId": "d_T142_1", "statement": "Use the reviewed dataset v7, not the draft v8", "evidence": ["art_dataset_1"], "alternatives": ["wait for v8 (blocked by review)"] },
+    { "decisionId": "d_T142_2", "statement": "Publish to the existing page URL", "evidence": ["link_board"], "alternatives": ["new URL (breaks existing links)"] }
+  ],
+  "openQuestions": [],
+  "artifacts": [
+    { "artifactId": "art_page_1", "sha256": "9f2c1a7d4b8e0f3a6c5d2b1e9a8f7c6d5e4b3a2f1c0d9e8b7a6f5c4d3e2b1a0f", "kind": "html" },
+    { "artifactId": "art_dataset_1", "sha256": "41ab8c2d9e0f1a3b5c7d9e1f2a4b6c8d0e2f4a6b8c0d2e4f6a8b0c2d4e6f8a0b", "kind": "csv" }
+  ],
+  "memoryDelta": [
+    { "scope": "bot", "entry": "Fuel Atlas page publishes to the existing URL; do not create a new one.", "contentHash": "sha256:7d1e2c3b4a5968778695a4b3c2d1e0f9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3" }
+  ],
+  "skillVersions": [{ "skillId": "skl_SHEET_OPS", "version": "1.3.0" }],
+  "procedureVersions": [{ "procedureId": "proc_PUBLISH_PAGE", "version": 2 }],
+  "actionWatermark": { "ledgerSeq": 88, "unresolvedActionIds": [] },
+  "nextIntent": "Await review; if rework requested, re-render from the same dataset and diff the page.",
+  "lostOnResume": ["provider cache", "native tool-call buffer"],
+  "workspaceCheckpointRef": "refs/t3/checkpoints/T142/attempt-2",
+  "createdBy": "bot_RAJIV",
+  "createdAt": "2026-10-24T18:12:40.000Z"
+}
