@@ -1,5 +1,11 @@
 # Akira final specification review activity
 
+## 2026-10-25 — Round 3 specification review
+
+Agent: CHATGPT
+
+Reviewed v0.5 after the round-2 reviews and both consolidations, with settled decisions, all companion documents and eight JSON fixtures within the manifest scope. Recorded three minor findings: the checkpoint-backup output directory is not created; the fault matrix mixes attempt outcomes with other component states despite its enum-membership gate; and integer-minor-unit cost storage lacks a sub-cent precision/rounding policy. No blocking or major findings. Read-only checks confirmed JSON parsing, schema versions, task cost-subtotal arithmetic and task/checkpoint revision/hash agreement. Review complete at `reviews/round-3/CHATGPT.md`; specification and other inputs unchanged. No git commands or runtime integrations executed.
+
 ## 2026-10-25 — Round 2 consolidation
 
 Agent: CLAUDE
