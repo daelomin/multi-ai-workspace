@@ -2,6 +2,12 @@
 
 ## 2026-10-25 — Round 2 specification review
 
+Agent: GROK
+
+Reviewed v0.4 after the round-1 consolidation, with settled decisions, all companion documents and eight JSON fixtures within the manifest scope. Recorded four major findings (the backup procedure is not a faithful complete generation; startup reconciliation can still dispatch during recovery quarantine; unresolved external actions can still be followed by another send; the specification-led dispatch guard has no decision procedure) and five minor findings covering CPAT descendant overlap, checkpoint task-definition identity, the undefined Money shape, per-route skill verification records, and the missing unauthorized-action runbook. A read-only rsync dry run confirmed colliding relative paths; SQLite VACUUM INTO behaviour was checked against the published language page. No validator, git command or runtime integration executed. Review complete at `reviews/round-2/GROK.md`; specification and other inputs unchanged.
+
+## 2026-10-25 — Round 2 specification review
+
 Agent: DEEPSEEK
 
 Reviewed v0.4 after the round-1 consolidation, with settled decisions, all companion documents and eight JSON fixtures within the manifest scope. Recorded one major finding (the backup procedure collects only the database and three file trees, omitting configuration, secrets, content-addressed skill/template files and checkpoint refs, and names the database snapshot only to the day) and five minor findings covering the unmapped failure/attempt-outcome vocabularies, the missing task-revision link for checkpoint mismatch detection, the undefined `Money` representation in cost schemas and fixtures, the absent unauthorized-action incident runbook, and inconsistent connector effort bases. Records read as text; no validator, git command or runtime integration executed. Review complete at `reviews/round-2/DEEPSEEK.md`; specification and other inputs unchanged.
