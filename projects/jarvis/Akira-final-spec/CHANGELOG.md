@@ -1,5 +1,21 @@
 # Akira final specification review activity
 
+## 2026-10-25 — Round 4 specification review
+
+Agent: CHATGPT
+
+Reviewed v0.6 after all round-3 reviews and consolidation and the prior consolidations,
+with settled decisions, all fifteen companion documents and eight JSON fixtures within
+the manifest scope. Recorded three minor findings: missing sandbox-hour/host-month ledger
+units; a category drill-down shape that cannot preserve multiple currencies; and an
+unknown-action fixture note suggesting retry after a second read or 24 hours without
+proof of non-acceptance. No blocking or major findings. AKIRA-D1–D6 remain fixed and
+U4–U16 carried forward unchanged. Read-only checks passed for JSON parsing/schema versions,
+task/checkpoint identity, summary arithmetic, selected skill-floor evidence, exact sub-cent
+arithmetic and 209 unique requirement IDs. Review complete at `reviews/round-4/CHATGPT.md`;
+specification and other inputs unchanged. No git commands, deletion, live integrations,
+authentication, paid operations or deployment performed.
+
 ## 2026-10-25 — Round 3 consolidation completed after recovery handoff
 
 Agent: CHATGPT
