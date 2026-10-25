@@ -1,6 +1,6 @@
 # 04 — Canonical data model, state machines and records
 
-**Status:** draft v0.4 · **Normative:** `spec.md` §5–§12 · **Representative JSON:** `evals/fixtures/`.
+**Status:** draft v0.6 · **Normative:** `spec.md` §5–§12 · **Representative JSON:** `evals/fixtures/`.
 
 ---
 
@@ -17,12 +17,26 @@
   (`human:<id>`, `bot:<id>`, `system`, `observer:<id>`, `connector:<id>`).
 - **Enums** are closed and versioned. An unknown value received from a newer peer is
   preserved as `unknown` with the raw value, never coerced (§`docs/05-interfaces.md` §7).
-- **Money** is one shape everywhere: `Money { amountMinor: integer; currency: string }`
+- **Summary/proposal Money** has one shape: `Money { amountMinor: integer; currency: string }`
   (minor units, e.g. cents). `MoneyRange { lowMinor: integer; highMinor: integer;
   currency: string }`. Inside a structure that already carries a `currency` (a
   `CostSummary` subtotal row), fields are named `…Minor` and share that currency. Decimals
   are a display format only, never stored. A USD estimate is a separate field with
   `estimate` provenance, never overwriting a provider-reported charge.
+- **ExactMoney** is the per-record and price-calculation shape:
+  `{ coefficient: string; scale: integer; currency: string }`, meaning the signed base-10
+  integer coefficient × 10^(-scale) major currency units. `scale >= 0`; the coefficient
+  is a canonical integer string (no leading zeros except `0`), handled with arbitrary
+  precision, never binary floating point. USD 0.004 is `{coefficient: "4000", scale: 6,
+  currency: "USD"}`. Products retain all source digits; scale may exceed six when needed.
+  A reported USD 1.84 remains exactly 1.84; extra trailing zeros imply no new measurement
+  precision. Keep the reported amount/scale and price-table inputs as provenance.
+  Aggregate effective records exactly, aligning scales, then round half to even to the
+  currency's minor units once per subtotal/display boundary, never per record.
+  The price table declares the currency minor-unit exponent. `Money`/`…Minor` summaries
+  and proposal estimates are boundary values, never inputs for re-summing usage records.
+  Thus 100 × USD 0.004 = USD 0.40. Combined display estimates sum displayed provenance
+  subtotals; any category/display rounding residual is labelled, never written as usage.
 - **Tokens** are integers ≥ 0 or `null` with an `unavailable_reason`.
 - **Append-only** records (events, attempts, actions, usage, ratings revisions, audit)
   are never updated in place; corrections are new records that supersede.
@@ -147,9 +161,12 @@ SkillSupportEntry {
 }
 ```
 
-The rendered support level (`native-verified`, `native-unverified`, `projected-unverified`,
-`prompt-injected`, `unsupported`; AK-SKL-04) is derived from `mechanism` and `verified`;
-a verified `projected` or `prompt-injected` entry renders as such with its evidence.
+The support level (`native-verified`, `native-unverified`, `projected-verified`,
+`projected-unverified`, `prompt-injected`, `unsupported`; AK-SKL-04) is derived from
+`mechanism` and `verified`; a `prompt-injected` entry keeps that level whether or not
+`verified` is set and renders "(unverified)" when it is not. Only `native-verified`
+satisfies a native floor.
+`unsupported` always has `verified: false`.
 `evidence` is required when `verified` is true and absent otherwise: an unverified entry
 never carries a fabricated verification timestamp.
 
@@ -215,7 +232,7 @@ TriageRecord {
 
 Attempt {
   id: att_…; taskId: task_…; number: integer; status: AttemptStatus;
-  route: RouteSnapshot;                 // harness, driver, provider, model, account, options
+  route: RouteSnapshot;                 // harness, driver, provider, model, account, authClass, options
   botId: bot_…; startedAt; endedAt?;
   outcome: { class: AttemptOutcomeClass; detail: string };   // §4.2
   checkpointBefore: chk_…; checkpointAfter?: chk_…;
@@ -224,17 +241,31 @@ Attempt {
   approvalIds: appr_…[]; cancellation?: { by: actor; reason: string };
 }
 
+RouteSnapshot {
+  harness: string; driver: string; provider: string; model: string;
+  instanceId: string; accountLabel?: string;
+  authClass: "subscription-oauth"|"api-key"|"local"|"none";
+  options: object; provenance: "verified"|"assumed";
+}
+RouteOption = RouteDecision.candidates[number];  // same shape in TriageRecord.proposedRoutes
+
 RouteDecision {
   id: rtd_…; taskId: task_…; attemptNumber?;
-  taskClass: string; capabilityFloor: CapabilityFloor;
+  roleBasis: string;                    // policy/default/explicit override, with reason
+  taskClass: string; capabilityFloor: CapabilityFloor;       // includes requiredSkills: skl_…[]
   schemaVersion: string;                // contract version (docs/05 §7)
   candidates: { routeKey: string;
+                authClass: "subscription-oauth"|"api-key"|"local"|"none";   // docs/05 §2.1
+                options: object; provenance: "verified"|"assumed";
                 meetsFloor: boolean;     // capability only: tools, context, skill support >= requiredSkillSupport,
                                          // reliability. Never cleared by quota/auth/availability.
+                skillSupport: { skillId: skl_…; mechanism; verified: boolean; evidence? }[];
+                                         // the SkillSupportEntry (§2) per required skill: the input
+                                         // of the skill part of the floor check
                 available: "available"|"quota_exhausted"|"auth"|"rate_limited"|"unknown";
                 availabilitySource?: string;   // e.g. provider meter, last error, timestamp
                 estimatedCost: MoneyRange; costUnit: "provider-charge"|"price-table"|"subscription-equivalent";
-                estimateBasis: string; support: "verified"|"assumed"|"unknown"; note?: string;
+                estimateBasis: string; note?: string;
                 role: "specification-led" | "advanced" }[];   // see §4.1 and §4.3
   chosen: { routeKey: string; reason: string; alternativesRejected: string[] };
   fallbackPolicy: "none" | "infrastructure-only" | "always-adequate";  // default infrastructure-only
@@ -289,7 +320,8 @@ TaskCheckpoint {
 | any non-terminal | cancel | cancelled | reason; children cancelled |
 | done/failed/cancelled | reopen | triaged | actor authorized; new revision |
 
-A new attempt (`task.start`) on a task with any `dispatched` or `unknown` action is
+A new attempt (`task.start`) on a task with any `dispatched`, `unknown`, or unresolved
+`intent` action whose attempt is no longer live is
 rejected until that action is reconciled, whatever edge led to `ready`.
 
 **Invariants:** one active attempt; no `done` without acceptance evidence; no transition
@@ -323,16 +355,19 @@ runbooks use the **outcome** names.
 | `network` | `failed_network` |
 | `safety_block` | `failed_safety_block` |
 | `unknown` | `failed_unknown` |
-| any class, when an action was `dispatched`/`unknown` | `interrupted` or `failed_unknown` (external-effect guard below) |
+| any class, when an action was `dispatched`/`unknown`/`intent`-with-dead-attempt | `interrupted` when the session or attempt ended without a provider terminal event (severed stream, restart, kill); `failed_unknown` when the provider returned a terminal error but acceptance of the action is not established (external-effect guard below) |
 
 A restart that finds a running attempt with no live session records `interrupted`
-(AK-TSK-14), never a bare "failed". A contract test asserts that every expected outcome
-in the fault matrix is a member of the closed set above.
+(AK-TSK-14), never a bare "failed". A contract test asserts that every fault-matrix row
+whose result kind is `attempt outcome` is a member of the closed set above; rows of other
+result kinds (action state, delivery state, watchdog, invariant, retention, quarantine) are
+asserted against their own component, not against this set (`docs/10` §3).
 
 **External-effect guard.** `failed_network` is reserved for failures with no dispatched
 external action (DNS/TLS/timeout before acceptance, or a transport failure before any tool
 request left). If the attempt dispatched any external action (ledger state `dispatched` or
-`unknown`), the outcome is `interrupted` or `failed_unknown`, regardless of the transport
+`unknown`, or `intent` with a dead attempt), the outcome is `interrupted` if there is no provider terminal event, or `failed_unknown`
+if a terminal error leaves acceptance unestablished, regardless of the transport
 symptom (e.g. a 5xx mid-stream after a tool request was sent), and it is ineligible for
 automatic fallback until the action is reconciled (§4.4).
 
@@ -366,8 +401,15 @@ from the document). It does not block an advanced model from doing the work.
 "advanced"`, evaluated by the `triaged → ready` guard. The role is a route-policy
 attribute (data, versioned with the policy, recorded on the candidate at decision time).
 Proposed default, not HUMAN-approved: when more than one candidate meets the floor, the
-lowest-expected-cost one is `specification-led` and every other floor-meeting candidate is
-`advanced`; a sole floor-meeting candidate is `advanced`. `not-ready` rejects candidates
+uniquely cheapest one *within a comparable group of at least two floor-meeting
+candidates with the same auth class, cost unit and currency* is `specification-led` and
+every other floor-meeting candidate is `advanced`; a sole floor-meeting candidate in a group is `advanced`. The cheapest candidate must
+have `highMinor < lowMinor` of every peer to be uniquely cheapest. Candidates in different auth classes or cost units are not ranked against each
+other unless the policy enables the labelled routing comparison unit (U16, default off), in
+which case the operator or policy sets the role. Two `MoneyRange`s are ordered only when
+they do not overlap (`highMinor` of one < `lowMinor` of the other); overlapping ranges are
+unordered; absent a uniquely cheapest candidate all candidates stay `advanced` by default, and the route policy or
+operator may set the role per route key. `not-ready` rejects candidates
 whose role is `specification-led`; a below-floor candidate is rejected by the floor check
 alone, whatever the readiness outcome (its `role` comes from the route policy and is
 irrelevant to the guard). `ready` and `ready-with-risks` accept either role.
@@ -376,11 +418,22 @@ irrelevant to the guard). `ready` and `ready-with-risks` accept either role.
 
 | State | Meaning | Allowed next |
 |---|---|---|
-| intent | action decided, not sent | dispatched, cancelled |
-| dispatched | request possibly reached the provider | confirmed, failed, unknown |
+| intent | action decided, connector not yet invoked under the write-ahead contract | dispatched, cancelled; unknown during dead-attempt recovery if never-sent proof is unavailable |
+| dispatched | durably recorded **before** the connector call; request possibly reached the provider | confirmed, failed, unknown |
 | confirmed | provider acknowledged with an id | (terminal) |
 | failed | provider rejected; no effect | intent (new action id) |
 | unknown | acceptance not established | confirmed, failed (after reconciliation) |
+
+**Write-ahead rule (AK-TSK-10).** The executor persists `intent`, then durably appends
+`dispatched`, and only then invokes the connector. `intent → cancelled` is allowed only
+before that append. An `intent` action whose attempt is no longer live (crash, kill,
+restart) is treated as possibly sent: startup recovery verifies it by reconciliation and
+never resends it, unless the executor can prove the connector call was never started. It
+blocks new attempts and dependent actions exactly as `dispatched`/`unknown` do. Recovery
+appends `unknown` before reconciling a possibly sent dead-attempt `intent`; proof the call
+never started permits `cancelled` instead. A read-back confirmation then follows the
+normal `unknown → confirmed` evidence path; no recovery transition invokes the connector
+write. A failed read-back alone does not prove non-acceptance.
 
 **Rule:** `unknown → failed` requires evidence (read-back, error proving no acceptance),
 never a timeout alone. A new action with the same logical intent reuses the idempotency
@@ -415,7 +468,7 @@ UsageRecord {
   owner: { kind: "bot"|"task"|"room"|"observer"|"connector"; id };
   attribution: { botId?; taskId?; attemptId?; roomId?; threadId?; turnId?;
                  parentTaskId?; parentUsageId? };
-  route: { harness; driver; provider; model; instanceId; accountLabel? };
+  route: RouteSnapshot;                 // includes authClass, options and provenance
   schemaVersion: string;
   category: "turn"|"tool"|"delegation"|"routine"|"review"|"coordination"|"observer"|"media"|"other";
                 // overhead = review|coordination|observer; delivery = all others (docs/09 §3)
@@ -424,7 +477,7 @@ UsageRecord {
              cacheCreation: integer|null; output: integer|null;
              reasoning?: integer|null; unavailableReason?: string };
   units?: { kind: "call"|"minute"|"message"|"image"|"video-second"|"job"; count: number };
-  cost?: { amountMinor: integer; currency: string; provenance: CostProvenance;
+  cost?: ExactMoney & { provenance: CostProvenance;   // §1 exact fixed point
            priceTableVersion?: string; providerChargeId?: string };
   state: "reserved"|"reported"|"corrected"|"released"|"unavailable";
   createdAt; settledAt?; supersedes?: use_…; notes?: string;
@@ -476,7 +529,7 @@ messages, image renders and sandbox time are attributed without pretending to be
 
 - `akeru_bot_usage_entries` gains nullable columns: `task_id`, `attempt_id`, `room_id`,
   `parent_entry_id`, `instance_id`, `account_label`, `measurement`, `currency`,
-  `amount_minor`, `price_table_version`, `units_kind`, `units_count`, `supersedes_id`.
+  `cost_coefficient`, `cost_scale`, `price_table_version`, `units_kind`, `units_count`, `supersedes_id`.
   Existing rows remain valid with nulls, preserving the `UNIQUE(bot_id, source_key)`
   semantics for old writers. Legacy `category` values are mapped by the deterministic
   table in `docs/09-accounting.md` §3 (delegated→delegation, reflector→observer,
@@ -500,7 +553,8 @@ messages, image renders and sandbox time are attributed without pretending to be
    attempt that produced artifacts.
 3. A task cannot be `done` while any acceptance criterion is `open` or `failed` (a
    waived criterion needs an actor and a reason).
-4. An action in `unknown` blocks dependent actions until reconciled.
+4. An action in `dispatched`, `unknown`, or unresolved dead-attempt `intent` blocks
+   dependent actions and new task attempts until reconciled (or proven never sent).
 5. A usage record's parent chain is acyclic; a child has exactly one parent.
 6. A rating's reviewer is not the rated bot; the rated task is `review`/`done`.
 7. A proposal cannot be `accepted` without an `evaluated` result and an approver distinct

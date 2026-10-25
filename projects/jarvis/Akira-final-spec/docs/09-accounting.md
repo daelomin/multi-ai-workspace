@@ -1,6 +1,6 @@
 # 09 — Token, cost and credit accounting
 
-**Status:** draft v0.4 · **Normative:** `spec.md` §12 · **Schema:** `docs/04-data-model.md` §5.
+**Status:** draft v0.6 · **Normative:** `spec.md` §12 · **Schema:** `docs/04-data-model.md` §5.
 
 The accounting system exists to answer three questions without lying:
 
@@ -27,7 +27,7 @@ The accounting system exists to answer three questions without lying:
    cost provenance (§4a). Where a single figure is useful it is a *combined economic
    estimate*, labelled as such, never called spend, and always shown with its components.
 7. **Routing compares like with like.** Cost-based route ranking (AK-TRG-10) runs within
-   one `auth_class` by default. Ranking across classes uses one named *routing comparison
+   one `authClass` by default. Ranking across classes uses one named *routing comparison
    unit* — the API-equivalent price-table estimate — only when the routing policy enables
    it (proposed default: off, so a cross-class choice is made by the operator). The
    comparison unit is displayed as "routing comparison, not spend".
@@ -60,7 +60,7 @@ The accounting system exists to answer three questions without lying:
 owner        bot | task | room | observer | connector
 attribution  botId, taskId, attemptId, roomId, threadId, turnId,
              parentTaskId, parentUsageId
-route        harness, driver, provider, model, instanceId, accountLabel
+route        harness, driver, provider, model, instanceId, accountLabel, authClass, options, provenance
 category     turn | tool | delegation | routine | review | coordination | observer
              | media | other
 measurement  provider-reported | estimated | subscription-equivalent | unknown
@@ -182,6 +182,12 @@ Any UI text must be generated from records, not from a hand-written sample.
 
 Rules:
 
+- **Precision.** A record stores cost as exact fixed point (`ExactMoney`, coefficient + scale + currency;
+  `docs/04` §1). Estimates (tokens × price) retain every source digit, including products
+  below a millionth; a provider-reported rounded charge is stored exactly as reported.
+  Summaries sum aligned coefficients exactly and convert to currency minor units once,
+  rounding half to even. Example: 100 records of USD 0.004 (coefficient `4000`, scale 6)
+  sum to USD 0.40. Display summaries must not be re-summed to derive ledger totals.
 - A provider-reported charge always wins over an estimate for the same record; the
   estimate is retained as `supersedes` context, not displayed as a second charge.
 - Price tables are versioned files with source URL and date. A model with no price entry
@@ -250,7 +256,7 @@ Example: 3 reported, 2 estimated, 1 subscription, 0 unknown → 6/6; adding 2 un
 CPAT(route, taskClass) =
   ( Σ over the UNION of effective usage records of the cohort, each record once,
     any category, including failed attempts, rework, child work and overhead )
-  ÷ number of distinct accepted tasks in the same cohort
+  ÷ number of accepted ROOT tasks in the same cohort
 ```
 
 **Cohort.** The cohort is the set of *root* tasks (no `parentTaskId`) of the class; a child
@@ -258,7 +264,10 @@ task's records belong to its root's cohort through the parent link, whatever the
 own class. The numerator is the union of the effective usage-record ids of the cohort's
 roots and all their descendants, each counted once. It is never a sum of per-task inclusive
 totals, which overlap whenever a parent and child both appear (§4 check 2). Overhead
-records are in that union once. The denominator counts the same roots that were accepted.
+records are in that union once. The denominator counts the same roots that were accepted;
+an accepted child task is counted through its root only, never as a second accepted task
+(an accepted child under a root that is not accepted adds cost to the numerator and
+nothing to the denominator).
 Reported per cost provenance (§4a); the combined estimate is labelled as such.
 
 **Route attribution.** A cost record is attributed to the route of the attempt that

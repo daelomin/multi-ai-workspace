@@ -11,9 +11,33 @@
   "delegationId": null,
   "intent": "Publish the updated Fuel Atlas page with the corrected stop-rate dataset.",
   "acceptanceCriteria": [
-    { "id": "ac1", "statement": "Page loads with the new dataset", "validation": "artifact page.html downloaded and opened in the screenshot test", "status": "met", "evidence": ["art_page_1"] },
-    { "id": "ac2", "statement": "Stop rates match the reviewed dataset", "validation": "assert 12 sample cells against dataset.csv", "status": "met", "evidence": ["art_dataset_1"] },
-    { "id": "ac3", "statement": "Board item links the page and the rating", "validation": "board item resolves both links", "status": "met", "evidence": ["item_T142"] }
+    {
+      "id": "ac1",
+      "statement": "Page loads with the new dataset",
+      "validation": "artifact page.html downloaded and opened in the screenshot test",
+      "status": "met",
+      "evidence": [
+        "art_page_1"
+      ]
+    },
+    {
+      "id": "ac2",
+      "statement": "Stop rates match the reviewed dataset",
+      "validation": "assert 12 sample cells against dataset.csv",
+      "status": "met",
+      "evidence": [
+        "art_dataset_1"
+      ]
+    },
+    {
+      "id": "ac3",
+      "statement": "Board item links the page and the rating",
+      "validation": "board item resolves both links",
+      "status": "met",
+      "evidence": [
+        "item_T142"
+      ]
+    }
   ],
   "status": "review",
   "priority": "normal",
@@ -22,64 +46,263 @@
   "triage": {
     "revision": 2,
     "taskClass": "data-publish",
-    "complexity": { "ambiguity": 1, "integrations": 2, "contextSize": 2, "validationDifficulty": 2, "expectedRework": 1, "irreversibility": 2 },
+    "complexity": {
+      "ambiguity": 1,
+      "integrations": 2,
+      "contextSize": 2,
+      "validationDifficulty": 2,
+      "expectedRework": 1,
+      "irreversibility": 2
+    },
     "flags": [],
-    "estimate": { "effortHours": { "low": 2, "high": 4 }, "cost": { "lowMinor": 150, "highMinor": 400, "currency": "USD" }, "confidence": 0.6, "basis": "2 similar publish tasks in the last 30 days" },
+    "estimate": {
+      "effortHours": {
+        "low": 2,
+        "high": 4
+      },
+      "cost": {
+        "lowMinor": 150,
+        "highMinor": 400,
+        "currency": "USD"
+      },
+      "confidence": 0.6,
+      "basis": "2 similar publish tasks in the last 30 days"
+    },
     "readiness": {
       "outcome": "ready",
       "criteria": {
-        "intendedOutcome": { "outcome": "pass", "evidence": ["ac1"] },
-        "scopeAndExclusions": { "outcome": "pass", "evidence": ["ac1", "ac2"] },
-        "dependencies": { "outcome": "pass", "evidence": ["art_dataset_1"] },
-        "interfaces": { "outcome": "pass", "evidence": ["art_dataset_1"] },
-        "constraints": { "outcome": "pass", "evidence": ["ac3"] },
-        "boundedSubtasks": { "outcome": "pass", "evidence": ["chk_T142_A1"] },
-        "acceptanceExamples": { "outcome": "pass", "evidence": ["ac2"] },
-        "independentValidation": { "outcome": "pass", "evidence": ["ac1", "ac2"] },
-        "unknownsResolved": { "outcome": "pass", "evidence": ["chk_T142_A1"] }
+        "intendedOutcome": {
+          "outcome": "pass",
+          "evidence": [
+            "ac1"
+          ]
+        },
+        "scopeAndExclusions": {
+          "outcome": "pass",
+          "evidence": [
+            "ac1",
+            "ac2"
+          ]
+        },
+        "dependencies": {
+          "outcome": "pass",
+          "evidence": [
+            "art_dataset_1"
+          ]
+        },
+        "interfaces": {
+          "outcome": "pass",
+          "evidence": [
+            "art_dataset_1"
+          ]
+        },
+        "constraints": {
+          "outcome": "pass",
+          "evidence": [
+            "ac3"
+          ]
+        },
+        "boundedSubtasks": {
+          "outcome": "pass",
+          "evidence": [
+            "chk_T142_A1"
+          ]
+        },
+        "acceptanceExamples": {
+          "outcome": "pass",
+          "evidence": [
+            "ac2"
+          ]
+        },
+        "independentValidation": {
+          "outcome": "pass",
+          "evidence": [
+            "ac1",
+            "ac2"
+          ]
+        },
+        "unknownsResolved": {
+          "outcome": "pass",
+          "evidence": [
+            "chk_T142_A1"
+          ]
+        }
       },
       "risks": []
     },
     "proposedRoutes": [
-      { "routeKey": "claude/sonnet-4.7", "meetsFloor": true, "available": "available", "estimatedCost": { "lowMinor": 120, "highMinor": 240, "currency": "USD" }, "costUnit": "subscription-equivalent", "estimateBasis": "price table 2026-10-01", "support": "verified", "role": "advanced" },
-      { "routeKey": "deepseek/deepseek-chat", "meetsFloor": false, "available": "available", "estimatedCost": { "lowMinor": 30, "highMinor": 70, "currency": "USD" }, "costUnit": "price-table", "estimateBasis": "price table 2026-10-01", "support": "unknown", "note": "below floor: skills prompt-injected", "role": "specification-led" }
+      {
+        "routeKey": "claude/sonnet-4.7",
+        "authClass": "subscription-oauth",
+        "provenance": "verified",
+        "meetsFloor": true,
+        "skillSupport": [
+          {
+            "skillId": "skl_SHEET_OPS",
+            "mechanism": "native",
+            "verified": true,
+            "evidence": {
+              "verifiedAt": "2026-10-24T17:40:00.000Z",
+              "model": "sonnet-4.7",
+              "evidence": "skill transcript: read A1:C20, wrote B2, cited range"
+            }
+          }
+        ],
+        "available": "available",
+        "availabilitySource": "provider meter, checked 2026-10-24T18:02:00Z",
+        "estimatedCost": {
+          "lowMinor": 120,
+          "highMinor": 240,
+          "currency": "USD"
+        },
+        "costUnit": "subscription-equivalent",
+        "estimateBasis": "price table 2026-10-01",
+        "note": "native skills, verified",
+        "role": "advanced",
+        "options": {}
+      },
+      {
+        "routeKey": "deepseek/deepseek-chat",
+        "authClass": "api-key",
+        "provenance": "assumed",
+        "meetsFloor": false,
+        "skillSupport": [
+          {
+            "skillId": "skl_SHEET_OPS",
+            "mechanism": "prompt-injected",
+            "verified": false,
+            "note": "no injection test run yet (unverified)"
+          }
+        ],
+        "available": "available",
+        "availabilitySource": "provider probe, checked 2026-10-24T18:02:00Z",
+        "estimatedCost": {
+          "lowMinor": 30,
+          "highMinor": 70,
+          "currency": "USD"
+        },
+        "costUnit": "price-table",
+        "estimateBasis": "price table 2026-10-01",
+        "note": "below floor: skills are prompt-injected (not native-verified); tool transcript pending",
+        "role": "specification-led",
+        "options": {}
+      }
     ],
-    "decision": { "routeKey": "claude/sonnet-4.7", "reason": "native skill support for sheet-ops; cost difference small for this task class", "policyVersion": "balanced-2026.10" },
+    "decision": {
+      "routeKey": "claude/sonnet-4.7",
+      "reason": "native skill support for sheet-ops; cost difference small for this task class",
+      "policyVersion": "balanced-2026.10"
+    },
     "discovery": null,
     "createdAt": "2026-10-24T14:02:11.000Z",
     "supersedes": 1
   },
   "routeDecisionId": "rtd_T142_2",
-  "checkpointIds": ["chk_T142_A1", "chk_T142_A2"],
-  "progress": [
-    { "stepId": "plan", "status": "done" },
-    { "stepId": "fetch-dataset", "status": "done" },
-    { "stepId": "render-page", "status": "done" },
-    { "stepId": "verify", "status": "done" },
-    { "stepId": "publish", "status": "done" }
+  "checkpointIds": [
+    "chk_T142_A1",
+    "chk_T142_A2"
   ],
-  "artifacts": ["art_page_1", "art_dataset_1"],
-  "reviewIds": ["rat_R77"],
-  "attemptIds": ["att_T142_1", "att_T142_2", "att_T142_3"],
+  "progress": [
+    {
+      "stepId": "plan",
+      "status": "done"
+    },
+    {
+      "stepId": "fetch-dataset",
+      "status": "done"
+    },
+    {
+      "stepId": "render-page",
+      "status": "done"
+    },
+    {
+      "stepId": "verify",
+      "status": "done"
+    },
+    {
+      "stepId": "publish",
+      "status": "done"
+    }
+  ],
+  "artifacts": [
+    "art_page_1",
+    "art_dataset_1"
+  ],
+  "reviewIds": [
+    "rat_R77"
+  ],
+  "attemptIds": [
+    "att_T142_1",
+    "att_T142_2",
+    "att_T142_3"
+  ],
   "cost": {
     "exclusive": {
       "schemaVersion": "1.0",
-      "subtotals": [{ "currency": "USD", "providerReportedMinor": 82, "priceTableEstimateMinor": 46, "subscriptionEquivalentMinor": 184 }],
-      "combinedEstimate": { "amountMinor": 312, "currency": "USD", "label": "combined economic estimate, not spend" },
-      "coverage": { "reported": 3, "estimated": 2, "subscription": 1, "unknown": 0 }
+      "subtotals": [
+        {
+          "currency": "USD",
+          "providerReportedMinor": 82,
+          "priceTableEstimateMinor": 46,
+          "subscriptionEquivalentMinor": 184
+        }
+      ],
+      "combinedEstimate": {
+        "amountMinor": 312,
+        "currency": "USD",
+        "label": "combined economic estimate, not spend"
+      },
+      "coverage": {
+        "reported": 3,
+        "estimated": 2,
+        "subscription": 1,
+        "unknown": 0
+      }
     },
     "inclusive": {
       "schemaVersion": "1.0",
-      "subtotals": [{ "currency": "USD", "providerReportedMinor": 82, "priceTableEstimateMinor": 84, "subscriptionEquivalentMinor": 184 }],
-      "combinedEstimate": { "amountMinor": 350, "currency": "USD", "label": "combined economic estimate, not spend" },
-      "coverage": { "reported": 3, "estimated": 3, "subscription": 1, "unknown": 0 }
+      "subtotals": [
+        {
+          "currency": "USD",
+          "providerReportedMinor": 82,
+          "priceTableEstimateMinor": 84,
+          "subscriptionEquivalentMinor": 184
+        }
+      ],
+      "combinedEstimate": {
+        "amountMinor": 350,
+        "currency": "USD",
+        "label": "combined economic estimate, not spend"
+      },
+      "coverage": {
+        "reported": 3,
+        "estimated": 3,
+        "subscription": 1,
+        "unknown": 0
+      }
     },
     "overhead": {
       "schemaVersion": "1.0",
       "definition": "review + coordination + observer",
-      "subtotals": [{ "currency": "USD", "providerReportedMinor": 30, "priceTableEstimateMinor": 15, "subscriptionEquivalentMinor": null }],
-      "combinedEstimate": { "amountMinor": 45, "currency": "USD", "label": "combined economic estimate, not spend" },
-      "coverage": { "reported": 2, "estimated": 1, "subscription": 0, "unknown": 0 }
+      "subtotals": [
+        {
+          "currency": "USD",
+          "providerReportedMinor": 30,
+          "priceTableEstimateMinor": 15,
+          "subscriptionEquivalentMinor": null
+        }
+      ],
+      "combinedEstimate": {
+        "amountMinor": 45,
+        "currency": "USD",
+        "label": "combined economic estimate, not spend"
+      },
+      "coverage": {
+        "reported": 2,
+        "estimated": 1,
+        "subscription": 0,
+        "unknown": 0
+      }
     }
   },
   "createdAt": "2026-10-24T14:02:11.000Z",

@@ -1,5 +1,27 @@
 # Akira final specification review activity
 
+## 2026-10-25 — Round 3 consolidation completed after recovery handoff
+
+Agent: CHATGPT
+
+Completed the same v0.6 consolidation begun by CLAUDE before weekly-credit exhaustion;
+preserved and assessed its partial edits without bumping to v0.7. Read all three completed
+reviews and manifest inputs. Accepted all 21 findings (2 major, 19 minor), grouped into
+11 changes with complete traceability in `reviews/round-3/CONSOLIDATION.md`. Completed
+write-ahead action ordering and recovery guards; safety-control commands; route auth,
+options, provenance and per-skill floors; within-class cost-range role defaults; inclusive
+and root-cohort CPAT formulas; exact fixed-point usage costs and observer Money; projected
+skill labels; silence mapping with legacy alias; seven-item checked backup/manifest
+contract; and a typed 18-row fault matrix. Aligned companion contracts and JSON examples,
+retaining Codex skill support as unverified rather than inventing evidence. Settled
+AKIRA-D1–D6 were already applied; U4–U16 carried forward unchanged, none decided here.
+GROK served-model provenance is unverified and recorded. README now says Round 4 reviewing
+v0.6 under `reviews/round-4/`; convergence is not claimed and no further review was run.
+Static checks passed for all eight JSON fixtures, required contract fields and semantic
+invariants, exact sub-cent arithmetic, 18 fault rows and 209 requirement IDs. These are
+specification checks, not runtime acceptance tests. No git commands, deletion, live
+integration, deployment or out-of-project activity recording performed.
+
 ## 2026-10-25 — Round 3 specification review
 
 Agent: GROK

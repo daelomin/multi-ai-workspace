@@ -1,6 +1,6 @@
 # 08 — Collaboration, silence, ratings, observer and inspectable records
 
-**Status:** draft v0.4 · **Normative:** `spec.md` §10, §11, §15 · **Schema:** `docs/04-data-model.md`.
+**Status:** draft v0.6 · **Normative:** `spec.md` §10, §11, §15 · **Schema:** `docs/04-data-model.md`.
 
 ---
 
@@ -84,16 +84,21 @@ any evidence (what was checked), then emits nothing to the room.
 |---|---|---|
 | `no_new_work` | message needs no action and adds no information | always |
 | `already_answered` | a newer message or another bot answered the same point | answer is verifiably equivalent or better |
-| `not_addressed` | bot is not addressed and has no evidence to add | room rule allows |
 | `duplicate` | same content/topic within the dedupe window | dedupe key matches |
 | `waiting_dependency` | bot is blocked and has nothing actionable | blocker recorded on a task |
-| `quiet_hours` | room policy | policy in force |
+| `quiet_hours` | room policy (the "quiet hours" half of the last AK-COL-05 clause) | policy in force |
 | `policy_hold` | room rule says only lead/assigned bots speak (the "explicit room rule" clause of AK-COL-05) | rule matches |
 | `no_evidence` | bot is **not addressed** and would have to speculate (the "not addressed and no evidence to add" clause of AK-COL-05) | guard: rejected if the bot was directly addressed (mention, assignment or direct question); it says so internally, not in chat |
 
-Every code maps to exactly one AK-COL-05 clause; the closed set here and the normative
-list are identical. A policy-table test enforces the mapping and that a direct question
-cannot be answered with silence.
+The seven codes map onto the six AK-COL-05 clauses: every code belongs to exactly one
+clause and every clause has at least one code. Five clauses have one code each
+(`no_new_work`, `already_answered`, `waiting_dependency`, `no_evidence`, `duplicate`); the
+last clause (quiet hours or an explicit room rule) has two (`quiet_hours`,
+`policy_hold`), so the mapping is code → clause, not one-to-one. (v0.5's separate
+`not_addressed` duplicated `no_evidence`: retain it in historical records and decode it
+as a legacy alias of `no_evidence`, with the same direct-address guard; new records emit
+only the seven canonical codes.) A policy-table test enforces the
+mapping and that a direct question cannot be answered with silence.
 
 A reason not in this set is a schema error, not a free-text excuse. Every silent turn
 still writes an audit record (what it read, what it checked, what it spent).
@@ -284,7 +289,8 @@ ObserverProposal {
   id; target: { kind: "template"|"persona"|"procedure"|"skill"|"route-policy"|"communication-policy"; id; version };
   diagnosis: string; evidence: Link[]; change: string; diff?: string;
   expectedBenefit: { metric; direction; rationale }[];
-  expectedCost: { tokens; money; risk }[];
+  expectedCost: { tokens; money: Money | MoneyRange; risk }[];      // docs/04 §1
+  // evaluation.results.costDeltaPerTask is a Money (signed amountMinor; may be negative)
   evaluation: { method: "shadow"|"held-out"|"ab"; sampleSize; results; accepted: boolean };
   status: "draft"|"evaluated"|"awaiting_review"|"accepted"|"rejected"|"superseded"|"active";
   proposedBy: "observer"; approvedBy?: actor; activatedAt?; rollbackTo?: version;

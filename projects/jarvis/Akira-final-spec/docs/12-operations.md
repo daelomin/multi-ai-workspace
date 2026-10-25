@@ -1,6 +1,6 @@
 # 12 — Security, deployment, operations and recovery runbooks
 
-**Status:** draft v0.4 · **Normative:** `spec.md` §15, §17 · **Estimates and SLOs are proposals, not HUMAN-approved.**
+**Status:** draft v0.6 · **Normative:** `spec.md` §15, §17 · **Estimates and SLOs are proposals, not HUMAN-approved.**
 
 Nothing in this document authorizes execution against real data. Runbooks are written to
 be followed on a staging environment first; commands that delete anything are explicitly
@@ -133,38 +133,55 @@ Logs are optional and retained short; they are not part of restore correctness.
 
 ### 5.2 Procedure
 
-```bash
-# Stop the service (consistent snapshot), or use VACUUM INTO while running.
-systemctl --user stop akira-bot.service
-# One timestamp (to the second) names the whole generation, database snapshot included.
-TS="$(date +%FT%H%M%S)"
-GEN="/backup/files/$TS"
-mkdir "$GEN"   # fails if it already exists; never reuse a generation
-# $CONFIG_DIR, $REGISTRY_DIR and $WORKSPACES are the deployment-layout paths (§2).
-# 1. Database snapshot, same generation name (VACUUM INTO fails if the target exists)
-sqlite3 "$STATE/state.sqlite" "VACUUM INTO '$GEN/state.sqlite'"
-# 2-3. File trees: each tree keeps its own directory under the generation (no trailing
-#      slashes on the sources), so equal relative names in different trees never collide.
-#      No deletion flags: the backup never removes anything from earlier generations.
-rsync -a "$STATE/attachments" "$STATE/artifacts" "$STATE/memory" "$GEN/"
-# 4. Secrets: encrypted with the separate backup key into $GEN/secrets.enc (never plaintext)
-# 5. Configuration: settings.json, routing policy, price tables, upstream.yaml + patch list,
-#    service unit
-rsync -a "$CONFIG_DIR" "$GEN/"
-# 6. Content-addressed template/skill/procedure files (or their export bundle)
-rsync -a "$REGISTRY_DIR" "$GEN/"
-# 7. Checkpoint refs: list the refs and bundle the objects per active workspace
-for W in "$WORKSPACES"/*; do
-  git -C "$W" for-each-ref refs/t3/checkpoints > "$GEN/checkpoint-refs/$(basename "$W").refs"
-  git -C "$W" bundle create "$GEN/checkpoint-refs/$(basename "$W").bundle" --glob='refs/t3/checkpoints/*'
-done
-# Manifest: one entry and one checksum per item above; verify, encrypt, store off-host
-( cd "$GEN" && find . -type f ! -name MANIFEST.sha256 -exec sha256sum {} + > MANIFEST.sha256 )
-```
+The backup implementation follows these checked steps. This is a specification outline,
+not a complete executable backup script; encryption and manifest generation are packaging
+work in P10. Any command failure stops generation completion; preserve the incomplete
+generation for diagnosis, never relabel a failed copy/export as an absent source.
 
-A backup is complete only when the manifest has an entry and a checksum for each of the
-seven items above (an absent item is listed as absent, with the reason, not skipped), the
-checksums verify, and a restore drill has passed within the last quarter.
+1. Stop the service for the whole consistent snapshot; failure stops the run. Inventory
+   the seven items, configured source paths and active workspace ids. Use a new generation
+   (`mkdir "$GEN"`, no reuse); name its database snapshot with the same per-run timestamp.
+   A timestamp collision fails, never overwrites. Record recovery point and source versions.
+2. Snapshot the database with checked `VACUUM INTO` to a fresh path inside the generation.
+   Copy attachments, artifacts and memory to distinct paths; settings/configuration and
+   registry content likewise have their own explicit destinations. For a present tree,
+   checked `rsync -a "$SOURCE/" "$DEST/"` copies into its dedicated destination, never
+   a shared flattened tree. An absent tree gets a reason, not a failed rsync treated as
+   success. A missing required source or unexpected missing mount makes the generation
+   incomplete; it remains visible with its absent marker.
+3. Encrypt secrets directly to `secrets.enc` with the separate backup key, checking success
+   and decryptability in the authorized drill, or record `absent: re-enter after restore`.
+   Never create plaintext secrets inside the generation.
+4. Create the checkpoint destination **before** any workspace export:
+
+   ```bash
+   mkdir "$GEN/checkpoint-refs"   # checked; fresh generation only
+   ```
+
+   For each inventoried workspace id, create its own directory. Check success of
+   `git -C "$W" for-each-ref refs/t3/checkpoints` writing its `.refs` list, then, if
+   nonempty, `git -C "$W" bundle create "$BUNDLE" --glob='refs/t3/checkpoints/*'`.
+   Verify the bundle and object/ref coverage before completion. If no refs exist, retain
+   the successful empty list with `no checkpoint refs` and no bundle; a failure is never
+   an empty-list result. Include the workspace repository/tree at the recovery point
+   (or a verified backed-up repository reference) so the refs can be restored. With no
+   active workspaces item 7 is `absent: no active workspaces`, explicitly.
+5. Generate a structured `MANIFEST.json` with **exactly seven top-level item entries**,
+   numbered as §5.1, even for an empty/absent source. Each entry is either
+   `{item, paths, checksum}` or `{item, absent: reason}`. `paths` may list multiple
+   destinations (e.g. attachments and artifacts); its checksum hashes a canonical,
+   sorted inventory of relative paths, file hashes and empty-directory markers, so an
+   empty present tree still has a checksum. Optional per-file `MANIFEST.sha256` detail
+   does not replace these item entries and excludes manifest files from its own inventory.
+   Include generation id, recovery point, secret handling, workspace export results and
+   completeness status. Verify all checksums and the seven-item inventory before marking
+   complete and copying/encrypting off-host. Completion is atomic; failed runs cannot
+   produce a final complete manifest. Missing required items remain incomplete even
+   though an absent marker records them; intentional secrets re-entry or no-workspace
+   cases are valid only with the stated restore obligations.
+
+A usable backup requires the complete manifest, verified checksums and a restore drill
+within the last quarter. No deletion, prune or overwrite is part of generation completion.
 
 **Append-only rule (AKIRA-D2, AK-OPS-11).** Each run writes a new generation; earlier
 generations and dated database snapshots are preserved. Removing any generation is a
@@ -177,7 +194,10 @@ assert the file is still present in the earlier generation and the second genera
 not contain it. Also assert, on synthetic state holding a file with the same relative name
 (`same/note.txt`) in `attachments/`, `artifacts/` and `memory/` with different contents,
 that the generation holds three distinct paths and hashes; that two runs on the same day
-produce two database snapshots; and that all seven items are present in the manifest.
+produce two database snapshots; and that all seven items have manifest entries. T-13 also exercises a fresh
+checkpoint destination, a workspace with refs, a workspace with no refs, no active
+workspaces, an empty tree and a whole missing source tree (absent marker + incomplete
+status for required sources); injected ref-list/bundle failures leave no complete manifest.
 
 ### 5.3 Restore
 
@@ -210,7 +230,8 @@ writers never act at once. Then:
    reconciliation; it is never replayed. While quarantine is on, startup reconciliation
    (AK-TSK-14) may only mark or block: it must not dispatch, start a routine or send.
 4. Only then are dispatch, routines and outbound delivery released, per task, with the
-   release recorded.
+   release recorded using `quarantine.release` (docs/05 §1.5), with stored evidence for
+   each task/routine/delivery. An unresolved effect prevents release.
 
 A restore drill keeps dispatch, routines and outbound writes disabled for its whole
 duration.
@@ -288,8 +309,9 @@ secret in the record.
 
 ### 7.7 Runaway spend
 
-Engage the kill switch (pause dispatch), stop the offending task/bot, inspect the ledger,
-add a guard, and record the incident. The kill switch preserves state.
+Engage `dispatch.pause` (docs/05 §1.5), stop the offending task/bot, inspect the ledger,
+add a guard, and record the incident. The kill switch preserves state. Use `dispatch.resume` only after inspection; it does
+not clear quarantine or other pause scopes.
 
 ### 7.8 Disk full
 

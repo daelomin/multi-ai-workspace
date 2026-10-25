@@ -1,6 +1,6 @@
 # 05 — Interface and API contracts
 
-**Status:** draft v0.4 · **Normative:** `spec.md` §6–§9 · **Schema detail:** `docs/04-data-model.md`
+**Status:** draft v0.6 · **Normative:** `spec.md` §6–§9 · **Schema detail:** `docs/04-data-model.md`
 
 Akira extends Akeru's typed WebSocket RPC and orchestration command set. It does not add
 an HTTP API for internal operations, and it does not let adapters call each other. The
@@ -77,6 +77,8 @@ receipt and dispatches nothing. All queries are projections and never mutate.
 | `retention.set` | archive policy (never auto-delete) | no destructive option |
 | `purge.request` | permanent removal of named items | explicit ids; backup first; `destructive` scope; audit |
 | `bot.delete` (upstream, guarded) | Akeru's hard-delete decider command | **not callable directly in Akira**: the decider rejects it unless it is issued through `purge.request` guards (explicit ids, verified backup, `destructive` scope, audit record). It is never reachable from a timer, retention sweep or UI path |
+| `dispatch.pause` / `dispatch.resume` | kill switch (AK-SEC-09): stop or resume starting provider turns and external writes, globally or per bot/connector | HUMAN Operator role (§8.1); explicit target scope (`global`, bot id or connector id) and reason; durable pause latch checked before every turn, routine, outbound delivery and external write, including writes requested by a running attempt; preserves state and cancels nothing; audit (actor, scope, reason, commandId, time, result); resume clears only the named latch, never quarantine or another active pause |
+| `quarantine.release` | release one task, routine or channel delivery from recovery quarantine (AK-OPS-15) | HUMAN Operator role (§8.1); item kind/id and recovery interval required; stored reconciliation evidence establishing prior effects (including a HUMAN reconciliation note with that evidence) required; unresolved effects reject release; one item per command; audit (actor, item, interval, evidence, commandId, time, result); release never clears a dispatch pause |
 | `health.report` | server/provider/connector/backup status | read-only |
 
 ---
@@ -100,7 +102,7 @@ interface ProviderAdapter {
 
 interface StartTurnInput {
   threadId: string; attemptId: string; taskId?: string;
-  route: RouteSnapshot;                          // model, options, instance, account
+  route: RouteSnapshot;                          // docs/04 §3: authClass, options, provenance included
   messages: CanonicalMessage[];                  // from projection + memory assembly
   memory: MemoryAssembly;                        // persona, USER/MEMORY/GROUP, task scope
   tools: ToolDescriptor[];                       // grants only
@@ -160,7 +162,8 @@ idempotent and content-hashed, so re-projecting does not duplicate or mutate.
 **Verification is orthogonal to mechanism.** Each per-route support entry is a
 `SkillSupportEntry` (`docs/04` §2): the mechanism (native, projected, prompt-injected,
 unsupported) and a `verified` flag; its `evidence` record (route, model, date, evidence)
-is required when `verified` is true and absent otherwise. The
+is required when `verified` is true and absent otherwise. The level derived from the pair
+includes `projected-verified` (AK-SKL-04). The
 flag applies to every mechanism, including `prompt-injected`: a prompt-injected route
 with no evidence record is rendered "prompt-injected (unverified)" and counts as
 unverified for the floor and for `SKILLS.md`. The downgrade rule is total: no evidence
@@ -205,6 +208,15 @@ interface ActionResult {
 }
 ```
 
+**Write-ahead rule (AK-TSK-10).** The executor persists the action as `intent`, then
+durably appends `dispatched`, and only then calls `execute`. `execute` is never invoked for
+an action without a durable `dispatched` record. If the process dies between the record
+and the result, recovery finds `dispatched`; if it dies before the record is durable, the
+action stays `intent`, and an `intent` whose attempt is not live is reconciled, not
+resent, unless the executor can prove `execute` was never started. Recovery appends
+`unknown` for a possibly sent legacy `intent`, or `cancelled` with never-started proof
+(docs/04 §4.4); it never invokes `execute` as part of that state repair.
+
 **Rules.** `retrySafe` is a property of the operation semantics, not of the error. A
 connector that cannot prove non-acceptance returns `unknown`; the executor never retries
 `unknown` automatically. Specialist adapters implement the same interface with
@@ -231,9 +243,11 @@ connector that cannot prove non-acceptance returns `unknown`; the executor never
 
 The taxonomy is closed and shared by attempts, UI and routing. A provider-specific error
 is mapped into one class; unmapped errors become `unknown` with the raw code retained.
-Each class maps to exactly one attempt outcome (`docs/04` §4.2 mapping table). The
-**Retry** and **Fallback** columns apply only when no external action of the attempt is
-`dispatched` or `unknown`; otherwise the outcome is `interrupted`/`failed_unknown`, there
+Each class maps to exactly one attempt outcome (`docs/04` §4.2 mapping table), except
+under the external-effect guard below, which replaces the outcome by `interrupted` (no
+provider terminal event) or `failed_unknown` (terminal error, acceptance not established).
+The **Retry** and **Fallback** columns apply only when no external action of the attempt is
+`dispatched`, `unknown` or `intent` with a dead attempt; otherwise the outcome is `interrupted`/`failed_unknown`, there
 is no retry or fallback, and the task waits for reconciliation (AK-RTE-12, AK-TSK-11).
 
 ---

@@ -5,26 +5,112 @@
   "attemptNumber": 2,
   "taskClass": "data-publish",
   "capabilityFloor": {
-    "requiredTools": ["sheet.read", "file.write", "web.publish"],
+    "requiredTools": [
+      "sheet.read",
+      "file.write",
+      "web.publish"
+    ],
     "minimumContext": 64000,
     "requiredSkillSupport": "native-verified",
-    "requiredReliability": "tool-transcript-verified"
+    "requiredReliability": "tool-transcript-verified",
+    "requiredSkills": [
+      "skl_SHEET_OPS"
+    ]
   },
   "candidates": [
-    { "routeKey": "claude/sonnet-4.7", "meetsFloor": true, "available": "available", "availabilitySource": "provider meter, checked 2026-10-24T18:02:00Z", "estimatedCost": { "lowMinor": 120, "highMinor": 240, "currency": "USD" }, "costUnit": "subscription-equivalent", "estimateBasis": "price table 2026-10-01", "support": "verified", "note": "native skills", "role": "advanced" },
-    { "routeKey": "deepseek/deepseek-chat", "meetsFloor": false, "available": "available", "availabilitySource": "provider probe, checked 2026-10-24T18:02:00Z", "estimatedCost": { "lowMinor": 30, "highMinor": 70, "currency": "USD" }, "costUnit": "price-table", "estimateBasis": "price table 2026-10-01", "support": "unknown", "note": "below floor: skills are prompt-injected (not native-verified); tool transcript pending", "role": "specification-led" },
-    { "routeKey": "codex/gpt-5.1-codex", "meetsFloor": true, "available": "quota_exhausted", "availabilitySource": "attempt 1 error class failed_quota, 2026-10-24T17:20:00Z", "estimatedCost": { "lowMinor": 100, "highMinor": 200, "currency": "USD" }, "costUnit": "subscription-equivalent", "estimateBasis": "subscription-equivalent", "support": "assumed", "note": "capability adequate; account quota exhausted at decision time (availability, not capability)", "role": "specification-led" }
+    {
+      "routeKey": "claude/sonnet-4.7",
+      "authClass": "subscription-oauth",
+      "provenance": "verified",
+      "meetsFloor": true,
+      "skillSupport": [
+        {
+          "skillId": "skl_SHEET_OPS",
+          "mechanism": "native",
+          "verified": true,
+          "evidence": {
+            "verifiedAt": "2026-10-24T17:40:00.000Z",
+            "model": "sonnet-4.7",
+            "evidence": "skill transcript: read A1:C20, wrote B2, cited range"
+          }
+        }
+      ],
+      "available": "available",
+      "availabilitySource": "provider meter, checked 2026-10-24T18:02:00Z",
+      "estimatedCost": {
+        "lowMinor": 120,
+        "highMinor": 240,
+        "currency": "USD"
+      },
+      "costUnit": "subscription-equivalent",
+      "estimateBasis": "price table 2026-10-01",
+      "note": "native skills, verified",
+      "role": "advanced",
+      "options": {}
+    },
+    {
+      "routeKey": "deepseek/deepseek-chat",
+      "authClass": "api-key",
+      "provenance": "assumed",
+      "meetsFloor": false,
+      "skillSupport": [
+        {
+          "skillId": "skl_SHEET_OPS",
+          "mechanism": "prompt-injected",
+          "verified": false,
+          "note": "no injection test run yet (unverified)"
+        }
+      ],
+      "available": "available",
+      "availabilitySource": "provider probe, checked 2026-10-24T18:02:00Z",
+      "estimatedCost": {
+        "lowMinor": 30,
+        "highMinor": 70,
+        "currency": "USD"
+      },
+      "costUnit": "price-table",
+      "estimateBasis": "price table 2026-10-01",
+      "note": "below floor: skills are prompt-injected (not native-verified); tool transcript pending",
+      "role": "specification-led",
+      "options": {}
+    },
+    {
+      "routeKey": "codex/gpt-5.1-codex",
+      "authClass": "subscription-oauth",
+      "provenance": "assumed",
+      "meetsFloor": false,
+      "skillSupport": [
+        {
+          "skillId": "skl_SHEET_OPS",
+          "mechanism": "native",
+          "verified": false
+        }
+      ],
+      "available": "quota_exhausted",
+      "availabilitySource": "attempt 1 error class failed_quota, 2026-10-24T17:20:00Z",
+      "estimatedCost": {
+        "lowMinor": 100,
+        "highMinor": 200,
+        "currency": "USD"
+      },
+      "costUnit": "subscription-equivalent",
+      "estimateBasis": "subscription-equivalent",
+      "note": "Below native-verified skill floor: native support remains unverified; quota also exhausted. Overlap with Claude does not assign a default specification-led role.",
+      "role": "advanced",
+      "options": {}
+    }
   ],
   "chosen": {
     "routeKey": "claude/sonnet-4.7",
     "reason": "Only route that meets the floor and has an available account; native skill support; cost within the estimate band.",
     "alternativesRejected": [
       "deepseek: below the native-verified skill floor (prompt-injected, unverified); not offered as an adequate resume route",
-      "codex: meets the floor but unavailable (failure class: failed_quota); not an adequacy decision"
+      "codex: native skill support unverified (below floor) and quota exhausted; the two reasons are recorded independently"
     ]
   },
   "fallbackPolicy": "infrastructure-only",
   "policyVersion": "balanced-2026.10",
   "decidedBy": "policy:balanced-2026.10",
-  "createdAt": "2026-10-24T18:02:44.000Z"
+  "createdAt": "2026-10-24T18:02:44.000Z",
+  "roleBasis": "balanced-2026.10: floor-meeting overlapping subscription ranges stay advanced; explicit policy assigns below-floor DeepSeek specification-led (never dispatchable)"
 }

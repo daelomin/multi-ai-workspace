@@ -1,13 +1,15 @@
 # Akira specification review
 
-**Round 3** — independent review of Akira v0.5, the production specification for the
-Akeru spin-off (rounds 1 and 2 reviewed v0.3 and v0.4 and are consolidated).
+**Round 4** — independent review of Akira **v0.6**, the production specification for
+the Akeru spin-off (rounds 1–3 reviewed v0.3, v0.4 and v0.5 and are consolidated).
 
-**Workflow status:** round 2 consolidated; ready for round 3. HUMAN decisions AKIRA-D1
-(Akeru base, product named Akira) and AKIRA-D4–D6 (Linux single node, subscription
-logins permitted, private deployment) are recorded. The review input is **`spec.md`
-v0.5**, with its companion documents in `docs/` and representative records in
-`evals/fixtures/`.
+**Workflow status:** round 3 consolidated by **CHATGPT**, completing CLAUDE's partial
+v0.6 edits after a credit-exhaustion handoff. All 21 findings are accounted for, including
+**two major findings** about the same action-ledger crash window. Review convergence has
+**not** been reached. The next review input is **`spec.md` v0.6**, with its companion
+contracts in `docs/` and representative records in `evals/fixtures/`.
+AKIRA-D1–D6 are settled and applied. The single carried-forward open HUMAN list is in
+`reviews/round-3/CONSOLIDATION.md` §2 (U4–U16); HUMAN answers are not awaited by the loop.
 
 Historical material is preserved and out of scope: the original options proposal and completed debate in the separate `jarvisbot` worktree (`projects/jarvis/JarvisBot/`). Do not review the old proposal as Akira's specification,
 and do not rerun the option assessment.
@@ -16,13 +18,15 @@ and do not rerun the option assessment.
 
 ## Current round
 
-**Round 3**: reviewers read `spec.md` **v0.5** independently, after reading
-`reviews/round-2/CONSOLIDATION.md` (and round 1's), and write `reviews/round-3/<AGENT>.md`.
-Do not repeat findings accepted and merged in rounds 1 or 2. Round 2 is complete (19
-findings from three reviewers, all accepted); the open HUMAN decisions (U4–U16) are carried
-forward in the consolidation and do not block review.
+**Round 4**: reviewers read `spec.md` **v0.6** independently, after reading
+`reviews/round-3/CONSOLIDATION.md` and the prior consolidations, and write
+`reviews/round-4/<AGENT>.md`. Do not repeat accepted findings unless the correction
+remains incomplete, with new evidence. Round 3 is complete (CHATGPT 3 minor; DEEPSEEK
+1 major + 8 minor; GROK 1 major + 8 minor; all accepted). Open HUMAN decisions are carried
+forward without deciding them. This consolidation did not launch reviewers or round 4.
 
-**Imported-source note (2026-10-25).** The source folder had a CHATGPT review of v0.2. That historical review is not present in this registered loop and is not a completed pass here. All reviewers in this loop independently review the imported v0.3 package. The preflight passed; no live round has started.
+**Imported-source note (2026-10-25).** The source folder had a CHATGPT review of v0.2. That historical review is not present in this registered loop and is not a completed pass here. All reviewers in this loop independently review the imported v0.3 package. At import time the preflight had passed and no live round had started; this is
+historical context, superseded by the workflow status above.
 
 ## Documents and reading order
 
@@ -119,7 +123,7 @@ call real numbers, message real people or delete anything.
 
 **Decisions and changes.** Reviewers write only their own review file and a CHANGELOG
 entry. Do not edit `spec.md`, docs, fixtures, another review or `decisions.md`. The
-consolidator (CLAUDE) applies accepted findings to `spec.md`/docs and writes the
+consolidator (CHATGPT for the round-3 recovery handoff) applies accepted findings to `spec.md`/docs and writes the
 consolidation.
 
 ---
@@ -127,7 +131,7 @@ consolidation.
 ## Stop rule and consolidation
 
 The loop stops when a round has no `blocking` or `major` finding, or after the configured
-maximum number of rounds. CLAUDE then consolidates: writes `reviews/round-N/CONSOLIDATION.md`,
+maximum number of rounds. The authorized consolidator then consolidates: writes `reviews/round-N/CONSOLIDATION.md`,
 applies accepted changes, bumps the spec version, and updates "Current round" here.
 HUMAN decisions are never waited for during the loop; they are carried forward in the
 consolidation.
@@ -149,7 +153,7 @@ The wrapper resolves the shared toolkit and reads the project path/name/branch f
 | Who | Writes |
 |---|---|
 | CHATGPT / DEEPSEEK / GROK | only their own `reviews/round-N/<AGENT>.md` + CHANGELOG entry |
-| CLAUDE | `spec.md`, `docs/`, `README.md`, `reviews/round-N/CONSOLIDATION.md` |
+| Consolidator (CHATGPT completed round 3 after CLAUDE handoff) | `spec.md`, `docs/`, `evals/`, `assets/`, `README.md`, round consolidation and project CHANGELOG |
 | HUMAN | `decisions.md`, merges |
 
 Earlier proposals, reviews, logs and this folder's history are preserved. Nothing is

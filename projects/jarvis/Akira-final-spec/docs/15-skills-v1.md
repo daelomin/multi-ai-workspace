@@ -1,6 +1,6 @@
 # 15 — Akira v1 skill catalogue and `SKILLS.md`
 
-**Status:** draft v0.4 · **Normative:** `spec.md` AK-SKL-01..14 · **Schema:** `docs/04-data-model.md` §2.
+**Status:** draft v0.6 · **Normative:** `spec.md` AK-SKL-01..14 · **Schema:** `docs/04-data-model.md` §2.
 
 This document answers one question: **which skills ship in Akira v1, and what does
 `SKILLS.md` contain?**
@@ -95,6 +95,11 @@ route as usual.
 | Text-only (S1, S2, S4, S9, S10) | passes on **all four** routes (Codex, Claude, DeepSeek, Grok), native or injected; fixture output validated |
 | Tool + workspace (S5–S8) | `native-verified` on at least one route; `prompt-injected` verified on the other supported routes; resource access proven |
 | Connector-dependent (S11–S14) | `native-verified` or `prompt-injected` on the routes the bot may use; connector auth + a real read proven first |
+
+Support labels are derived from `SkillSupportEntry` (docs/04 §2), including
+`projected-verified` and `projected-unverified`. A verified projection remains projected;
+only `native-verified` meets a native floor. Prompt injection keeps its mechanism label
+and shows its verification flag/evidence separately.
 
 A skill with no passing fixture is `deferred`, not "experimental". The UI shows the
 support level and the last verification date on the skill row and in the generated

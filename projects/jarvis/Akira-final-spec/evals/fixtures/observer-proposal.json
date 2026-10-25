@@ -11,13 +11,13 @@
     { "metric": "resolution_rating", "direction": "increase", "rationale": "fewer follow-up fixes" }
   ],
   "expectedCost": [
-    { "tokens": 0, "money": 0, "risk": "one extra validation step per run" },
-    { "tokens": 42000, "money": 1.2, "risk": "evaluation runs" }
+    { "tokens": 0, "money": { "amountMinor": 0, "currency": "USD" }, "risk": "one extra validation step per run" },
+    { "tokens": 42000, "money": { "amountMinor": 120, "currency": "USD" }, "risk": "evaluation runs" }
   ],
   "evaluation": {
     "method": "shadow",
     "sampleSize": 6,
-    "results": { "accepted": 4, "rejected": 2, "baselineAccepted": 3, "costDeltaPerTask": 0.34, "latencyDeltaPct": 4 },
+    "results": { "accepted": 4, "rejected": 2, "baselineAccepted": 3, "costDeltaPerTask": { "amountMinor": 34, "currency": "USD" }, "latencyDeltaPct": 4 },
     "accepted": true
   },
   "status": "awaiting_review",

@@ -1,6 +1,6 @@
 # 10 — Tests, acceptance scenarios and traceability
 
-**Status:** draft v0.4 · **Normative:** `spec.md` §18 and every requirement it references.
+**Status:** draft v0.6 · **Normative:** `spec.md` §18 and every requirement it references.
 **Nothing in this document has been executed.** It defines what must pass, with which
 fixtures and evidence, before a requirement is called done.
 
@@ -50,7 +50,8 @@ attempt without route provenance; a duplicate bot.
 ### T-02 — Forced credit exhaustion mid-task
 
 **Steps.** Start a task on a route whose account is scripted to return `quota_exhausted`
-after the first tool call. Observe the pause; answer "switch route" to an adequate
+after the first read-only tool call (no external write; an unresolved write instead
+uses the external-effect guard and T-03). Observe the pause; answer "switch route" to an adequate
 alternate; resume.
 
 **Pass.** Attempt ends `failed_quota`; the exhausted route is recorded
@@ -70,11 +71,20 @@ changed task definition with no mismatch reported.
 
 **Steps.** Stub connector accepts `mail.send` then drops the response. Akira records
 `unknown`. Kill the server. Restart. Run reconciliation with the stub reporting the
-message exists.
+message exists. **Write-ahead variants (F-18):** block the durable `dispatched`
+append and assert the connector is never invoked; kill before that append completes.
+Separately kill after durable append but before the call, and after stub acceptance but
+before result persistence. Seed a legacy/fault-injected dead-attempt `intent` whose call
+was started without the append: recovery must reconcile it rather than resend. This last
+case models the old ordering defect; it is forbidden in the corrected executor.
 
 **Pass.** Exactly one message exists in the stub. The action becomes `confirmed` with the
 external id. No automatic retry occurred before reconciliation. Dependent work stayed
-blocked. The UI showed `unknown` before resolution. Audit records the reconciliation.
+blocked. The UI showed `unknown` before resolution. Audit records the reconciliation. In
+the write-ahead variant the connector is never invoked before a durable `dispatched`
+record exists; the surviving `intent` of a dead attempt is reconciled (read-back), not
+resent, and the task cannot start a new attempt until it is resolved; when the executor
+proves the call never started, the action is cancelled with that proof recorded.
 
 **Fail signals.** Duplicate message; retry while unknown; task marked done; silent
 resolution with no evidence.
@@ -161,7 +171,10 @@ child = inclusive $3.50; the coverage buckets sum to the cost-bearing records; C
 a multi-attempt accepted task once in the denominator; a same-class parent/child pair
 (parent $1 + child $1) yields a numerator of $2, not $3; a task that switched routes
 contributes each attempt's cost to that attempt's route and counts once in the delivering
-route's denominator; a late cache-token correction
+route's denominator; an accepted child under an accepted root adds nothing to the
+denominator; inclusive T-142 equals exclusive (every category) + child, $3.50; 100 records
+of USD 0.004 total USD 0.40 (summed as exact fixed point, rounded once), never 0 or 1.00; a
+late cache-token correction
 supersedes the effective snapshot without double counting tokens (including an
 unavailable-to-reported settlement); a pre-migration usage row keeps one valid category
 and counts once.
@@ -180,7 +193,11 @@ an evidence link (a `pass` without one fails the test); readiness `not-ready` di
 the cheap-build path until gaps are assigned: the guard rejects candidates with `role:
 specification-led` (docs/04 §4.3) while a floor-meeting `advanced` candidate may proceed
 with the risks attached, and a below-floor candidate is rejected by the floor check for
-every readiness outcome (the route-decision fixture carries both roles); discovery stays within budget; re-triage creates
+every readiness outcome (the route-decision fixture carries both roles); candidates in two
+auth classes are not ranked against each other by the role default, and two overlapping
+cost ranges leave all otherwise eligible candidates `advanced` by default; each candidate's `skillSupport` is the
+input of the skill floor and a `meetsFloor: true` candidate below the required support
+fails validation; discovery stays within budget; re-triage creates
 a new revision; route rationale visible; actual cost compared with the estimate after
 completion.
 
@@ -230,8 +247,14 @@ for both generations; removal of any generation requires a HUMAN-named operation
 generation: a file with the same relative name in `attachments/`, `artifacts/` and
 `memory/` (different contents) yields three distinct paths and hashes and all three restore
 to their own trees; two runs on the same day produce two database snapshots; the manifest
-has an entry and checksum for all seven items of `docs/12` §5.1 (secrets present only
-encrypted).
+has one entry per item for all seven items of `docs/12` §5.1 (checksum, or `absent` with
+the reason; secrets present only encrypted). On a fresh generation with at least one
+workspace holding `refs/t3/checkpoints`, `checkpoint-refs/` exists and holds that
+workspace's ref list and bundle; with no workspaces the item is listed `absent: no active
+workspaces`; removing a whole source tree yields an `absent` entry, not a silent skip; a
+failed ref-list or bundle command stops completion and no complete manifest is written;
+empty trees have a checksummed inventory, and missing required trees are marked absent
+and incomplete. Faults are simulated with fixture snapshots, not by deleting real files.
 
 **Fail signals.** Reused destination directory; `--delete*` flags; an earlier copy missing;
 trees merged into one directory; a database snapshot overwritten or failing because the
@@ -257,6 +280,14 @@ pass); a task released because its snapshot status was not in a listed set; seco
 message; both environments writing;
 quarantine released without reconciliation.
 
+**Safety controls (AK-SEC-09, AK-OPS-15).** `quarantine.release` without stored
+reconciliation evidence is rejected; with it, one item is released and audited.
+`dispatch.pause` blocks starting turns and external writes without cancelling work or
+losing state, and `dispatch.resume` restores dispatch; both require the HUMAN Operator role and are audited. Test global, bot and connector
+pause scopes, a write from an already-running attempt, pause persistence across restart,
+unauthorized commands, and that resume/release cannot clear each other's independent
+barriers. Release tests cover task, routine and channel delivery individually.
+
 ### T-15 — Skill catalogue completeness and availability gate
 
 **Steps.** Run each mandatory skill's fixture (`docs/15` §2) on its required route
@@ -274,28 +305,37 @@ fixture advertised; browser automation substituted for the connector.
 
 ## 3. Fault injection matrix
 
-| ID | Fault | Injection point | Expected attempt outcome | Expected recovery |
-|---|---|---|---|---|
-| F-01 | 401/expired token | provider adapter probe | `failed_auth` (class `auth_expired`) | block, ask reconnect, no fallback by default |
-| F-02 | 429 with Retry-After | adapter | `failed_rate_limit` if no action is `dispatched`/`unknown`; otherwise `interrupted`/`failed_unknown` (429 after a send) | backoff, then infrastructure fallback if configured and no unresolved action; with an unresolved action: no retry or fallback until reconciled (both sub-cases tested) |
-| F-03 | 5xx mid-stream | adapter stream | `failed_network` only if no external action was dispatched; if any action is `dispatched`/`unknown`: `interrupted` or `failed_unknown`, not eligible for automatic fallback until reconciled | never duplicate tool side effects; resume from checkpoint; both sub-cases tested |
-| F-04 | Quota zero | adapter/probe | `failed_quota` | pause + options |
-| F-05 | Tool schema mismatch | adapter tool mapping | `failed_tool_contract` | repair or reroute, one retry |
-| F-06 | Context overflow | provider | `failed_context_overflow` | compaction, scope split |
-| F-07 | Provider silent 90 s | runtime ingestion | watchdog activity (not a failure) | operator decides; task not auto-failed |
-| F-08 | Crash between action dispatch and ack | executor + process kill | `unknown` | reconciliation, no blind retry |
-| F-09 | Duplicate webhook | channel/WhatsApp stub | idempotent ignore | no double task, no double reply |
-| F-10 | Lost chat result after completion | restart before delivery | pending → delivered once | ack in same persisted step (Akeru pattern) |
-| F-11 | Disk full during checkpoint | filesystem | attempt fails `failed_unknown` | operator alert; no corrupt checkpoint committed |
-| F-12 | Skill resource missing | skill adapter | `failed_capability` | explicit unsupported, not silent |
-| F-13 | Observer evaluation provider down | observer | `failed_network` (no dispatched action) | proposal stays `draft`; no activation |
-| F-14 | Concurrent task start | supervisor | invariant rejection | one active attempt |
-| F-15 | Clock skew / retention sweep | synthetic clock | no deletion | timer test proves absence |
-| F-16 | Restore of a snapshot older than a confirmed non-idempotent write | restore drill | n/a (recovery quarantine) | no second write; affected task `blocked` for HUMAN reconciliation unless the prior effect is established (T-14) |
-| F-17 | Cancel while an action is `unknown` | canceller on a running task | `cancelled` | task cannot go to `ready` or start a new attempt until the action is reconciled; goes `blocked`/`paused` (T-03 variant) |
+Result kinds: `attempt outcome` (member of `AttemptOutcomeClass`, `docs/04` §4.2),
+`action state` (§4.4), `delivery state`, `watchdog`, `invariant`, `retention`,
+`quarantine`. The membership contract test applies only to `attempt outcome` results; each
+other kind is asserted against its own component. A row may name both an attempt outcome
+and another result; each is then asserted separately.
 
-Every expected attempt outcome in this matrix must be a member of the closed
-`AttemptOutcomeClass` set (`docs/04` §4.2); a contract test enforces it.
+| ID | Fault | Injection point | Result kind | Expected result | Expected recovery |
+|---|---|---|---|---|---|
+| F-01 | 401/expired token | provider adapter probe | attempt outcome | `failed_auth` (class `auth_expired`) | block, ask reconnect, no fallback by default |
+| F-02 | 429 with Retry-After | adapter | attempt outcome | `failed_rate_limit` if no action is `dispatched`/`unknown`; otherwise `interrupted` (stream severed) or `failed_unknown` (terminal 429, acceptance not established) | backoff, then infrastructure fallback if configured and no unresolved action; with an unresolved action: no retry or fallback until reconciled (both sub-cases tested) |
+| F-03 | 5xx mid-stream | adapter stream | attempt outcome | `failed_network` before any external action; `interrupted` when stream ends without terminal event after send; `failed_unknown` for terminal error with acceptance unestablished | no duplicate effects; external-effect cases wait for reconciliation; all branches tested |
+| F-04 | Quota zero | adapter/probe | attempt outcome | `failed_quota` | pause + options |
+| F-05 | Tool schema mismatch | adapter tool mapping | attempt outcome | `failed_tool_contract` | repair or reroute, one retry |
+| F-06 | Context overflow | provider | attempt outcome | `failed_context_overflow` | compaction, scope split |
+| F-07 | Provider silent 90 s | runtime ingestion | watchdog | operator inbox activity, no terminal failure | operator decides; not auto-failed |
+| F-08 | Crash between dispatch and ack | executor + process kill | attempt outcome; action state | attempt `interrupted`; action `dispatched` or `unknown`, then `confirmed` only with evidence | reconciliation, no blind retry |
+| F-09 | Duplicate webhook | channel/WhatsApp stub | delivery state | idempotent ignore | no double task/reply |
+| F-10 | Lost chat result after completion | restart before delivery | delivery state | pending → delivered once | ack in same persisted step |
+| F-11 | Disk full during checkpoint | filesystem | attempt outcome | `failed_unknown` | operator alert; no corrupt checkpoint committed |
+| F-12 | Skill resource missing | skill adapter | attempt outcome | `failed_capability` | explicit unsupported |
+| F-13 | Observer evaluation provider down | observer | attempt outcome | `failed_network` (no external action) | proposal stays `draft` |
+| F-14 | Concurrent task start | supervisor | invariant | rejected second start | one active attempt |
+| F-15 | Clock skew / retention sweep | synthetic clock | retention | no deletion | timer test proves absence |
+| F-16 | Restore older than a confirmed non-idempotent write | restore drill | quarantine | affected work blocked pending reconciliation | no second write; T-14 |
+| F-17 | Cancel while action unknown | canceller | attempt outcome; action state | `cancelled`; action remains `unknown` | no ready/start until reconciliation; blocked/paused |
+| F-18 | Crash around write-ahead boundary | executor durable append / stub | invariant; attempt outcome; action state | no call before durable `dispatched`; attempt `interrupted`; dead-attempt `intent` blocks until reconciled or proven never sent | T-03 variants: pre-append, post-append/pre-call, accepted/pre-result, legacy bad ordering; no resend |
+
+Enum membership applies to each explicitly named attempt outcome only; component states
+and assertions are checked separately. Test every named branch, including the
+external-effect override in docs/04 §4.2 (no terminal event → `interrupted`; terminal error
+with unestablished acceptance → `failed_unknown`).
 
 ---
 
@@ -313,8 +353,11 @@ Every expected attempt outcome in this matrix must be a member of the closed
 | `evals/fixtures/skill-package.json` | canonical skill with support matrix (format example; its validation fixture is planned) |
 
 All fixtures carry `schemaVersion` (`docs/05` §7). Fixtures are validated against the
-published shapes (`docs/04`: `Money` as `amountMinor` + currency, `SkillSupportEntry`,
-checkpoint `taskRevision`, candidate `role`) as well as JSON syntax; the executable
+published shapes (`docs/04`: summary/proposal `Money` as `amountMinor` + currency,
+usage `ExactMoney` as coefficient + scale + currency, `SkillSupportEntry`, checkpoint
+`taskRevision`, `RouteSnapshot`, and candidates including `authClass`, options, provenance,
+per-required-skill `skillSupport`, `role` and role basis; `docs/08` ObserverProposal money
+and cost delta) as well as JSON syntax; the executable
 validator is implementation work (P0/P1) and must reject a shape mismatch. Fixtures are
 validated for semantic
 invariants as well as JSON syntax: no route with `meetsFloor: true` below the required
@@ -342,7 +385,7 @@ Every row is a release gate. The Phase column uses the backlog numbering `P0`–
 | AK-UX-01..05 | declaration E2E, isolation test | — | P1 |
 | AK-RTE-01..16 | T-01, T-02, adapter contract, route provenance | F-01..F-05, F-03 external-effect guard | P3 |
 | AK-TRG-01..16 | T-02, T-10, eval calibration, availability-vs-floor test (T-02) | F-04, F-06 | P3 |
-| AK-TSK-01..18 | T-03, T-11, T-14, state-machine property tests (incl. resume/recovery transitions) | F-08, F-10, F-11, F-14, F-16 | P2 |
+| AK-TSK-01..18 | T-03, T-11, T-14, state-machine property tests (incl. resume/recovery transitions) | F-08, F-10, F-11, F-14, F-16, F-18 | P2 |
 | AK-SKL-01..12 | T-04, per-route skill E2E | F-12 | P4 |
 | AK-SKL-13..14 | T-04 plus catalogue tests (T-15): each mandatory skill's `docs/15` fixture passes on its required route matrix; negative tests: a skill whose fixture failed, or a conditional skill whose connector is not workflow-verified, is not advertised in `SKILLS.md` or the registry | F-12 | P4 (conditional skills: P8) |
 | AK-COL-01..14 | room routing, T-06, anti-loop tests | F-09 | P6 |
@@ -389,7 +432,7 @@ A release candidate is blocked unless:
 2. Requirement-level suites for the release's scope pass.
 3. Restore drill passed within the proposed RTO.
 4. Security suite passed; no open high severity.
-5. Fault matrix F-01..F-17 passed for the implemented paths.
+5. Fault matrix F-01..F-18 passed for the implemented paths.
 6. Migration rehearsal passed for a synthetic team of 10 bots/4 rooms.
 7. Changelog, compatibility matrix, known limitations and upstream revision recorded.
 8. AKIRA-D2 checks: no timer-based deletion; purge requires explicit naming.
