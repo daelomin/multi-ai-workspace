@@ -31,6 +31,7 @@ WORKSPACE = HERE.parent
 sys.path.insert(0, str(HERE))
 import loop_monitor as lm  # noqa: E402
 import specs_review_loop as rl  # noqa: E402
+import loop_project as lp
 
 PORT = int(os.environ.get("LOOP_WIZARD_PORT", "8795"))
 JOBS = lm.OUT_DIR / "jobs"
@@ -145,8 +146,9 @@ README_TEMPLATE = (HERE / "templates/spec-review/readme.md").read_text(encoding=
 def a_create_loop(a: dict) -> dict:
     """New loop in its own git worktree (own branch, own files), so it can run beside other loops."""
     folder, name = a.get("folder", ""), a.get("name", "").strip()
-    if not FOLDER_RE.match(folder) or not NAME_RE.match(name):
+    if not FOLDER_RE.fullmatch(folder) or not NAME_RE.fullmatch(name):
         raise ValueError("folder must look like projects/<project>/<spec>; name 2-30 letters/digits/spaces")
+    lp.relative(folder)  # reject traversal before creating a worktree
     template = a.get("template", "spec-review")
     if template not in ("spec-review", "option-debate"):
         raise ValueError("unknown workflow template")
@@ -157,9 +159,15 @@ def a_create_loop(a: dict) -> dict:
         raise ValueError("invalid name/branch")
     if any(l["id"] == lid for l in raw_loops()):
         raise ValueError(f"loop id {lid!r} is already registered")
+    if sh(["git", "check-ref-format", "--branch", branch])[0] or base.startswith("-"):
+        raise ValueError("invalid branch/base")
+    if sh(["git", "cat-file", "-e", f"{base}:{folder}"])[0] == 0:
+        raise ValueError("destination project already exists at the base ref; register or resume it instead")
     wt = lm.LOOPS_ROOT / lid
     if wt.exists():
         raise ValueError(f"{wt} already exists")
+    # Validate and snapshot input content before any Git mutation. Never import old runtime state.
+    imported = lp.source_files(Path(a["source"]).expanduser()) if a.get("source") else []
     proj = wt / folder
     log: list[str] = []
 
@@ -169,20 +177,33 @@ def a_create_loop(a: dict) -> dict:
             raise RuntimeError("\n".join(log))
 
     lm.LOOPS_ROOT.mkdir(parents=True, exist_ok=True)
-    step(f"git worktree add -b {branch} {wt} {base}", sh(["git", "worktree", "add", "-b", branch, str(wt), base]))
+    # Populate a new empty checkout with only the toolkit and this project. No existing files removed.
+    step("create isolated worktree", sh(["git", "worktree", "add", "--no-checkout", "-b", branch, str(wt), base]))
+    patterns = f"/generic/\n/{folder}/\n/.gitignore\n/.gitattributes\n"
+    result = subprocess.run(["git", "sparse-checkout", "set", "--no-cone", "--stdin"], cwd=wt,
+                            input=patterns, capture_output=True, text=True)
+    step("select toolkit and project", (result.returncode, result.stdout + result.stderr))
+    step("materialize selected files", sh(["git", "read-tree", "-mu", "HEAD"], wt))
     (proj / "automation").mkdir(parents=True)
     (proj / "reviews").mkdir()
     (proj / "reviews" / ".gitkeep").write_text("")
     (proj / "automation" / ".gitignore").write_text("logs/\n")
     (proj / "spec.md").write_text(f"# {name} specification\n\nVersion 0.1\n\n(write the spec here)\n", encoding="utf-8")
-    readme_template = (HERE / "templates" / template / "readme.md").read_text(encoding="utf-8")
-    (proj / "README.md").write_text(readme_template.format(name=name), encoding="utf-8")
+    for relative, content in imported:
+        destination = proj / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(content)
+    cfg = lp.manifest(name, lid, folder, branch, template)
+    lp.scaffold(proj, cfg, HERE / "templates")
     if template == "option-debate":
         (proj / "workflow.json").write_text(json.dumps({"template": template, "phase": "options"}, indent=2) + "\n")
-    log.append(f"wrote {folder}/spec.md, README.md, automation/.gitignore")
+    report = lp.validate(proj, expected=cfg)
+    if not report["ok"]:
+        raise ValueError("; ".join(report["errors"]))
+    log.append(f"generated scoped loop metadata and instructions; imported {len(imported)} content files")
     step("git add", sh(["git", "add", "--", folder], wt))
     step("git commit", sh(["git", "commit", "-m", f"HUMAN: add {name} spec for the review loop", "--", folder], wt))
-    entry = {"id": lid, "project": folder, "name": name, "branch": branch, "worktree": str(wt)}
+    entry = {"id": lid, "project": folder, "name": name, "branch": branch, "worktree": str(wt), "manifest": "loop.json"}
     for k in ("after", "autostart"):
         if a.get(k):
             entry[k] = a[k]
@@ -262,6 +283,9 @@ def a_job(a: dict) -> dict:
     if mode not in ("preflight", "one", "full"):
         raise ValueError("mode must be preflight, one or full")
     l = find(a.get("id", ""))
+    report = lp.validate(lm.project_dir(l), expected=l)
+    if not report["ok"]:
+        raise ValueError("Loop configuration invalid: " + "; ".join(report["errors"]))
     if lm.lock_held(lm.checkout_lock(l)) or lm.lock_held(lm.logs_dir(l) / ".loop.lock"):
         raise ValueError(f"{l['name']} already has a loop or preflight running in {lm.loop_root(l)}; wait for it to finish "
                          "(a second one there would switch its branch)")
@@ -284,15 +308,23 @@ def a_job(a: dict) -> dict:
     return {"ok": True, "job": jid}
 
 
+def a_validate(a: dict) -> dict:
+    loop = find(a.get("id", ""))
+    report = lp.validate(lm.project_dir(loop), expected=loop)
+    return {**report, "output": "\n".join(report["errors"] + report["warnings"]) or "Configuration valid"}
+
+
 def a_retry(a: dict) -> dict:
     l = find(a.get("id", ""))
-    (lm.logs_dir(l) / ".monitor.json").unlink(missing_ok=True)
+    mark = lm.logs_dir(l) / ".monitor.json"
+    if mark.exists():
+        mark.rename(mark.with_name(f"monitor-attempt-{time.time_ns()}.json"))
     return {"ok": True, "output": f"cleared failed launch of {l['id']}"}
 
 
 ACTIONS = {"state": a_state, "loops": a_loops, "git_status": a_git_status, "commit": a_commit,
            "create_loop": a_create_loop, "make_worktree": a_make_worktree, "register": a_register, "monitor_start": a_monitor_start,
-           "monitor_stop": a_monitor_stop, "job": a_job, "retry": a_retry}
+           "monitor_stop": a_monitor_stop, "job": a_job, "retry": a_retry, "validate": a_validate}
 
 
 def job_info(jid: str) -> dict:

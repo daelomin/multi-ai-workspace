@@ -47,6 +47,9 @@ REVIEWERS="${REVIEWERS:-CHATGPT,DEEPSEEK,GROK}"
 
 mode="${1:-preflight}"
 
+# Validate configuration before account probes or branch changes. Legacy projects remain supported.
+python3 "$REPO/generic/loop_project.py" validate --project "$ROOT/$PROJECT" --name "$NAME" --branch "$BRANCH"
+
 # --- sanity checks ---
 for bin in git python3 codex claude "$CURSOR_AGENT_BIN"; do
   command -v "$bin" >/dev/null 2>&1 || { echo "missing binary: $bin" >&2; exit 1; }
@@ -61,7 +64,7 @@ if [[ "$REVIEWERS" == *GROK* ]] && ! grep -q "run_cursor_agent" "$LOOP"; then
 fi
 
 
-source ~/.credentials
+if [ -f "$HOME/.credentials" ]; then source "$HOME/.credentials"; fi
 # --- DeepSeek key: env first, else hidden prompt; never written anywhere ---
 if [ -z "${DEEPSEEK_API_KEY:-}" ]; then
   read -rsp "DeepSeek API key: " DEEPSEEK_API_KEY; echo
@@ -84,12 +87,12 @@ fi
 
 case "$mode" in
   preflight)
-    python3 "$LOOP" "${PROJECT_ARGS[@]}" --preflight ;;
+    python3 "$LOOP" "${PROJECT_ARGS[@]}" --reviewers "$REVIEWERS" --preflight ;;
   one)
-    python3 "$LOOP" "${PROJECT_ARGS[@]}" --preflight
+    python3 "$LOOP" "${PROJECT_ARGS[@]}" --reviewers "$REVIEWERS" --preflight
     python3 "$LOOP" "${PROJECT_ARGS[@]}" --reviewers "$REVIEWERS" --max-rounds 1 ;;
   full)
-    python3 "$LOOP" "${PROJECT_ARGS[@]}" --preflight
+    python3 "$LOOP" "${PROJECT_ARGS[@]}" --reviewers "$REVIEWERS" --preflight
     python3 "$LOOP" "${PROJECT_ARGS[@]}" --reviewers "$REVIEWERS" --max-rounds "$REVIEW_MAX_ROUNDS" ;;
   *)
     echo "usage: $0 <project-dir> <name> [branch] {preflight|one|full}" >&2; exit 2 ;;

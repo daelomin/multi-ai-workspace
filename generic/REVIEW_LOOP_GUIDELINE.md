@@ -28,7 +28,7 @@ Everything else (launcher, engine, tests) stays in `generic/`. Nothing goes at t
 ## 2. Required content
 
 - **`spec.md`** — first 500 characters contain `version X.Y` (e.g. `Version 0.2`); the loop reads it for prompts and commit messages.
-- **`README.md`** — must contain a line `**Round N**` under a "Current round" heading (N = the round to run next; the loop refuses to start without it). It also holds the review format, rules for reviewers and the stop rule. Copy the FuelBuddy README as the template (`projects/fuelbuddy/charging-diagnostic/README.md`) and replace names and links.
+- **`README.md`** — must contain a line `**Round N**` under a "Current round" heading (N = the round to run next; the loop refuses to start without it). It also holds the review format, rules for reviewers and the stop rule. Use `generic/templates/spec-review/readme.md`, or create/import through the wizard. Do not copy another project's operational README or handoff.
 - **`decisions.md`** (optional) — HUMAN decisions with ids (`<PREFIX>-D1`, …). If the file exists, the loop adds the rule "decisions are fixed, do not re-raise them as blocking/major" to the prompts.
 - Review findings use the shape defined in the README (`### <AGENT>-<n> · title`, `**Severity:** blocking|major|minor`, …). A review file is complete only if it ends with `Result: complete` and has findings or `Findings: none`.
 
@@ -100,7 +100,7 @@ generic/loop_monitor.py retry <id>    # clear a failed launch
 
 Every new loop gets its own **git worktree**: its own folder and branch, in `~/GIT/multi-ai-workspace.loops/<loop-id>/` (override with `LOOP_WORKTREES_DIR`). Loops in different worktrees run in parallel; the engine code always runs from the main checkout, only the loop's files and git operations are in the worktree.
 
-- **Create:** the assistant's "Create a new loop" makes the worktree and branch from your current branch, writes `spec.md` and `README.md` there and commits that folder. It records `branch` and `worktree` in `generic/loops.json`.
+- **Create:** the wizard creates a new worktree without checking out historical project files, then materializes only `generic/`, the selected project, and repository ignore/attribute files. It writes a portable `loop.json`, project-local activity log, scope instructions and launcher. Existing worktrees retain their original layout.
 - **Existing loops:** a loop registered before this has no `worktree` and uses the main checkout (only one at a time). The assistant offers "Give this loop its own worktree"; the branch must not be checked out in the main checkout.
 - **Your spec goes in the worktree:** edit `<worktree>/projects/<project>/<spec>/spec.md` and commit it there (the assistant's git step does it for the selected loop). The launcher refuses to run on a dirty worktree.
 - **Replies go to the right branch:** the engine commits and pushes inside its own worktree, so each review lands on that loop's branch. Git refuses the same branch in two worktrees, and the launcher lock is per worktree.
@@ -132,7 +132,7 @@ The wizard offers two templates, stored in `generic/templates/`:
 
 Existing projects without `workflow.json` keep `spec-review`. For an option debate, add `workflow.json` with `{"template": "option-debate", "phase": "options"}` and use the corresponding `readme.md` template. Never edit or bump the input proposal in this phase. Prompts for independent proposals, peer challenges, responses and consolidation are separately editable Markdown templates. Every pass uses distinct files and logs; resume preserves completed passes. The monitor shows all debate passes and an `awaiting_choice` state, which does not unlock chained implementation loops.
 
-This option-debate rule overrides §6's instruction to proceed without HUMAN decisions: choosing the primary implementation is an explicit gate. No full specifications before the choice. After HUMAN explicitly selects, record it in project `decisions.md`, switch workflow to `{"template": "spec-review", "phase": "specification", "human_choice": "<actual HUMAN choice and decision reference>"}`, remove the README waiting marker and advance to the next round. Then write/review the full specification of that selected option. AI recommendations never count as HUMAN selection.
+This option-debate rule overrides §6's instruction to proceed without HUMAN decisions: choosing the primary implementation is an explicit gate. No full specifications before the choice. After HUMAN explicitly selects, record it in project `decisions.md`, switch workflow to `{"template": "spec-review", "phase": "specification", "human_choice": "<actual HUMAN choice and decision reference>"}`, update loop.json template too if the project is manifest-managed, remove the README waiting marker and advance to the next round. Then write/review the full specification of that selected option. AI recommendations never count as HUMAN selection.
 
 Use new rounds to change an existing loop's purpose; preserve earlier reviews and logs. Do not reuse spec-review outputs as completed option-debate passes.
 
@@ -218,3 +218,30 @@ PY
 Adapt the reviewer, round and stage only to the actual failed pass (`review`, `challenge`, or `response`). Unrelated dirty/staged files are refused; inspect them instead of stashing or deleting them automatically. Once the worktree is clean, run the normal restart above. For this incident, the completed CHATGPT response is preserved, and DEEPSEEK-RESPONSE is the next unfinished pass.
 
 If the output is genuinely partial, preserve it and obtain a completed response before finalizing it. A formatting marker does not establish substantive completion. Never overwrite a partial pass or start a new round simply to bypass a failed validation without reviewing the recovery plan.
+
+## 13. Generic projects and safe imports (schema 1)
+
+New wizard loops use `loop.json` in the project folder. It declares the loop identity, project path, branch, template, project-local changelog, review inputs and consolidation write paths. The registry still locates worktrees; disagreement with the manifest blocks a managed launch. No existing registration or worktree is migrated automatically. Legacy loops without a manifest keep their previous prompts, root changelog, file permissions, positional launcher and resume behavior; suspicious copied instructions are reported as warnings there.
+
+**Create/import:** the wizard's optional existing-specification folder imports only `spec.md`, optional `decisions.md`, and `docs/`, `evals/`, `assets/`. It generates a new README, launcher, project scope and fresh review state. Old READMEs, HANDOFF files, launch scripts, reviews, logs, workflow state and secrets are excluded. Source files and their history remain untouched. Imports reject symlinks and path traversal. Other relative companion directories should be added to the manifest explicitly rather than importing an entire former worktree.
+
+**Scope:** new worktrees use sparse checkout from an initially empty worktree; unrelated files are never materialized. Git history is preserved. Existing worktrees are never sparsified or cleaned. New agents use project-local instructions and activity logs, avoiding unrelated root MASTER/TODO queues.
+
+**Validate before running:** from the toolkit root:
+
+```bash
+python3 generic/loop_project.py validate --project /absolute/worktree/projects/example/spec
+```
+
+The portable project wrapper resolves the shared toolkit and reads its adjacent manifest; it contains no copied project path or branch:
+
+```bash
+bash /absolute/worktree/projects/example/spec/automation/run_review_loop.sh preflight
+bash /absolute/worktree/projects/example/spec/automation/run_review_loop.sh one
+```
+
+Validation checks missing input/version/round metadata, manifest disagreement, stale executable launch references and missing claimed reviews. It runs before model probes. A preflight success remains a preflight success; the wizard clearly requires a separate live-round action.
+
+**Companion edits:** schema-1 manifests explicitly authorize spec-review consolidation paths such as `docs` and `evals`. The same paths feed the prompt, dirty-file guard and commit scope. Reviewers still edit only their own pass and the configured activity log. Options debates never gain permission to rewrite the proposal or companion specs. Manifest, decisions, workflow and scope instructions remain protected from consolidation edits.
+
+**Existing projects:** migrating one is explicit work: preserve its original operational files, add a manifest matching its registry entry, reconcile instructions and missing-review claims, and validate. Keep existing reviews, round state and logs. Do not call the new-project scaffold over a completed loop or reset it to round 1. Retry controls preserve prior launch markers as history instead of deleting them.

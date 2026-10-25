@@ -36,6 +36,8 @@ import tempfile
 import time
 from pathlib import Path
 
+import loop_project as lp
+
 HERE = Path(__file__).resolve().parent
 WORKSPACE = HERE.parent
 
@@ -127,8 +129,45 @@ def configure(project: str | Path, name: str | None = None, branch: str | None =
     DECISIONS = PROJECT / "decisions.md"
     LOG_DIR = PROJECT / "automation" / "logs"  # stays with the project; keep it gitignored
     parts = Path(REL_PROJECT).parts
-    NAME = name or (parts[1] if len(parts) > 1 and parts[0] == "projects" else PROJECT.name)
-    BRANCH = branch or f"agent/loop/{slug(NAME)}-review"
+    cfg = lp.load(PROJECT)
+    NAME = name or cfg.get("name") or (parts[1] if len(parts) > 1 and parts[0] == "projects" else PROJECT.name)
+    BRANCH = branch or cfg.get("branch") or f"agent/loop/{slug(NAME)}-review"
+
+
+def activity_rel() -> str:
+    cfg = lp.load(PROJECT)
+    return f"{REL_PROJECT}/{cfg.get('changelog', 'CHANGELOG.md')}" if cfg else "CHANGELOG.md"
+
+
+def scope_note() -> str:
+    cfg = lp.load(PROJECT)
+    if not cfg:
+        return ""
+    return (f"\nScope: {REL_PROJECT}/loop.json is authoritative. Review its declared inputs: "
+            + ", ".join(f"{REL_PROJECT}/{v}" for v in cfg.get("inputs", []))
+            + ". Unrelated projects and root historical MASTER/TODO queues are not this task. "
+            + f"Record activity only in {activity_rel()}.\n")
+
+
+def consolidation_rels(root: Path) -> list[str]:
+    cfg = lp.load(PROJECT)
+    rels = spec_rels(root) + [str(README.relative_to(root)), activity_rel()]
+    if cfg and workflow()["phase"] != "options":
+        for value in cfg.get("consolidation_paths", []):
+            path = lp.within(PROJECT, value)
+            rels.append(str(path.relative_to(root)))
+    return list(dict.fromkeys(rels))
+
+
+def expand_allowed(root: Path, rels: list[str]) -> set[str]:
+    # Git reports individual files, whereas manifests declare companion directories.
+    changed = run(["git", "status", "--porcelain", "--untracked-files=all"], cwd=root).stdout.splitlines()
+    allowed = set(rels)
+    for line in changed:
+        name = line[3:].strip('"')
+        if any(name.startswith(rel + "/") for rel in rels):
+            allowed.add(name)
+    return allowed
 
 
 def workflow() -> dict:
@@ -162,9 +201,9 @@ def option_prompt(agent: str, n: int, stage: str, reviewers: list[str]) -> str:
     peers = ", ".join(a for a in reviewers if a != agent)
     values = dict(agent=agent, NAME=NAME, REL_PROJECT=REL_PROJECT, n=n, path=path, peers=peers,
                   priorities=json.dumps(workflow().get("priorities", []), ensure_ascii=False),
-                  context_files=json.dumps(workflow().get("context_files", [])))
+                  context_files=json.dumps(workflow().get("context_files", [])), changelog=activity_rel())
     return (prompt_template("option-debate", "common", **values) + "\n" +
-            prompt_template("option-debate", stage, **values))
+            prompt_template("option-debate", stage, **values) + scope_note())
 
 
 def validate_option_output(text: str, stage: str, agent: str, reviewers: list[str]) -> str | None:
@@ -188,7 +227,7 @@ def option_consolidation_prompt(n: int, reviewers: list[str]) -> str:
     files = ", ".join(step + ".md" for step in debate_steps(reviewers, "options"))
     return prompt_template("option-debate", "consolidation", NAME=NAME, REL_PROJECT=REL_PROJECT, n=n, files=files,
                            priorities=json.dumps(workflow().get("priorities", []), ensure_ascii=False),
-                  context_files=json.dumps(workflow().get("context_files", [])))
+                  context_files=json.dumps(workflow().get("context_files", [])), changelog=activity_rel()) + scope_note()
 
 
 def decisions_note(rule: str) -> str:
@@ -412,12 +451,15 @@ def assert_clean(root: Path, allow: set[str] = frozenset()) -> None:
 
 
 def commit_and_push(root: Path, paths: list[str], message: str) -> None:
-    pre = [p for p in staged_paths(root) if p not in set(paths)]
+    allowed = expand_allowed(root, paths)
+    pre = [p for p in staged_paths(root) if p not in allowed]
     if pre:
         raise SystemExit(f"unrelated paths already staged, refusing to commit them: {pre}")
-    run(["git", "add", "--", *paths], cwd=root)
+    stage = [p for p in paths if (root / p).exists()]
+    if stage:
+        run(["git", "add", "--", *stage], cwd=root)
     staged = staged_paths(root)
-    stray = [p for p in staged if p not in set(paths)]
+    stray = [p for p in staged if p not in expand_allowed(root, paths)]
     if stray:
         raise SystemExit(f"unexpected staged paths: {stray}")
     if staged:
@@ -736,14 +778,14 @@ def review_prompt(agent: str, n: int) -> str:
                "drift, schema gaps. Do not research external standards. Sign the review, the finding "
                "ids (CURSOR-1, …) and the CHANGELOG entry as CURSOR.")
     return (f"{who}\n\nRead {REL_PROJECT}/README.md and follow its 'Instructions for the reviewing AI' "
-            f"for round {n}: read spec.md (the local file, current version v{spec_version()}), and from "
-            f"round 2 read reviews/round-{n - 1}/ first. Write your review to {review_path}, starting "
+            f"for round {n}: read {REL_PROJECT}/spec.md (current version v{spec_version()}), and from "
+            f"round 2 read {REL_PROJECT}/reviews/round-{n - 1}/ first. Write your review to {review_path}, starting "
             f"with '# {agent} review — round {n}'.\n\n"
-            + REVIEW_RULES.format(review_path=review_path, agent=agent, n=n, name=NAME,
+            + REVIEW_RULES.format(review_path=review_path, agent=agent, n=n, name=NAME, changelog=activity_rel(),
                                   decisions_rule=decisions_note(
                                       f"- Read {REL_PROJECT}/decisions.md: decisions listed there are SETTLED "
                                       "by HUMAN. Treat them as fixed; do not re-open them and do not review the "
-                                      "spec's remaining 'Pending HUMAN decision' text for them.\n")))
+                                      "spec's remaining 'Pending HUMAN decision' text for them.\n")) + scope_note())
 
 
 def consolidation_prompt(n: int, reviewers: list[str], converged: bool, provenance: dict | None = None) -> str:
@@ -768,6 +810,10 @@ def consolidation_prompt(n: int, reviewers: list[str], converged: bool, provenan
     return prompt_template(
         "spec-review", "consolidation", NAME=NAME, REL_PROJECT=REL_PROJECT, version=spec_version(),
         previous=n - 1, n=n, files=files, final=final, provenance=prov_lines,
+        changelog=activity_rel(),
+        companions=("Additional permitted companion paths: " + ", ".join(lp.load(PROJECT).get("consolidation_paths", []))
+                    + ". Update companion contracts and examples consistently with accepted spec changes. "
+                    if lp.load(PROJECT) else ""), scope=scope_note(),
         decisions=decisions_note(
             f"Read {REL_PROJECT}/decisions.md: every decision listed there is settled by HUMAN. Apply it to spec.md "
             "(replace the matching 'Pending HUMAN decision' passage, adjust the affected sections) and remove it from "
@@ -788,12 +834,12 @@ def do_review(agent: str, n: int, root: Path, stage: str = "review",
         err = validate(path.read_text(encoding="utf-8"))
         if err:
             raise SystemExit(f"{rel} exists but is unfinished ({err}); inspect it; preserve it and use a new round for a fresh debate")
-        assert_clean(root, {rel, "CHANGELOG.md"})
+        assert_clean(root, {rel, activity_rel()})
         if is_pushed(root, rel):
             log(f"round {n}: {agent} review complete and pushed, skipping")
         else:
             log(f"round {n}: {agent} review complete but not pushed, resuming at commit/push")
-            commit_and_push(root, [rel, "CHANGELOG.md"], f"{agent}: {NAME} {stage} round {n}")
+            commit_and_push(root, [rel, activity_rel()], f"{agent}: {NAME} {stage} round {n}")
         return {"requested": "n/a", "reported": [], "verified": False, "note": "resumed, not rerun"}
     assert_clean(root)
     round_dir(n).mkdir(parents=True, exist_ok=True)
@@ -829,11 +875,11 @@ def do_review(agent: str, n: int, root: Path, stage: str = "review",
     err = validate(path.read_text(encoding="utf-8"))
     if err:
         raise SystemExit(f"{agent} review is unfinished ({err}); see {logfile}")
-    extra = unexpected_changes(root, {rel, "CHANGELOG.md"})
+    extra = unexpected_changes(root, {rel, activity_rel()})
     if extra:
         raise SystemExit(f"{agent} changed files outside its review: {extra}")
     (LOG_DIR / f"r{n}-{step.lower()}.provenance.json").write_text(json.dumps(prov, indent=2), encoding="utf-8")
-    commit_and_push(root, [rel, "CHANGELOG.md"], f"{agent}: {NAME} {stage} round {n}")
+    commit_and_push(root, [rel, activity_rel()], f"{agent}: {NAME} {stage} round {n}")
     return prov
 
 
@@ -861,7 +907,7 @@ def do_consolidation(n: int, reviewers: list[str], converged: bool, root: Path,
                      provenance: dict | None = None) -> None:
     options = workflow()["phase"] == "options"
     path = round_dir(n) / "CONSOLIDATION.md"
-    rel_all = [str(path.relative_to(root)), *spec_rels(root), str(README.relative_to(root)), "CHANGELOG.md"]
+    rel_all = [str(path.relative_to(root)), *consolidation_rels(root)]
     if options:
         rel_all = [r for r in rel_all if r not in spec_rels(root)]
     if path.exists():
@@ -871,7 +917,7 @@ def do_consolidation(n: int, reviewers: list[str], converged: bool, root: Path,
             log(f"round {n}: consolidation complete and pushed, skipping")
         else:
             log(f"round {n}: consolidation written but not pushed, resuming at commit/push")
-            assert_clean(root, set(rel_all))
+            assert_clean(root, expand_allowed(root, rel_all))
             commit_and_push(root, rel_all, f"CLAUDE: consolidate {NAME} round {n} into spec v{spec_version()}")
         return
     assert_clean(root)
@@ -893,8 +939,12 @@ def do_consolidation(n: int, reviewers: list[str], converged: bool, root: Path,
         raise SystemExit(f"CLAUDE did not bump the spec version (still v{before}); see {logfile}")
     if not options and not converged and current_round() != n + 1:
         raise SystemExit(f"CLAUDE did not move README to round {n + 1}; see {logfile}")
+    if lp.load(PROJECT):
+        report = lp.validate(PROJECT)
+        if not report["ok"]:
+            raise SystemExit("Invalid consolidation project state: " + "; ".join(report["errors"]))
     rel = list(rel_all)
-    extra = unexpected_changes(root, set(rel))
+    extra = unexpected_changes(root, expand_allowed(root, rel))
     if extra:
         raise SystemExit(f"CLAUDE changed files outside the consolidation: {extra}")
     commit_and_push(root, rel, f"CLAUDE: consolidate {NAME} round {n} into spec v{spec_version()}")
@@ -1020,6 +1070,9 @@ def main() -> None:
     if missing:
         raise SystemExit(f"{REL_PROJECT} has no {' or '.join(missing)}")
     root = repo_root()
+    report = lp.validate(PROJECT, expected={"name": NAME, "branch": BRANCH, "project": REL_PROJECT})
+    if not report["ok"]:
+        raise SystemExit("Loop configuration invalid: " + "; ".join(report["errors"]))
     log(f"project {REL_PROJECT} ({NAME}), branch {BRANCH}")
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     lock = open(LOG_DIR / ".loop.lock", "w")

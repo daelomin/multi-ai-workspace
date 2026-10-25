@@ -47,7 +47,7 @@ a{color:var(--blue)}
 
 <script>
 const TOKEN = '__TOKEN__';
-const COLORS = {preflight: '#eab308', running: 'var(--green)', complete: 'var(--blue)', failed: 'var(--red)', pending: 'var(--grey)'};
+const COLORS = {awaiting_choice: '#a855f7', preflight: '#eab308', running: 'var(--green)', complete: 'var(--blue)', failed: 'var(--red)', pending: 'var(--grey)'};
 const chat = document.getElementById('chat'), dash = document.getElementById('dash');
 const dur = s => s == null ? '' : ' ' + (s >= 3600 ? Math.floor(s/3600) + 'h' + String(Math.floor(s%3600/60)).padStart(2,'0') + 'm' : s >= 60 ? Math.floor(s/60) + 'm' + String(Math.round(s%60)).padStart(2,'0') + 's' : Math.round(s) + 's');
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -178,7 +178,8 @@ function gitStep(id) {
   };
 }
 const monitorStep = () => step('Start the monitor', 'Keeps the colours fresh, and launches chained loops. It keeps running after you close this page.', 'Start monitor', () => api('monitor_start', {}));
-const preflightStep = id => step('Check the backends (preflight)', 'Probes ChatGPT/DeepSeek/Grok/Claude. Takes a minute or two; no spec changes.', 'Run preflight', show => runJob(id, 'preflight', show));
+const validateStep = id => step('Validate project setup', 'Checks manifest, copied launch paths and review-state claims before paid calls. Legacy loops report compatibility warnings.', 'Validate', () => api('validate', {id}));
+const preflightStep = id => step('Check the backends (preflight)', 'Checks configured backends only. It does not start a review; choose Run one round or Run full loop afterwards.', 'Run preflight', show => runJob(id, 'preflight', show));
 const runSteps = id => {
   step('Run one round', 'One review round (all reviewers + consolidation). Uses the paid backends.', 'Run one round', show => runJob(id, 'one', show), {confirm: 'Run one live round? This uses the paid AI backends.'});
   step('…or run up to 5 rounds', 'Stops by itself when a round has no blocking/major findings.', 'Run full loop', show => runJob(id, 'full', show), {confirm: 'Run the FULL loop (up to 5 rounds)? This uses the paid AI backends.'});
@@ -201,7 +202,7 @@ async function existing() {
   form('Which loop?', [{id: 'id', short: 'Loop', label: 'Loop', options: loops.map(l => [l.id, `${l.name} (${l.project})`])}], v => {
     const loop = loops.find(l => l.id === v.id);
     say('Do these in order. Each button runs the step for you.');
-    const go = () => { gitStep(v.id); monitorStep(); preflightStep(v.id); runSteps(v.id); again(); };
+    const go = () => { gitStep(v.id); validateStep(v.id); monitorStep(); preflightStep(v.id); runSteps(v.id); again(); };
     if (!loop.worktree) {
       step('Give this loop its own worktree',
         `This loop still uses the main checkout, so only one loop can run there at a time. A worktree gives it its own folder on branch <code>${esc(loop.branch)}</code> so several loops can run together. The branch must not be checked out in the main checkout.`,
@@ -215,6 +216,7 @@ async function newLoop(chain) {
   const fields = [
     {id: 'template', short: 'Workflow', label: 'What should the AIs do?', options: [['spec-review', 'Review an implementation specification'], ['option-debate', 'Assess options, debate, then wait for my choice']]},
     {id: 'folder', short: 'Folder', label: 'Spec folder (projects/<project>/<spec>)', value: 'projects/', re: /^projects\/[\w.-]+\/[\w.-]+$/, msg: 'Use projects/<project>/<spec>, e.g. projects/acme/billing-spec'},
+    {id: 'source', short: 'Import', label: 'Existing specification folder (optional; imports spec, decisions, docs, evals and assets only)', ph: '/absolute/path/to/spec-folder'},
     {id: 'name', short: 'Name', label: 'Short name (used in commit messages)', ph: 'MySpec', re: /^[\w -]{2,30}$/, msg: 'Letters, digits and spaces, 2–30 characters'},
   ];
   if (chain) {
@@ -224,11 +226,11 @@ async function newLoop(chain) {
   }
   form('Where should the new spec live, and what do you call it?', fields, v => {
     say(`I'll create a branch, the spec and README skeletons, commit them, and register the loop${chain ? ' (chained)' : ''}.`);
-    step('Create the loop', 'Creates a git worktree on a new branch <code>agent/loop/&lt;name&gt;-review</code> (from your current branch), writes spec.md + README.md there, commits only that folder, and adds the loop to the monitor. The loop then works only in that worktree.', 'Create it',
-      () => api('create_loop', {folder: v.folder, name: v.name, template: v.template, ...(chain ? {after: v.after, autostart: v.auto === 'yes'} : {})}),
+    step('Create the loop', 'Creates an isolated checkout containing the toolkit and this project. Imports specification content when selected; generates fresh instructions, manifest and launcher. Old reviews, logs, handoffs and launch scripts are excluded. Existing loops are unchanged.', 'Create it',
+      () => api('create_loop', {folder: v.folder, name: v.name, template: v.template, source: v.source, ...(chain ? {after: v.after, autostart: v.auto === 'yes'} : {})}),
       {after: r => {
         say(`Created loop <b>${esc(r.id)}</b> on branch <code>${esc(r.branch)}</code> in <code>${esc(r.worktree)}</code>. <b>Put the real spec into <code>${esc(r.spec)}</code> and commit it</b> (the next step does the commit) before the loop runs; it reviews that file.`);
-        gitStep(r.id); monitorStep();
+        gitStep(r.id); validateStep(r.id); monitorStep();
         if (chain && v.auto === 'yes') say(`When <b>${esc(v.after)}</b> turns blue the monitor will launch <b>${esc(v.name)}</b> by itself. A failed launch stops and shows a red "Allow relaunch" button.`);
         else { preflightStep(r.id); runSteps(r.id); }
         again();

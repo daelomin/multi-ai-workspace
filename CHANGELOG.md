@@ -581,3 +581,11 @@
 **Files:** `generic/REVIEW_LOOP_GUIDELINE.md`
 **Change:** Added exact foreground/background JarvisBot resume commands, lock/clean-tree checks, expected resume semantics, logs and completed-but-uncommitted pass recovery. Documented the standalone Findings: none marker and validation/finalization without a model rerun.
 **Verification:** Commands follow the existing launcher and engine signatures; live recovery of the round-2 CHATGPT response is being performed with these calls.
+
+
+## 2026-10-25 — Generic loop setup with backward-compatible legacy mode
+**Agent:** CHATGPT
+**Files:** `generic/loop_project.py`, wizard/launcher/engine/monitor, workflow templates, guideline and worktree tests.
+**Change:** New loops use a portable project manifest, scoped activity log, generated instructions/launcher and a sparse checkout created from an empty worktree. Optional imports copy only declared specification content and regenerate operational state. Validation catches copied launch paths, mismatched identities, missing claimed reviews and unsafe scopes before model probes. Companion-document permissions are shared between prompts, guards and commits. Legacy registrations, worktrees, root changelogs and review state keep their existing behavior. Retry records are preserved; successful preflight timestamps no longer populate graph errors. Akira's not-yet-started loop was explicitly migrated with original operational files backed up and all 26 specification/decision/companion files verified byte-for-byte unchanged.
+**Verification:** 85 generic tests pass, including imported-content isolation, preservation of existing registrations/reviews, executable portable-wrapper dispatch, companion-file consolidation and legacy resume cases. Python, Bash and browser-JavaScript syntax checks pass. All six registered loops validate. No paid review was started by this change.
+**Handoff:** CHATGPT releases generic setup changes. Existing completed loops were not migrated or cleaned.

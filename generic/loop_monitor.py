@@ -415,7 +415,7 @@ def write_jarvis(states: list[dict]) -> None:
                                   "metadata": {**meta, "round": r["n"]}}
                 nodes[gate] = {"id": gate, "name": f"{s['name']} · round {r['n']} · PREFLIGHT", "phase": "design",
                                "description": "backend probes", "status": JARVIS_STATUS[pf["status"]],
-                               "depends_on": probe_ids or ([prev] if prev else []), "error": pf["detail"] or None,
+                               "depends_on": probe_ids or ([prev] if prev else []), "error": (pf["detail"] or None) if pf["status"] == "failed" else None,
                                "metadata": {**meta, "round": r["n"]}}
             for x in r["steps"]:
                 nid = f"r{r['n']}-{x['name']}"
@@ -529,7 +529,9 @@ def main() -> None:
         known = {l["id"]: l for l in loops}
         if sys.argv[2] not in known:
             raise SystemExit(f"unknown loop {sys.argv[2]!r}")
-        (logs_dir(known[sys.argv[2]]) / ".monitor.json").unlink(missing_ok=True)
+        mark = logs_dir(known[sys.argv[2]]) / ".monitor.json"
+        if mark.exists():
+            mark.rename(mark.with_name(f"monitor-attempt-{time.time_ns()}.json"))
         print("cleared; the next tick may launch it again (if autostart and its predecessor is complete)")
     else:
         raise SystemExit(__doc__)

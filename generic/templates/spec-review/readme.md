@@ -1,6 +1,6 @@
 # {name} spec — multi-AI review
 
-Review rounds for `spec.md`. General rules: `CONTRIBUTING.md`; loop rules: `generic/REVIEW_LOOP_GUIDELINE.md`.
+Review rounds for `spec.md`. Loop rules: `generic/REVIEW_LOOP_GUIDELINE.md`.
 
 ## Current round
 
