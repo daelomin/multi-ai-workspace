@@ -2,6 +2,12 @@
 
 ## 2026-10-25 — Round 1 specification review
 
+Agent: DEEPSEEK
+
+Reviewed v0.3, settled decisions, all companion documents and eight JSON fixtures within the manifest scope. Recorded five major findings (backup pruning, server-callable hard delete, quota recorded as a capability-floor failure, missing coordination category, and mixed-unit cost totals driving route selection) and eleven minor findings covering accounting consistency, evidence and traceability, silence, disputes, audit coverage, migration and phase/slice planning. Review complete at `reviews/round-1/DEEPSEEK.md`; specification and other inputs unchanged. No git commands or runtime integrations executed.
+
+## 2026-10-25 — Round 1 specification review
+
 Agent: CHATGPT
 
 Reviewed v0.3, settled decisions, all companion documents and eight JSON fixtures within the manifest scope. Recorded two major findings (deletion-enabled backup and external-effect replay after snapshot restore) and six minor findings covering accounting, recovery transitions, fixture contracts and skill traceability. Review complete at `reviews/round-1/CHATGPT.md`; specification and other inputs unchanged. No git commands or runtime integrations executed.
