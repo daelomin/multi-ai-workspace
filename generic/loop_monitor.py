@@ -124,7 +124,7 @@ def read_json(path: Path) -> dict:
 def step_info(logdir: Path, n: int, step: str) -> dict:
     """Model, effort, tier and served model of a step, from the engine's timing file."""
     t = read_json(logdir / f"r{n}-{step.lower()}.timing.json")
-    return {k: t[k] for k in ("model", "effort", "tier", "reported", "cost_usd", "cost_basis") if t.get(k) is not None and t.get(k) != ""}
+    return {k: t[k] for k in ("actor", "model", "effort", "tier", "reported", "cost_usd", "cost_basis") if t.get(k) is not None and t.get(k) != ""}
 
 
 def describe(x: dict) -> str:
@@ -262,6 +262,10 @@ def evaluate(loop: dict) -> dict:
             first_open = step
         out["steps"].append({"name": step, "status": state, "detail": detail,
                              "seconds": step_seconds(logdir, n, step, state), **step_info(logdir, n, step)})
+    cfg = rl.lp.load(project).get("consolidator", {})
+    for step in out["steps"]:
+        if step["name"] == "CLAUDE" and not (logdir / f"r{n}-claude.timing.json").exists() and cfg.get("backend") == "CHATGPT":
+            step.update(actor="CHATGPT", model=cfg["model"], effort=cfg["effort"])
     pf = preflight_state(logdir, n, pre_running)
     out["preflight"] = pf
     out["rounds"].append({"n": n, "steps": out["steps"], "preflight": pf})
@@ -269,7 +273,7 @@ def evaluate(loop: dict) -> dict:
     if not running:  # a failed preflight marks the still-pending steps of the backends that did not answer
         for name, why in read_json(logdir / "preflight.json").get("failed", {}).items():
             for x in out["steps"]:
-                if x["name"] == ("CLAUDE" if name == "ANTHROPIC" else name) and x["status"] == "pending":
+                if x["name"] == ("CLAUDE" if name in ("ANTHROPIC", "CHATGPT-CONSOLIDATOR") else name) and x["status"] == "pending":
                     x.update(status="failed", detail=f"preflight: {why}")
     failed = [s for s in out["steps"] if s["status"] == "failed"]
     if rl.awaiting_choice(text) and not running:
@@ -362,7 +366,7 @@ def write_html(states: list[dict]) -> Path:
                          f'probe {html.escape(x["name"])}</span>' for x in (pf or {}).get("probes", []))
         chips = (f'<span class="chip" style="background:{COLORS[pf["status"]]}" title="{html.escape(pf["detail"])}">PREFLIGHT</span>'
                  + pchips if pf else "") + "".join(f'<span class="chip" style="background:{COLORS[x["status"]]}" title="{html.escape(x["detail"] or describe(x))}">'
-                        f'{html.escape(label(x["name"], x.get("seconds")))}</span>' for x in s["steps"]) or '<span class="muted">no steps</span>'
+                        f'{html.escape(label(x.get("actor", x["name"]), x.get("seconds")))}</span>' for x in s["steps"]) or '<span class="muted">no steps</span>'
         after = (f'<div class="muted">after {html.escape(s["after"])}</div>' if s["after"] else "") + \
             (f'<div class="muted">branch {html.escape(s["branch"])}' + (f' · {html.escape(s["worktree"])}' if s.get("worktree") else " · main checkout") + "</div>"
              if s.get("branch") else "")
@@ -422,13 +426,13 @@ def write_jarvis(states: list[dict]) -> None:
                 last = x["name"] == "CLAUDE"
                 dependencies = reviewers if last else (initial if x["name"].endswith("-CHALLENGE") else
                                   challenges if x["name"].endswith("-RESPONSE") else ([gate] if gate else []))
-                nodes[nid] = {"id": nid, "name": " · ".join(filter(None, [f"{s['name']} · round {r['n']} · {label(x['name'], x.get('seconds'))}", describe(x)])),
+                nodes[nid] = {"id": nid, "name": " · ".join(filter(None, [f"{s['name']} · round {r['n']} · {label(x.get('actor', x['name']), x.get('seconds'))}", describe(x)])),
                               "phase": "implement" if last else "validate", "description": nid,
                               "status": JARVIS_STATUS[x["status"]],
                               "depends_on": dependencies,
                               "error": x["detail"] or None,
                               "metadata": {**meta, "round": r["n"], "duration_seconds": x.get("seconds"),
-                                           **{k: x[k] for k in ("model", "effort", "tier", "reported", "cost_usd", "cost_basis")
+                                           **{k: x[k] for k in ("actor", "model", "effort", "tier", "reported", "cost_usd", "cost_basis")
                                               if x.get(k) is not None}}}
             prev = f"r{r['n']}-CLAUDE"
         if s["status"] == "awaiting_choice":

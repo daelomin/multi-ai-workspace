@@ -134,6 +134,17 @@ def configure(project: str | Path, name: str | None = None, branch: str | None =
     BRANCH = branch or cfg.get("branch") or f"agent/loop/{slug(NAME)}-review"
 
 
+def consolidator_config() -> dict:
+    """Per-project override; legacy projects keep their Claude consolidator."""
+    return lp.load(PROJECT).get("consolidator", {"backend": "CLAUDE"})
+
+
+def run_consolidator_codex(prompt: str, root: Path, logfile: Path, timeout: int):
+    cfg = consolidator_config()
+    return run_codex(prompt, root, logfile, timeout,
+                     model=cfg.get("model"), effort=cfg.get("effort"))
+
+
 def activity_rel() -> str:
     cfg = lp.load(PROJECT)
     return f"{REL_PROJECT}/{cfg.get('changelog', 'CHANGELOG.md')}" if cfg else "CHANGELOG.md"
@@ -305,6 +316,10 @@ def step_config(agent: str) -> dict:
         m = EFFORT_RE.search(model)
         return {"model": model, "effort": m.group(1).lower() if m else "default",
                 "tier": "fast" if model.endswith("-fast") else ""}
+    cfg = consolidator_config()
+    if cfg["backend"] == "CHATGPT":
+        return {"actor": "CHATGPT", "model": cfg["model"], "effort": cfg["effort"],
+                "tier": CODEX_SERVICE_TIER or "standard"}
     return {"model": CLAUDE_MODEL, "effort": CONSOLIDATOR_EFFORT or "default", "tier": ""}  # CLAUDE
 
 
@@ -623,7 +638,7 @@ def run_claude(profile: str, prompt: str, root: Path, logfile: Path, timeout: in
     return result
 
 
-def codex_args(prompt: str, root: Path, last: Path | None = None) -> list[str]:
+def codex_args(prompt: str, root: Path, last: Path | None = None, *, model: str | None = None, effort: str | None = None) -> list[str]:
     """One command builder for preflight and review steps."""
     if os.environ.get("CODEX_DANGEROUS_FULL_ACCESS") == "1":
         log("WARNING: CODEX_DANGEROUS_FULL_ACCESS=1, Codex runs without sandbox or approvals")
@@ -633,8 +648,11 @@ def codex_args(prompt: str, root: Path, last: Path | None = None) -> list[str]:
     out = ["--output-last-message", str(last)] if last else []
     if CODEX_SERVICE_TIER:
         out += ["-c", f'service_tier="{CODEX_SERVICE_TIER}"']
+    overrides = (["--model", model] if model else [])
+    if effort:
+        overrides += ["-c", f'model_reasoning_effort="{effort}"']
     return ["codex", "exec", *mode, "--skip-git-repo-check", "-C", str(root), *out,
-            *CODEX_EXTRA_ARGS, prompt]
+            *CODEX_EXTRA_ARGS, *overrides, prompt]
 
 
 def codex_usage(log_text: str) -> dict | None:
@@ -713,8 +731,8 @@ def log_codex_usage(usage: dict | None) -> None:
         f"window tokens ({usage['max_request_context_pct']}%); {cost}")
 
 
-def run_codex(prompt: str, root: Path, logfile: Path, timeout: int) -> dict | None:
-    args = codex_args(prompt, root, logfile.with_suffix(".last.md"))
+def run_codex(prompt: str, root: Path, logfile: Path, timeout: int, *, model: str | None = None, effort: str | None = None) -> dict | None:
+    args = codex_args(prompt, root, logfile.with_suffix(".last.md"), model=model, effort=effort)
     try:
         res = run(args, cwd=root, check=False, timeout=timeout)
     except subprocess.TimeoutExpired as exc:
@@ -905,6 +923,7 @@ def validate_option_consolidation(path: Path) -> None:
 
 def do_consolidation(n: int, reviewers: list[str], converged: bool, root: Path,
                      provenance: dict | None = None) -> None:
+    actor = consolidator_config()["backend"]
     options = workflow()["phase"] == "options"
     path = round_dir(n) / "CONSOLIDATION.md"
     rel_all = [str(path.relative_to(root)), *consolidation_rels(root)]
@@ -918,27 +937,38 @@ def do_consolidation(n: int, reviewers: list[str], converged: bool, root: Path,
         else:
             log(f"round {n}: consolidation written but not pushed, resuming at commit/push")
             assert_clean(root, expand_allowed(root, rel_all))
-            commit_and_push(root, rel_all, f"CLAUDE: consolidate {NAME} round {n} into spec v{spec_version()}")
+            commit_and_push(root, rel_all, f"{actor}: consolidate {NAME} round {n} into spec v{spec_version()}")
         return
     assert_clean(root)
     before = spec_version()
     original_spec = SPEC.read_bytes()
-    log(f"round {n}: CLAUDE consolidating (spec v{before})")
+    log(f"round {n}: {actor} consolidating (spec v{before})")
+    # Keep the historical consolidation slot so old monitor IDs and resumes remain valid.
     logfile = LOG_DIR / f"r{n}-claude.log"
     with timed(n, "claude") as t:
-        res = run_claude("ANTHROPIC", consolidation_prompt(n, reviewers, converged, provenance), root, logfile, STEP_TIMEOUT)
-        t.note(reported=", ".join(res.get("_provenance", {}).get("reported") or []),
-               cost_usd=round(res.get("total_cost_usd", 0), 4), cost_basis="subscription-equivalent (claude.ai login)")
+        prompt = consolidation_prompt(n, reviewers, converged, provenance).replace("CLAUDE", actor)
+        if actor == "CHATGPT":
+            usage = run_consolidator_codex(prompt, root, logfile, STEP_TIMEOUT)
+            t.note(**codex_banner(logfile), actor=actor, usage=usage,
+                   cost_usd=(usage or {}).get("cost_usd"), cost_basis="subscription-equivalent estimate")
+            logfile.with_suffix(".provenance.json").write_text(json.dumps(
+                {"actor": actor, "requested": consolidator_config()["model"],
+                 "reported": codex_banner(logfile).get("model"), "verified": False,
+                 "note": "model from the Codex banner", "usage": usage}, indent=2))
+        else:
+            res = run_claude("ANTHROPIC", prompt, root, logfile, STEP_TIMEOUT)
+            t.note(reported=", ".join(res.get("_provenance", {}).get("reported") or []),
+                   cost_usd=round(res.get("total_cost_usd", 0), 4), cost_basis="subscription-equivalent (claude.ai login)")
     if not path.exists():
-        raise SystemExit(f"CLAUDE did not write {path}; see {logfile}")
+        raise SystemExit(f"{actor} did not write {path}; see {logfile}")
     if options:
         if SPEC.read_bytes() != original_spec:
-            raise SystemExit("CLAUDE changed the proposal before HUMAN selected an option")
+            raise SystemExit(f"{actor} changed the proposal before HUMAN selected an option")
         validate_option_consolidation(path)
     if not options and spec_version() == before:
-        raise SystemExit(f"CLAUDE did not bump the spec version (still v{before}); see {logfile}")
+        raise SystemExit(f"{actor} did not bump the spec version (still v{before}); see {logfile}")
     if not options and not converged and current_round() != n + 1:
-        raise SystemExit(f"CLAUDE did not move README to round {n + 1}; see {logfile}")
+        raise SystemExit(f"{actor} did not move README to round {n + 1}; see {logfile}")
     if lp.load(PROJECT):
         report = lp.validate(PROJECT)
         if not report["ok"]:
@@ -946,8 +976,8 @@ def do_consolidation(n: int, reviewers: list[str], converged: bool, root: Path,
     rel = list(rel_all)
     extra = unexpected_changes(root, expand_allowed(root, rel))
     if extra:
-        raise SystemExit(f"CLAUDE changed files outside the consolidation: {extra}")
-    commit_and_push(root, rel, f"CLAUDE: consolidate {NAME} round {n} into spec v{spec_version()}")
+        raise SystemExit(f"{actor} changed files outside the consolidation: {extra}")
+    commit_and_push(root, rel, f"{actor}: consolidate {NAME} round {n} into spec v{spec_version()}")
 
 
 def probe_write(root: Path, name: str, runner) -> None:
@@ -973,7 +1003,10 @@ def preflight(root: Path, reviewers: list[str], with_consolidator: bool) -> None
     tools = ["git"]
     if "CHATGPT" in reviewers:
         tools.append("codex")
-    if "DEEPSEEK" in reviewers or with_consolidator:
+    chatgpt_consolidator = with_consolidator and consolidator_config()["backend"] == "CHATGPT"
+    if "CHATGPT" in reviewers or chatgpt_consolidator:
+        tools.append("codex")
+    if "DEEPSEEK" in reviewers or (with_consolidator and not chatgpt_consolidator):
         tools.append("claude")
     if {"GROK", "CURSOR"} & set(reviewers):
         tools.append(CURSOR_AGENT_BIN)
@@ -992,7 +1025,10 @@ def preflight(root: Path, reviewers: list[str], with_consolidator: bool) -> None
     if "DEEPSEEK" in reviewers:
         log(f"DeepSeek key: {'found' if deepseek_key() else 'MISSING'}")
         probes.append(("DEEPSEEK", lambda: run_claude("DEEPSEEK", probe, root, LOG_DIR / "preflight-deepseek.log", 300)))
-    if with_consolidator:
+    if chatgpt_consolidator:
+        probes.append(("CHATGPT-CONSOLIDATOR", lambda: probe_write(
+            root, "CHATGPT-CONSOLIDATOR", lambda p, lf: run_consolidator_codex(p, root, lf, 300))))
+    elif with_consolidator:
         probes.append(("ANTHROPIC", lambda: run_claude("ANTHROPIC", probe, root, LOG_DIR / "preflight-claude.log", 300)))
     if "CHATGPT" in reviewers:
         probes.append(("CHATGPT", lambda: probe_write(root, "CHATGPT", lambda p, lf: run_codex(p, root, lf, 300))))

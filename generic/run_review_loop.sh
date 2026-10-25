@@ -55,7 +55,8 @@ for bin in git python3 codex claude "$CURSOR_AGENT_BIN"; do
   command -v "$bin" >/dev/null 2>&1 || { echo "missing binary: $bin" >&2; exit 1; }
 done
 [ -f "$LOOP" ] || { echo "not found: $LOOP" >&2; exit 1; }
-[ -d "$ANTHROPIC_CLAUDE_CONFIG_DIR" ] || { echo "Anthropic profile missing: $ANTHROPIC_CLAUDE_CONFIG_DIR (run: CLAUDE_CONFIG_DIR=$ANTHROPIC_CLAUDE_CONFIG_DIR claude, then /login)" >&2; exit 1; }
+CONSOLIDATOR_BACKEND="$(python3 -c 'import sys; from pathlib import Path; sys.path.insert(0, sys.argv[1]); import loop_project; print(loop_project.load(Path(sys.argv[2])).get("consolidator", {}).get("backend", "CLAUDE"))' "$REPO/generic" "$ROOT/$PROJECT")"
+[ "$CONSOLIDATOR_BACKEND" != "CLAUDE" ] || [ -d "$ANTHROPIC_CLAUDE_CONFIG_DIR" ] || { echo "Anthropic profile missing: $ANTHROPIC_CLAUDE_CONFIG_DIR (run: CLAUDE_CONFIG_DIR=$ANTHROPIC_CLAUDE_CONFIG_DIR claude, then /login)" >&2; exit 1; }
 
 # The loop script must already support the reviewers asked for (roadmap Phase 3 adds GROK).
 if [[ "$REVIEWERS" == *GROK* ]] && ! grep -q "run_cursor_agent" "$LOOP"; then

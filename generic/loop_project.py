@@ -57,6 +57,14 @@ def load(project: Path) -> dict:
             within(project, value)
             if key == 'consolidation_paths' and value in ('loop.json', 'workflow.json', 'decisions.md', 'AGENTS.md'):
                 raise ValueError(f'protected consolidation path: {value}')
+    cfg = data.get('consolidator', {'backend': 'CLAUDE'})
+    if not isinstance(cfg, dict) or cfg.get('backend') not in ('CLAUDE', 'CHATGPT'):
+        raise ValueError('consolidator backend must be CLAUDE or CHATGPT')
+    if cfg['backend'] == 'CHATGPT':
+        if not isinstance(cfg.get('model'), str) or not re.fullmatch(r'[A-Za-z0-9_.-]+', cfg['model']):
+            raise ValueError('CHATGPT consolidator requires a model identifier')
+        if cfg.get('effort') not in ('low', 'medium', 'high', 'xhigh', 'max'):
+            raise ValueError('CHATGPT consolidator requires a supported effort')
     return data
 
 
