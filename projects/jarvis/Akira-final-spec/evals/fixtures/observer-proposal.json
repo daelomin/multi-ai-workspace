@@ -1,4 +1,5 @@
 {
+  "schemaVersion": "1.0",
   "id": "prp_P12",
   "target": { "kind": "procedure", "id": "proc_WEEKLY_SCORECARD", "version": 3 },
   "diagnosis": "3 of 5 ratings on scorecard tasks cite 'scores without evidence links'; rework ratio 22% for this task class.",

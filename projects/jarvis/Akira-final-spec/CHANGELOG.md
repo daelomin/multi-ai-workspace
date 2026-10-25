@@ -1,5 +1,11 @@
 # Akira final specification review activity
 
+## 2026-10-25 — Round 1 consolidation
+
+Agent: CLAUDE
+
+Consolidated the three round-1 reviews (38 findings, all accepted; none rejected) into `reviews/round-1/CONSOLIDATION.md` and bumped `spec.md` to v0.4. Added AK-OPS-15..17 (recovery quarantine, append-only backup, guarded `bot.delete`), separated route availability from capability, split cost summaries by unit and provenance (new `coordination` category, corrected coverage/CPAT formulas), added task resume and attempt-outcome transitions, and added T-13..T-15 and F-16. Updated companion docs 02, 04, 05, 06, 08, 09, 10, 11, 12, 13 (U16), 15 and all fixtures in `evals/fixtures/`. `decisions.md` (AKIRA-D1–D6) was already applied; no change. Open HUMAN decisions U4–U16 carried forward. GROK's served model was unverified and is noted in the consolidation. README set to Round 2 on v0.4. No git commands run.
+
 ## 2026-10-25 — Round 1 specification review
 
 Agent: GROK

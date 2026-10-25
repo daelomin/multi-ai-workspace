@@ -1,4 +1,5 @@
 {
+  "schemaVersion": "1.0",
   "id": "task_T142",
   "title": "Fuel Atlas page v2",
   "requester": "bot_NATALIA",
@@ -24,12 +25,22 @@
     "estimate": { "effortHours": { "low": 2, "high": 4 }, "cost": { "low": 1.5, "high": 4.0, "currency": "USD" }, "confidence": 0.6, "basis": "2 similar publish tasks in the last 30 days" },
     "readiness": {
       "outcome": "ready",
-      "criteria": { "outcome": "pass", "scopeAndExclusions": "pass", "dependencies": "pass", "interfaces": "pass", "constraints": "pass", "boundedSubtasks": "pass", "acceptanceExamples": "pass", "independentValidation": "pass", "unknownsResolved": "pass" },
+      "criteria": {
+        "intendedOutcome": { "outcome": "pass", "evidence": ["ac1"] },
+        "scopeAndExclusions": { "outcome": "pass", "evidence": ["ac1", "ac2"] },
+        "dependencies": { "outcome": "pass", "evidence": ["art_dataset_1"] },
+        "interfaces": { "outcome": "pass", "evidence": ["art_dataset_1"] },
+        "constraints": { "outcome": "pass", "evidence": ["ac3"] },
+        "boundedSubtasks": { "outcome": "pass", "evidence": ["chk_T142_A1"] },
+        "acceptanceExamples": { "outcome": "pass", "evidence": ["ac2"] },
+        "independentValidation": { "outcome": "pass", "evidence": ["ac1", "ac2"] },
+        "unknownsResolved": { "outcome": "pass", "evidence": ["chk_T142_A1"] }
+      },
       "risks": []
     },
     "proposedRoutes": [
-      { "routeKey": "claude/sonnet-4.7", "meetsFloor": true, "estimatedCost": { "low": 1.2, "high": 2.4, "currency": "USD" }, "estimateBasis": "price table 2026-10-01", "support": "verified" },
-      { "routeKey": "deepseek/deepseek-chat", "meetsFloor": true, "estimatedCost": { "low": 0.3, "high": 0.7, "currency": "USD" }, "estimateBasis": "price table 2026-10-01", "support": "unknown", "note": "skills prompt-injected" }
+      { "routeKey": "claude/sonnet-4.7", "meetsFloor": true, "available": "available", "estimatedCost": { "low": 1.2, "high": 2.4, "currency": "USD" }, "costUnit": "subscription-equivalent", "estimateBasis": "price table 2026-10-01", "support": "verified" },
+      { "routeKey": "deepseek/deepseek-chat", "meetsFloor": false, "available": "available", "estimatedCost": { "low": 0.3, "high": 0.7, "currency": "USD" }, "costUnit": "price-table", "estimateBasis": "price table 2026-10-01", "support": "unknown", "note": "below floor: skills prompt-injected" }
     ],
     "decision": { "routeKey": "claude/sonnet-4.7", "reason": "native skill support for sheet-ops; cost difference small for this task class", "policyVersion": "balanced-2026.10" },
     "discovery": null,
@@ -49,9 +60,25 @@
   "reviewIds": ["rat_R77"],
   "attemptIds": ["att_T142_1", "att_T142_2", "att_T142_3"],
   "cost": {
-    "exclusive": { "amount": 3.12, "currency": "USD", "provenance": "mixed", "coverage": { "reported": 3, "estimated": 3, "unknown": 0 } },
-    "inclusive": { "amount": 3.50, "currency": "USD", "provenance": "mixed", "coverage": { "reported": 3, "estimated": 4, "unknown": 0 } },
-    "overhead": { "amount": 0.45, "currency": "USD", "provenance": "estimated", "coverage": { "reported": 2, "estimated": 1, "unknown": 0 } }
+    "exclusive": {
+      "schemaVersion": "1.0",
+      "subtotals": [{ "currency": "USD", "providerReported": 0.82, "priceTableEstimate": 0.46, "subscriptionEquivalent": 1.84 }],
+      "combinedEstimate": { "amount": 3.12, "currency": "USD", "label": "combined economic estimate, not spend" },
+      "coverage": { "reported": 3, "estimated": 2, "subscription": 1, "unknown": 0 }
+    },
+    "inclusive": {
+      "schemaVersion": "1.0",
+      "subtotals": [{ "currency": "USD", "providerReported": 0.82, "priceTableEstimate": 0.84, "subscriptionEquivalent": 1.84 }],
+      "combinedEstimate": { "amount": 3.50, "currency": "USD", "label": "combined economic estimate, not spend" },
+      "coverage": { "reported": 3, "estimated": 3, "subscription": 1, "unknown": 0 }
+    },
+    "overhead": {
+      "schemaVersion": "1.0",
+      "definition": "review + coordination + observer",
+      "subtotals": [{ "currency": "USD", "providerReported": 0.30, "priceTableEstimate": 0.15, "subscriptionEquivalent": null }],
+      "combinedEstimate": { "amount": 0.45, "currency": "USD", "label": "combined economic estimate, not spend" },
+      "coverage": { "reported": 2, "estimated": 1, "subscription": 0, "unknown": 0 }
+    }
   },
   "createdAt": "2026-10-24T14:02:11.000Z",
   "updatedAt": "2026-10-24T18:41:02.000Z",

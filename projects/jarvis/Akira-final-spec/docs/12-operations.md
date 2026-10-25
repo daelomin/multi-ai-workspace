@@ -1,6 +1,6 @@
 # 12 — Security, deployment, operations and recovery runbooks
 
-**Status:** draft v0.3 · **Normative:** `spec.md` §15, §17 · **Estimates and SLOs are proposals, not HUMAN-approved.**
+**Status:** draft v0.4 · **Normative:** `spec.md` §15, §17 · **Estimates and SLOs are proposals, not HUMAN-approved.**
 
 Nothing in this document authorizes execution against real data. Runbooks are written to
 be followed on a staging environment first; commands that delete anything are explicitly
@@ -92,8 +92,8 @@ non-destructive upgrade path, and no secrets in the artifact.
    candidate starts; retain and verify).
 2. Stop the service; run forward migrations; start; check health and a scripted smoke
    turn.
-3. If unhealthy: stop, restore the snapshot, restart the previous version; record the
-   incident and the failing migration.
+3. If unhealthy: stop, restore the snapshot, restart the previous version in recovery
+   quarantine (§5.3, AK-OPS-15); record the incident and the failing migration.
 4. Never run a downgrade without the matching database snapshot; schema rollback is
    not assumed.
 
@@ -110,7 +110,7 @@ non-destructive upgrade path, and no secrets in the artifact.
 | Client pairing tokens | auth store, hashed | scoped, expiring | revoke device |
 
 Rules: never in prompts/memory/artifacts/exports/logs; never in the repository; never in
-environment files that are world-readable; a suspected leak is an incident (§9.6).
+environment files that are world-readable; a suspected leak is an incident (§7.6).
 
 ---
 
@@ -138,13 +138,26 @@ Logs are optional and retained short; they are not part of restore correctness.
 systemctl --user stop akira-bot.service
 # Snapshot the database
 sqlite3 "$STATE/state.sqlite" "VACUUM INTO '/backup/state-$(date +%F).sqlite'"
-# Copy files with metadata; no overwrite of the source
-rsync -a --delete-after "$STATE"/{attachments,artifacts,memory}/ /backup/files/
+# Copy files into a fresh, uniquely named generation directory. No deletion flags:
+# the backup never removes anything from earlier generations.
+GEN="/backup/files/$(date +%FT%H%M%S)"
+mkdir "$GEN"   # fails if it already exists; never reuse a generation
+rsync -a "$STATE"/{attachments,artifacts,memory}/ "$GEN"/
 # Encrypt the backup set (separate key), then checksum and store off-host
 ```
 
 A backup is complete only when the manifest lists every item, the checksums verify, and a
 restore drill has passed within the last quarter.
+
+**Append-only rule (AKIRA-D2, AK-OPS-11).** Each run writes a new generation; earlier
+generations and dated database snapshots are preserved. Removing any generation is a
+separate operation that requires a HUMAN message naming the items (same rule as purge,
+§10). A source file that is absent in a later run (partial mount, interrupted restore,
+named purge) does not remove its copy from earlier generations.
+
+**Backup test (T-13).** On synthetic state: back up; remove a source file; back up again;
+assert the file is still present in the earlier generation and the second generation does
+not contain it.
 
 ### 5.3 Restore
 
@@ -153,8 +166,29 @@ restore drill has passed within the last quarter.
 systemctl --user stop akira-bot.service
 # Place the database and files, fix ownership/permissions (0600/0700)
 # Re-enter secrets, or decrypt the separately stored secret set
-# Start; verify health; run the restore checklist
+# Start in QUARANTINE (see below); verify health; run the restore checklist
+# Release quarantine only after the recovery-interval reconciliation completes
 ```
+
+**Recovery quarantine (AK-OPS-15).** A restored or rolled-back server (§3.4 step 3
+included) starts with autonomous dispatch, routines, outbound channel delivery and all
+external writes disabled. The original environment must be stopped or fenced (its
+credentials/webhooks revoked or pointed away) before the restored one is enabled, so two
+writers never act at once. Then:
+
+1. Record the recovery point (snapshot time) and the uncertain interval (snapshot time →
+   failure time).
+2. For every task that was `ready`, `running`, `blocked` or `awaiting_input` at the
+   recovery point, and every routine due in the interval, reconcile against preserved
+   post-snapshot evidence (original database/logs if recoverable) and external state
+   (read-back, idempotency lookup, channel history).
+3. A task whose prior effects cannot be established stays `blocked` for HUMAN
+   reconciliation; it is never replayed.
+4. Only then are dispatch, routines and outbound delivery released, per task, with the
+   release recorded.
+
+A restore drill keeps dispatch, routines and outbound writes disabled for its whole
+duration.
 
 **Restore checklist (must all pass):** bots and personas; rooms and memberships; tasks,
 attempts and checkpoints; memory files readable by the bot; skills present with support

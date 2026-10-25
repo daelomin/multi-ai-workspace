@@ -28,6 +28,7 @@ A reversible default is not an approval. When HUMAN answers, the answer is recor
 | U13 | What does "phone calls" need: outbound only, inbound, recording, transcription? | Outbound scripted; +inbound; +recording | Outbound first; recording requires policy config | No | Telephony adapter scope, cost, consent obligations |
 | U14 | How long may a task run before it needs a human checkpoint? | No limit; per-class deadline; spend-based | Deadlines optional per task; defaults proposed | No | Affects triage estimates, supervision and cost guards |
 | U15 | Should Akira adopt Akeru's analytics? | Off; anonymous counters on | Off | No | Privacy posture; no functional impact |
+| U16 | May route selection rank candidates across auth classes (API vs subscription) using a labelled API-equivalent comparison unit? (added v0.4, from review round 1) | Within one auth class only; cross-class ranking via the comparison unit; operator chooses | Off: rank within an auth class, cross-class choice is the operator's (`docs/09` §1.7) | No | Enabling it changes automatic route choice only; accounting and records are unchanged |
 
 ---
 

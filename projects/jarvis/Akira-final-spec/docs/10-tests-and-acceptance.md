@@ -1,6 +1,6 @@
 # 10 — Tests, acceptance scenarios and traceability
 
-**Status:** draft v0.3 · **Normative:** `spec.md` §18 and every requirement it references.
+**Status:** draft v0.4 · **Normative:** `spec.md` §18 and every requirement it references.
 **Nothing in this document has been executed.** It defines what must pass, with which
 fixtures and evidence, before a requirement is called done.
 
@@ -53,8 +53,10 @@ attempt without route provenance; a duplicate bot.
 after the first tool call. Observe the pause; answer "switch route" to an adequate
 alternate; resume.
 
-**Pass.** Attempt ends `failed_quota`; task status `paused`/`blocked` with a quota reason
-and options; no silent model downgrade; checkpoint exists; resume on the alternate route
+**Pass.** Attempt ends `failed_quota`; the exhausted route is recorded
+`meetsFloor: true, available: quota_exhausted` (not as a floor failure) and the task
+pauses rather than escalating; task status `paused`/`blocked` with a quota reason
+and options; `task.resume` moves `paused → ready` and a new attempt starts; no silent model downgrade; checkpoint exists; resume on the alternate route
 reconstructs plan/artifacts; a new attempt is recorded; cost of the failed attempt is
 visible.
 
@@ -115,8 +117,9 @@ repeated notifications.
 ### T-07 — Peer-disputed rating and correction
 
 **Steps.** Natalia rates Rajiv's task 3/5 for efficiency with a reason. Rajiv disputes with
-evidence that scope changed after the estimate. Resolve; then a second reviewer rates 5/5
-with an artifact.
+evidence that scope changed after the estimate. Natalia (the rating's author) attempts to
+resolve the dispute and is rejected; a third party or HUMAN resolves; then a second
+reviewer rates 5/5 with an artifact.
 
 **Pass.** Both rating revisions retained; disputed rating excluded from aggregates while
 open; dispute resolution records actor, evidence, outcome; reputation view shows sample
@@ -147,7 +150,15 @@ room, bot, route, team.
 
 **Pass.** Numbers equal the worked example within rounding; each record counted once
 exclusively; inclusive parent includes child exactly once; team total equals sum of
-exclusive records; reasoning tokens not added to output; coverage reports unknown.
+exclusive records; reasoning tokens not added to output; coverage reports unknown. The
+unit split of `docs/09` §4a is preserved (provider-reported $0.82 / price-table $0.46 /
+subscription-equivalent $1.84 exclusive) and no total is shown without it; every record
+has exactly one category; delivery $2.67 + overhead $0.45 = exclusive $3.12; exclusive +
+child = inclusive $3.50; the coverage buckets sum to the cost-bearing records; CPAT counts
+a multi-attempt accepted task once in the denominator; a late cache-token correction
+supersedes the effective snapshot without double counting tokens (including an
+unavailable-to-reported settlement); a pre-migration usage row keeps one valid category
+and counts once.
 
 **Fail signals.** Any total off by the child or overhead; duplicate settlement; hidden
 failed cost.
@@ -158,8 +169,10 @@ failed cost.
 execution: complexity flags, estimate range, readiness scoring, proposed routes.
 Run bounded discovery; re-triage with new evidence; choose a route.
 
-**Pass.** Triage record exists before dispatch; readiness `not-ready` disables the
-cheap-build path until gaps are assigned; discovery stays within budget; re-triage creates
+**Pass.** Triage record exists before dispatch; every `pass` readiness criterion carries
+an evidence link (a `pass` without one fails the test); readiness `not-ready` disables
+the cheap-build (specification-led) path until gaps are assigned, while a floor-meeting
+advanced route may proceed with the risks attached; discovery stays within budget; re-triage creates
 a new revision; route rationale visible; actual cost compared with the estimate after
 completion.
 
@@ -190,8 +203,51 @@ dispatched by a timer; all chats, memory and usage remain readable. The explicit
 requires named ids, a `destructive` scope, writes a backup first and is audited. Docker
 images are never touched by the application.
 
+Server-level check: a **direct `bot.delete` command** sent by a client is rejected unless
+it carries explicit ids, a verified backup, the `destructive` scope and an audit record
+(i.e. it is the `purge.request` path). A UI-less client with the command's scope cannot
+bypass the safeguards.
+
 **Fail signals.** Any automatic deletion; purge without backup/audit; cascade that removes
-chats or usage.
+chats or usage; a direct `bot.delete` accepted without the purge guards.
+
+### T-13 — Backup never removes earlier generations
+
+**Steps.** On synthetic state: run the backup (`docs/12` §5.2); remove a source file
+(simulating a named purge or a missing mount); run the backup again.
+
+**Pass.** The second run writes a new generation directory; the removed file is still
+present in the first generation; no deletion flag was used; manifests and checksums verify
+for both generations; removal of any generation requires a HUMAN-named operation.
+
+**Fail signals.** Reused destination directory; `--delete*` flags; an earlier copy missing.
+
+### T-14 — Restore into recovery quarantine does not replay effects
+
+**Steps.** Snapshot while a task is `ready`; then let the live stub system send a
+non-idempotent message and confirm it; restore the snapshot on a second environment
+(original fenced); start.
+
+**Pass.** The restored server starts with dispatch, routines, outbound delivery and
+external writes disabled; the recovery point and uncertain interval are recorded; the
+affected task is reconciled against preserved post-snapshot evidence or stays `blocked`
+for a HUMAN; no second message is sent; release from quarantine is recorded per task.
+
+**Fail signals.** Task dispatched on startup; second message; both environments writing;
+quarantine released without reconciliation.
+
+### T-15 — Skill catalogue completeness and availability gate
+
+**Steps.** Run each mandatory skill's fixture (`docs/15` §2) on its required route
+matrix; separately, register a conditional skill with no workflow-verified connector and a
+skill whose fixture is made to fail.
+
+**Pass.** Mandatory skills with passing fixtures are listed with per-route support and
+verification; the conditional skill and the failed-fixture skill are `deferred` and absent
+from `SKILLS.md` availability and the registry's available set.
+
+**Fail signals.** A conditional skill advertised before connector verification; a failed
+fixture advertised; browser automation substituted for the connector.
 
 ---
 
@@ -201,7 +257,7 @@ chats or usage.
 |---|---|---|---|---|
 | F-01 | 401/expired token | provider adapter probe | `auth_expired` | block, ask reconnect, no fallback by default |
 | F-02 | 429 with Retry-After | adapter | `rate_limited` | backoff, then infrastructure fallback if configured |
-| F-03 | 5xx mid-stream | adapter stream | `network`/`unknown` | never duplicate tool side effects; resume from checkpoint |
+| F-03 | 5xx mid-stream | adapter stream | `failed_network` only if no external action was dispatched; if any action is `dispatched`/`unknown`: `interrupted` or `failed_unknown`, not eligible for automatic fallback until reconciled | never duplicate tool side effects; resume from checkpoint; both sub-cases tested |
 | F-04 | Quota zero | adapter/probe | `quota_exhausted` | pause + options |
 | F-05 | Tool schema mismatch | adapter tool mapping | `tool_contract` | repair or reroute, one retry |
 | F-06 | Context overflow | provider | `context_overflow` | compaction, scope split |
@@ -214,6 +270,7 @@ chats or usage.
 | F-13 | Observer evaluation provider down | observer | `failed_network` | proposal stays `draft`; no activation |
 | F-14 | Concurrent task start | supervisor | invariant rejection | one active attempt |
 | F-15 | Clock skew / retention sweep | synthetic clock | no deletion | timer test proves absence |
+| F-16 | Restore of a snapshot older than a confirmed non-idempotent write | restore drill | n/a (recovery quarantine) | no second write; affected task `blocked` for HUMAN reconciliation unless the prior effect is established (T-14) |
 
 ---
 
@@ -228,7 +285,13 @@ chats or usage.
 | `evals/fixtures/observer-proposal.json` | proposal with evaluation and approvals |
 | `evals/fixtures/usage-record.json` | turn record with cache/reasoning and provenance |
 | `evals/fixtures/action-record.json` | unknown-outcome action with reconciliation |
-| `evals/fixtures/skill-package.json` | canonical skill with support matrix |
+| `evals/fixtures/skill-package.json` | canonical skill with support matrix (format example; its validation fixture is planned) |
+
+All fixtures carry `schemaVersion` (`docs/05` §7). Fixtures are validated for semantic
+invariants as well as JSON syntax: no route with `meetsFloor: true` below the required
+skill support; availability separate from capability; unit-split cost summaries whose
+subtotals sum to the combined estimate; readiness `pass` criteria with evidence;
+overhead equal to review + coordination + observer.
 
 Golden tasks for evals (synthetic, no customer data): a small coding task, a data
 extraction task, a research brief with citations, a review/challenge task, a triage
@@ -240,29 +303,34 @@ measure accepted outcome, rework and cost per route — not prose quality.
 ## 5. Traceability matrix
 
 Requirement groups map to suites; individual IDs are listed where behaviour differs.
-Every row is a release gate.
+Every row is a release gate. The Phase column uses the backlog numbering `P0`–`P10` of
+`docs/11-backlog.md`.
 
 | Requirements | Primary tests | Fault tests | Phase |
 |---|---|---|---|
-| AK-GOV-01..09 | decider/invariant tests, single-authority audit | F-08, F-14 | 1 |
-| AK-IDE-01..14 | T-01, T-05, template/instantiation contract tests | F-12 | 2 |
-| AK-UX-01..05 | declaration E2E, isolation test | — | 2 |
-| AK-RTE-01..16 | T-01, T-02, adapter contract, route provenance | F-01..F-05 | 3 |
-| AK-TRG-01..16 | T-02, T-10, eval calibration | F-04, F-06 | 4 |
-| AK-TSK-01..18 | T-03, T-11, state-machine property tests | F-08, F-10, F-11, F-14 | 3 |
-| AK-SKL-01..12 | T-04, per-route skill E2E | F-12 | 5 |
-| AK-COL-01..14 | room routing, T-06, anti-loop tests | F-09 | 6 |
-| AK-COL-03..07 (silence) | T-06, silence-policy table tests | F-07 | 6 |
-| AK-RAT-01..08 | T-07, aggregation invariants | — | 6 |
-| AK-OBS-01..08 | T-08, evaluation harness | F-13 | 7 |
-| AK-ACC-01..16 | T-09, ledger invariants, coverage tests | F-10 | 4 |
-| AK-SPC-01..12 | stub specialist E2E; live opt-in | F-08, F-09 | 8 |
-| AK-CON-01..12 | connector contract + health tests | F-08, F-09 | 8 |
-| AK-UX-06..22 | UI flow fixtures, accessibility checks | — | 9 |
-| AK-SEC-01..12 | security suite (injection, SSRF, scope, secrets) | F-01, F-11 | 9 |
-| AK-OPS-01..14 | T-11, restore drill, upgrade/rollback drill, alert test | F-11 | 10 |
-| AK-MIG (in AK-IDE-13/14, AK-OPS-12) | T-11 + migration rehearsal | — | 9 |
+| AK-GOV-01..09 | decider/invariant tests, single-authority audit | F-08, F-14 | P0–P2 |
+| AK-IDE-01..14 | T-01, T-05, template/instantiation contract tests | F-12 | P1 |
+| AK-UX-01..05 | declaration E2E, isolation test | — | P1 |
+| AK-RTE-01..16 | T-01, T-02, adapter contract, route provenance | F-01..F-05, F-03 external-effect guard | P3 |
+| AK-TRG-01..16 | T-02, T-10, eval calibration, availability-vs-floor test (T-02) | F-04, F-06 | P3 |
+| AK-TSK-01..18 | T-03, T-11, T-14, state-machine property tests (incl. resume/recovery transitions) | F-08, F-10, F-11, F-14, F-16 | P2 |
+| AK-SKL-01..12 | T-04, per-route skill E2E | F-12 | P4 |
+| AK-SKL-13..14 | T-04 plus catalogue tests (T-15): each mandatory skill's `docs/15` fixture passes on its required route matrix; negative tests: a skill whose fixture failed, or a conditional skill whose connector is not workflow-verified, is not advertised in `SKILLS.md` or the registry | F-12 | P4 (conditional skills: P8) |
+| AK-COL-01..14 | room routing, T-06, anti-loop tests | F-09 | P6 |
+| AK-COL-03..07 (silence) | T-06, silence-policy table tests (every code maps to an AK-COL-05 clause; a direct question cannot be silent) | F-07 | P6 |
+| AK-RAT-01..08 | T-07, aggregation invariants | — | P6 |
+| AK-OBS-01..08 | T-08, evaluation harness | F-13 | P6 |
+| AK-ACC-01..16 | T-09, ledger invariants, coverage tests, legacy-category migration test | F-10 | P5 (estimate/price-table slice: P2) |
+| AK-SPC-01..12 | stub specialist E2E; live opt-in | F-08, F-09 | P7 |
+| AK-CON-01..12 | connector contract + health tests | F-08, F-09 | P8 |
+| AK-UX-06..22 | UI flow fixtures, accessibility checks | — | P9 |
+| AK-SEC-01..12 | security suite (injection, SSRF, scope, secrets, S-11 export/restore audit) | F-01, F-11 | P10 |
+| AK-OPS-01..17 | T-11, T-12, T-13, T-14, restore drill, upgrade/rollback drill, alert test | F-11, F-16 | P10 (P0 for the deletion items) |
+| AK-MIG (in AK-IDE-13/14, AK-OPS-12) | T-11 + migration rehearsal | — | P9 |
 | AK-TST-01 | this document is the gate | — | all |
+
+Planned fixture directories under `evals/fixtures/skill-*/` are created with their skill
+in P4; until then they are planned, not present.
 
 ---
 
@@ -279,7 +347,8 @@ Every row is a release gate.
 | S-07 | Sandbox token lifetime | no refresh token in sandbox; access token expires |
 | S-08 | Privilege escalation via approval reuse | single-use, bound to call id |
 | S-09 | Log/analytics leakage | no prompt content, no ids beyond the allowed schema |
-| S-10 | Destructive command without scope/naming | rejected + audited |
+| S-10 | Destructive command without scope/naming (including a direct upstream `bot.delete`) | rejected + audited |
+| S-11 | Export and restore | each produces an audit record (actor, scopes/bundle id, destination, checksum, result); an export's destination and included scopes are visible |
 
 ---
 
@@ -287,11 +356,11 @@ Every row is a release gate.
 
 A release candidate is blocked unless:
 
-1. All T-01..T-12 pass with evidence on staging.
+1. All T-01..T-15 pass with evidence on staging.
 2. Requirement-level suites for the release's scope pass.
 3. Restore drill passed within the proposed RTO.
 4. Security suite passed; no open high severity.
-5. Fault matrix F-01..F-15 passed for the implemented paths.
+5. Fault matrix F-01..F-16 passed for the implemented paths.
 6. Migration rehearsal passed for a synthetic team of 10 bots/4 rooms.
 7. Changelog, compatibility matrix, known limitations and upstream revision recorded.
 8. AKIRA-D2 checks: no timer-based deletion; purge requires explicit naming.

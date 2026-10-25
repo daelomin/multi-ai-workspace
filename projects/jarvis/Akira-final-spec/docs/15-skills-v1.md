@@ -1,6 +1,6 @@
 # 15 — Akira v1 skill catalogue and `SKILLS.md`
 
-**Status:** draft v0.3 · **Normative:** `spec.md` AK-SKL-01..14 · **Schema:** `docs/04-data-model.md` §2.
+**Status:** draft v0.4 · **Normative:** `spec.md` AK-SKL-01..14 · **Schema:** `docs/04-data-model.md` §2.
 
 This document answers one question: **which skills ship in Akira v1, and what does
 `SKILLS.md` contain?**
@@ -51,7 +51,7 @@ available, prompt-injected otherwise).
 | # | Skill | Purpose | Triggers | Requires | Expected route support | Validation fixture |
 |---|---|---|---|---|---|---|
 | S1 | `task-plan` | Turn an intent into a bounded plan with acceptance criteria, validation per step, risks and open questions | any non-trivial task at triage | none (text) | all routes; text-only, so native or injected | `fixtures/skill-task-plan/`: intent with 3 constraints → ≤7 steps, each with a validation, no invented dependency |
-| S2 | `readiness-check` | Score a brief/spec against the 8 readiness criteria and return `ready` / `ready-with-risks` / `not-ready` with named gaps | before a specification-led handoff | none (text) | all routes | `fixtures/skill-readiness/`: deliberately incomplete brief → `not-ready` + the 3 missing criteria |
+| S2 | `readiness-check` | Score a brief/spec against the 9 readiness criteria (`docs/04` §4.3, each with an evidence link) and return `ready` / `ready-with-risks` / `not-ready` with named gaps | before a specification-led handoff | none (text) | all routes | `fixtures/skill-readiness/`: deliberately incomplete brief → `not-ready` + the 3 missing criteria |
 | S3 | `evidence-brief` | Answer a question as a cited brief: sources, confidence, contradictions, unanswered parts | research, "find out", "compare" | `web.fetch` | Claude/Codex/Grok native; DeepSeek/Kimi/OpenCode Go injected | `fixtures/skill-evidence/`: 3 synthetic sources incl. one contradiction → all cited, conflict flagged |
 | S4 | `challenge-review` | Produce a structured peer challenge: claim, evidence, objection, proposed test, severity | review, "challenge", "poke holes" | none (text) | all routes | `fixtures/skill-challenge/`: a flawed artifact → ≥1 major finding with evidence + test, no unsupported blocking |
 | S5 | `code-change` | Bounded repository change: read, plan, patch, run tests, checkpoint, report diff | code task assigned to an engineer bot | workspace read/write, shell, test runner | tool-capable routes only (T2 floor) | `fixtures/skill-code/`: failing test → patch passes, diff confined to target files, no secrets |
@@ -75,12 +75,12 @@ These are specified for v1 but must **not** be listed as available until the cor
 connector reaches workflow-verified status (`docs/07` §6). If a connector slips, the
 skill slips to v1.1 — it is not replaced by a browser-automation imitation.
 
-| # | Skill | Purpose | Requires | Validation fixture | Depends on |
-|---|---|---|---|---|---|
-| S11 | `sheet-ops` | Read a reviewed range, transform, write only a reviewed range, cite range and sheet id | Google Sheets connector + `sheet.read`/`sheet.write` | `fixtures/skill-sheet/` (existing example in `evals/fixtures/skill-package.json`) | Sheets connector (P8) |
-| S12 | `inbox-triage` | Classify inbox items, summarise threads, draft replies; send requires approval | Gmail connector (`gmail.readonly`, `gmail.compose`/`gmail.send`) | `fixtures/skill-inbox/`: 6 synthetic threads → correct labels, drafts, no send without approval | Gmail connector (P8) |
-| S13 | `calendar-plan` | Read events/free-busy, propose slots for a task; writes approval-gated | Calendar connector | `fixtures/skill-calendar/`: conflicting events → 2 viable slots, timezone correct | Calendar connector (P8) |
-| S14 | `release-checklist` | Verify release gates against repo, CI and issues; produce an evidence table | GitHub connector + CI access | `fixtures/skill-release/`: one red check → gate fails with the check linked | GitHub connector (P8) |
+| # | Skill | Purpose | Triggers | Requires | Expected route support | Validation fixture | Depends on |
+|---|---|---|---|---|---|---|---|
+| S11 | `sheet-ops` | Read a reviewed range, transform, write only a reviewed range, cite range and sheet id | "update the sheet", "read the range" | Google Sheets connector + `sheet.read`/`sheet.write` | tool-capable routes; `native-verified` on ≥1, others `prompt-injected` verified | `fixtures/skill-sheet/` (planned; `evals/fixtures/skill-package.json` is a format example only) | Sheets connector (P8) |
+| S12 | `inbox-triage` | Classify inbox items, summarise threads, draft replies; send requires approval | "triage my inbox", "draft replies" | Gmail connector (`gmail.readonly`, `gmail.compose`/`gmail.send`) | tool-capable routes, as S11 | `fixtures/skill-inbox/` (planned): 6 synthetic threads → correct labels, drafts, no send without approval | Gmail connector (P8) |
+| S13 | `calendar-plan` | Read events/free-busy, propose slots for a task; writes approval-gated | "find a slot", "schedule" | Calendar connector | tool-capable routes, as S11 | `fixtures/skill-calendar/` (planned): conflicting events → 2 viable slots, timezone correct | Calendar connector (P8) |
+| S14 | `release-checklist` | Verify release gates against repo, CI and issues; produce an evidence table | "release check", "are we ready to ship" | GitHub connector + CI access | tool-capable routes, as S11 | `fixtures/skill-release/` (planned): one red check → gate fails with the check linked | GitHub connector (P8) |
 
 Support for S11–S14 is connector-dependent, not route-dependent: they work on any route
 whose floor includes the connector's tools, with the skill's support level recorded per
@@ -108,10 +108,15 @@ The slice (`docs/11` §13) ships **two** skills:
 
 - **S1 `task-plan`** — proves the skill pipeline end-to-end on a text-only skill across
   all four routes without depending on a connector.
-- **S11 `sheet-ops`** — proves native execution and resource access on Claude, plus the
-  `prompt-injected` path on DeepSeek, using the existing fixture.
+- **S8 `data-extract`** — a connector-free skill that carries a `references/` file;
+  proves native execution and resource access on Claude, plus the `prompt-injected` path
+  on DeepSeek, with its own planned fixture (`fixtures/skill-data/`, created in the slice).
 
-The rest of the catalogue follows in P4 once the registry and adapters are in place.
+`sheet-ops` (S11) is **not** in the slice: it needs the Google Sheets connector (P8), and
+AK-SKL-14 forbids listing it before that connector is workflow-verified. The existing
+`evals/fixtures/skill-package.json` is a schema example for the package format only; its
+validation fixture is a planned Phase 4 placeholder. The rest of the catalogue follows in
+P4 once the registry and adapters are in place.
 
 ---
 

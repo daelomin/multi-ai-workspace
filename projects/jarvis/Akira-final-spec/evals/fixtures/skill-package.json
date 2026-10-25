@@ -1,4 +1,5 @@
 {
+  "schemaVersion": "1.0",
   "id": "skl_SHEET_OPS",
   "name": "sheet-ops",
   "version": "1.3.0",
@@ -20,8 +21,9 @@
     "runtime": []
   },
   "validation": {
-    "command": "akira skill verify sheet-ops --fixture evals/fixtures/sheet-fixture.json",
-    "fixture": "evals/fixtures/sheet-fixture.json",
+    "command": "akira skill verify sheet-ops --fixture fixtures/skill-sheet/sheet-fixture.json",
+    "fixture": "fixtures/skill-sheet/sheet-fixture.json",
+    "fixtureStatus": "planned (Phase 4 placeholder; not present in this draft)",
     "expected": "reads range A1:C20, writes B2, cites range, exits 0"
   },
   "provenance": "authored",
@@ -35,6 +37,7 @@
     "opencode-go/default": "prompt-injected"
   },
   "supportEvidence": [
-    { "routeKey": "claude/sonnet-4.7", "verifiedAt": "2026-10-24T17:40:00.000Z", "model": "sonnet-4.7", "evidence": "skill transcript: read A1:C20, wrote B2, cited range" }
+    { "routeKey": "claude/sonnet-4.7", "verified": true, "verifiedAt": "2026-10-24T17:40:00.000Z", "model": "sonnet-4.7", "evidence": "skill transcript: read A1:C20, wrote B2, cited range" },
+    { "routeKey": "deepseek/deepseek-chat", "verified": false, "note": "prompt-injected; no injection test run yet (unverified)" }
   ]
 }

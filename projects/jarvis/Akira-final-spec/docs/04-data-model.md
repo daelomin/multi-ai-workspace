@@ -1,6 +1,6 @@
 # 04 — Canonical data model, state machines and records
 
-**Status:** draft v0.3 · **Normative:** `spec.md` §5–§12 · **Representative JSON:** `evals/fixtures/`.
+**Status:** draft v0.4 · **Normative:** `spec.md` §5–§12 · **Representative JSON:** `evals/fixtures/`.
 
 ---
 
@@ -208,7 +208,13 @@ Attempt {
 RouteDecision {
   id: rtd_…; taskId: task_…; attemptNumber?;
   taskClass: string; capabilityFloor: CapabilityFloor;
-  candidates: { routeKey: string; meetsFloor: boolean; estimatedCost: MoneyRange;
+  schemaVersion: string;                // contract version (docs/05 §7)
+  candidates: { routeKey: string;
+                meetsFloor: boolean;     // capability only: tools, context, skill support >= requiredSkillSupport,
+                                         // reliability. Never cleared by quota/auth/availability.
+                available: "available"|"quota_exhausted"|"auth"|"rate_limited"|"unknown";
+                availabilitySource?: string;   // e.g. provider meter, last error, timestamp
+                estimatedCost: MoneyRange; costUnit: "provider-charge"|"price-table"|"subscription-equivalent";
                 estimateBasis: string; support: "verified"|"assumed"|"unknown"; note?: string }[];
   chosen: { routeKey: string; reason: string; alternativesRejected: string[] };
   fallbackPolicy: "none" | "infrastructure-only" | "always-adequate";  // default infrastructure-only
@@ -240,12 +246,21 @@ TaskCheckpoint {
 | From | Event | To | Guard |
 |---|---|---|---|
 | proposed | accept | triaged | acceptance criteria exist |
-| triaged | route selected | ready | readiness ≠ not-ready OR assessment override recorded |
-| ready | attempt dispatched | running | route meets floor; compatibility check passed |
+| triaged | route selected | ready | route meets floor; if readiness is `not-ready`, the route must not be specification-led/below-floor (an advanced route that meets the floor may proceed with the risks attached) |
+| ready | attempt dispatched (`task.start`) | running | route meets floor **and** is available; compatibility check passed |
 | running | needs input | awaiting_input | open question created |
 | running | dependency/external block | blocked | blocker recorded with owner |
 | running | pause (human or policy) | paused | reason |
-| running | attempt ended | review | artifacts + acceptance evidence |
+| awaiting_input | question answered | ready | answer recorded; checkpoint refreshed; route check re-run |
+| blocked | blocker resolved | ready | blocker reference closed; unresolved-action check passed; route check re-run |
+| paused | explicit resume (`task.resume`) | ready | reason recorded; quota-paused tasks need an available adequate route or an operator choice; new checkpoint created |
+| running | attempt ended `completed` | review | artifacts + acceptance evidence |
+| running | attempt ended `failed_rate_limit`/`failed_network` (no dispatched external action) | ready | infrastructure fallback permitted by policy and the alternate route meets the floor; otherwise `blocked` |
+| running | attempt ended `failed_quota` | paused | quota reason and recommended action; no fallback |
+| running | attempt ended `failed_capability`/`failed_tool_contract`/`failed_context_overflow`/`failed_safety_block` | triaged | re-triage required; no automatic fallback |
+| running | attempt ended `failed_auth` | blocked | repair action: reconnect or switch account |
+| running | attempt ended `failed_unknown`/`interrupted` | blocked or awaiting_input | resumable checkpoint written; any `dispatched`/`unknown` action reconciled first |
+| running | attempt ended `cancelled` | ready, paused or cancelled | as chosen by the canceller; reason recorded |
 | review | accepted | done | all criteria met or waived with reason |
 | review | rework requested | ready | new attempt planned, reason recorded |
 | review | rejected | failed | reason; reopenable |
@@ -266,19 +281,35 @@ Mapping to route policy: only `failed_rate_limit` and `failed_network` are eligi
 automatic infrastructure fallback by default. `failed_quota` pauses and asks. Capability,
 tool-contract and safety failures never fall back automatically; they re-triage.
 
+**External-effect guard.** `failed_network` is reserved for failures with no dispatched
+external action (DNS/TLS/timeout before acceptance, or a transport failure before any tool
+request left). If the attempt dispatched any external action (ledger state `dispatched` or
+`unknown`), the outcome is `interrupted` or `failed_unknown`, regardless of the transport
+symptom (e.g. a 5xx mid-stream after a tool request was sent), and it is ineligible for
+automatic fallback until the action is reconciled (§4.4).
+
+**Availability is not adequacy.** A quota-exhausted, auth-blocked or rate-limited route is
+recorded `meetsFloor: true` with `available` set accordingly; the task pauses (or falls
+back only for infrastructure classes). It is never escalated or re-triaged because of
+availability alone.
+
 ### 4.3 Readiness
 
 ```
 ReadinessResult {
   outcome: "ready" | "ready-with-risks" | "not-ready";
-  criteria: {
-    outcome: pass|fail|partial; scopeAndExclusions: …; dependencies: …; interfaces: …;
-    constraints: …; boundedSubtasks: …; acceptanceExamples: …; independentValidation: …;
-    unknownsResolved: …
+  criteria: {                       // nine named criteria; every one is an EvidencedCriterion
+    intendedOutcome, scopeAndExclusions, dependencies, interfaces,
+    constraints, boundedSubtasks, acceptanceExamples, independentValidation,
+    unknownsResolved: EvidencedCriterion
   };
   risks: { statement; mitigation; acceptedBy? }[];
 }
+EvidencedCriterion { outcome: "pass"|"fail"|"partial"; evidence: Link[]; note?: string }
 ```
+
+A `pass` with an empty `evidence` list is invalid and fails T-10. AK-TRG-06's list is the
+nine criteria above ("dependencies" and "interfaces" are separate criteria).
 
 A `not-ready` result blocks only the *specification-led downgrade* path (cheap implementer
 from the document). It does not block an advanced model from doing the work.
@@ -327,7 +358,9 @@ UsageRecord {
   attribution: { botId?; taskId?; attemptId?; roomId?; threadId?; turnId?;
                  parentTaskId?; parentUsageId? };
   route: { harness; driver; provider; model; instanceId; accountLabel? };
-  category: "turn"|"tool"|"delegation"|"routine"|"review"|"observer"|"media"|"other";
+  schemaVersion: string;
+  category: "turn"|"tool"|"delegation"|"routine"|"review"|"coordination"|"observer"|"media"|"other";
+                // overhead = review|coordination|observer; delivery = all others (docs/09 §3)
   measurement: "provider-reported"|"estimated"|"subscription-equivalent"|"unknown";
   tokens?: { uncachedInput: integer|null; cachedInput: integer|null;
              cacheCreation: integer|null; output: integer|null;
@@ -343,11 +376,21 @@ UsageRecord {
 **Cost summary** (derived, never stored as truth):
 
 ```ts
-CostSummary { amount: Money | null; currency: string;
-              provenance: "provider-reported"|"estimated"|"subscription-equivalent"|"mixed"|"unknown";
-              coverage: { reported: integer; estimated: integer; unknown: integer };
-              byCategory: Record<category, Money|null> }
+CostSummary { schemaVersion: string;
+              subtotals: { currency: string;
+                           providerReported: Money | null;
+                           priceTableEstimate: Money | null;
+                           subscriptionEquivalent: Money | null }[];   // one row per currency; never merged
+              combinedEstimate?: { amount: Money; currency: string; label: "combined economic estimate, not spend" };
+              coverage: { reported: integer; estimated: integer; subscription: integer; unknown: integer };
+              byCategory: Record<category, { amount: Money|null; provenance: CostProvenance|"mixed" }> }
 ```
+
+The subtotals are authoritative; `combinedEstimate` is optional, labelled, and must be
+shown with its subtotals. `coverage` counts cost-bearing records per bucket and the
+buckets sum to the cost-bearing records. A correction record is a superseding effective
+snapshot of all token and cost fields now known; queries take the effective revision once
+per logical usage record (`docs/09-accounting.md` §7).
 
 **Non-token costs** use the same table with `units`, so telephony minutes, template
 messages, image renders and sandbox time are attributed without pretending to be tokens.
@@ -372,7 +415,11 @@ messages, image renders and sandbox time are attributed without pretending to be
   `parent_entry_id`, `instance_id`, `account_label`, `measurement`, `currency`,
   `amount_minor`, `price_table_version`, `units_kind`, `units_count`, `supersedes_id`.
   Existing rows remain valid with nulls, preserving the `UNIQUE(bot_id, source_key)`
-  semantics for old writers.
+  semantics for old writers. Legacy `category` values are mapped by the deterministic
+  table in `docs/09-accounting.md` §3 (delegated→delegation, reflector→observer,
+  extraction/recall→other, unknown→other with the original value kept in `notes`); a
+  migration test asserts each pre-migration row keeps one valid category and is counted
+  once in exclusive totals.
 - `bots` projection gains `template_ref`, `persona_revision_id`, `lifecycle`,
   `policy_json`; a backfill creates a default persona revision from name/description and
   the saved tone, marked `imported` (not `authored`).
@@ -394,7 +441,8 @@ messages, image renders and sandbox time are attributed without pretending to be
 5. A usage record's parent chain is acyclic; a child has exactly one parent.
 6. A rating's reviewer is not the rated bot; the rated task is `review`/`done`.
 7. A proposal cannot be `accepted` without an `evaluated` result and an approver distinct
-   from the observer.
+   from the observer. A rating dispute is resolved by an actor distinct from both the
+   rating's author and the disputant (or a HUMAN); the resolver is recorded.
 8. A persona revision cannot be `active` for two instances at once if it is instance-scoped;
    template-scoped revisions are shared read-only.
 9. Archived bots cannot receive new tasks; restoring does not resume routines

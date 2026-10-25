@@ -1,6 +1,6 @@
 # 05 — Interface and API contracts
 
-**Status:** draft v0.3 · **Normative:** `spec.md` §6–§9 · **Schema detail:** `docs/04-data-model.md`
+**Status:** draft v0.4 · **Normative:** `spec.md` §6–§9 · **Schema detail:** `docs/04-data-model.md`
 
 Akira extends Akeru's typed WebSocket RPC and orchestration command set. It does not add
 an HTTP API for internal operations, and it does not let adapters call each other. The
@@ -60,7 +60,7 @@ receipt and dispatches nothing. All queries are projections and never mutate.
 |---|---|---|
 | `rating.submit` | rate a task outcome | reviewer ≠ rated bot; evidence required for extremes |
 | `rating.dispute` | contest a rating | evidence; aggregate exclusion |
-| `rating.resolve` | resolve a dispute | authorized reviewer; both versions retained |
+| `rating.resolve` | resolve a dispute | resolver distinct from rating author and disputant (or HUMAN); resolver recorded; both versions retained |
 | `observer.propose` | publish a proposal | target + evidence + expected benefit |
 | `observer.evaluate` | attach evaluation results | held-out/shadow evidence; cost recorded |
 | `observer.activate` | apply an accepted proposal | approver ≠ observer; version bump; rollback point |
@@ -71,11 +71,12 @@ receipt and dispatches nothing. All queries are projections and never mutate.
 | Command | Purpose | Key guards |
 |---|---|---|
 | `usage.query` | bot/task/room/route/account roll-ups | exclusive vs inclusive explicit |
-| `export.create` | full-team bundle | async; includes allowed scopes; no plaintext secrets |
+| `export.create` | full-team bundle | async; includes allowed scopes; no plaintext secrets; audited (actor, scopes, bundle id, destination, checksum, result) |
 | `export.verify` | validate a bundle | schema + checksum + restore dry-run |
-| `restore.apply` | restore into an environment | empty/dedicated target only; project mapping |
+| `restore.apply` | restore into an environment | empty/dedicated target only; project mapping; starts in recovery quarantine (AK-OPS-15); audited (actor, bundle id, target, checksum, result) |
 | `retention.set` | archive policy (never auto-delete) | no destructive option |
 | `purge.request` | permanent removal of named items | explicit ids; backup first; `destructive` scope; audit |
+| `bot.delete` (upstream, guarded) | Akeru's hard-delete decider command | **not callable directly in Akira**: the decider rejects it unless it is issued through `purge.request` guards (explicit ids, verified backup, `destructive` scope, audit record). It is never reachable from a timer, retention sweep or UI path |
 | `health.report` | server/provider/connector/backup status | read-only |
 
 ---
@@ -155,6 +156,15 @@ interface SkillAdapter {
 the skill's validation fixture and confirm resource access; a support level without a
 matching `verify` evidence record is downgraded to `*-unverified`. Projection is
 idempotent and content-hashed, so re-projecting does not duplicate or mutate.
+
+**Verification is orthogonal to mechanism.** Each per-route support entry carries the
+support level (the mechanism: native, projected, prompt-injected, unsupported) and a
+`verified` flag backed by a `supportEvidence` record (route, model, date, evidence). The
+flag applies to every mechanism, including `prompt-injected`: a prompt-injected route
+with no evidence record is rendered "prompt-injected (unverified)" and counts as
+unverified for the floor and for `SKILLS.md`. The downgrade rule is total: no evidence
+record → unverified, whatever the mechanism. `native-verified` remains the only level
+that satisfies a `native-verified` floor.
 
 ---
 

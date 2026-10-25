@@ -1,6 +1,6 @@
 # 08 — Collaboration, silence, ratings, observer and inspectable records
 
-**Status:** draft v0.3 · **Normative:** `spec.md` §10, §11, §15 · **Schema:** `docs/04-data-model.md`.
+**Status:** draft v0.4 · **Normative:** `spec.md` §10, §11, §15 · **Schema:** `docs/04-data-model.md`.
 
 ---
 
@@ -44,9 +44,11 @@ derived; the truth is the task/message/decision records.
 
 ### 2.3 Routing rules
 
-- `mention`: a message with `@bot` goes to that bot; multiple mentions → the named order,
-  last wins only if configured (Akeru's default), otherwise first-listed wins.
-- `lead-bot`: the room's lead answers; other bots may be pulled in by the lead.
+- `mention` (**the default rule for new rooms**): a message with `@bot` goes to that bot;
+  multiple mentions → the first-listed wins, unless the room is configured last-wins.
+- `lead-bot`: the room's lead answers every message; other bots may be pulled in by the
+  lead. This is Akeru's "boss answers, last mention wins" behaviour; it is applied to
+  migrated Akeru groups by configuration, not as the universal default.
 - `round-robin`: balanced assignment across eligible bots.
 - `assigned`: only the assigned bot answers; others may comment on board items.
 
@@ -86,8 +88,12 @@ any evidence (what was checked), then emits nothing to the room.
 | `duplicate` | same content/topic within the dedupe window | dedupe key matches |
 | `waiting_dependency` | bot is blocked and has nothing actionable | blocker recorded on a task |
 | `quiet_hours` | room policy | policy in force |
-| `policy_hold` | room rule says only lead/assigned bots speak | rule matches |
-| `no_evidence` | bot would have to speculate | it says so internally, not in chat |
+| `policy_hold` | room rule says only lead/assigned bots speak (the "explicit room rule" clause of AK-COL-05) | rule matches |
+| `no_evidence` | bot is **not addressed** and would have to speculate (the "not addressed and no evidence to add" clause of AK-COL-05) | guard: rejected if the bot was directly addressed (mention, assignment or direct question); it says so internally, not in chat |
+
+Every code maps to exactly one AK-COL-05 clause; the closed set here and the normative
+list are identical. A policy-table test enforces the mapping and that a direct question
+cannot be answered with silence.
 
 A reason not in this set is a schema error, not a free-text excuse. Every silent turn
 still writes an audit record (what it read, what it checked, what it spent).
@@ -216,9 +222,14 @@ Rating {
 |---|---|---|---|
 | Resolution | did not address the issue | partially, workaround needed | fully, no workaround |
 | Quality | wrong/unsafe/unusable | usable with fixes | correct, clear, ready |
-| Rework | major rewrite | minor fixes | none |
 | Efficiency | far over estimate/effort | near estimate | better than expected |
 | Handoff | no context, hard to continue | adequate | excellent, resumable |
+
+**Rework is not on the 1–5 scale.** It is the three-value enum `none | minor | major`
+(§5.1), reported as a count per bot/task class. Reputation formulas average only the
+numeric criteria (resolution, quality, efficiency, handoff); where a formula needs a
+number for rework it uses a single documented one-way mapping (`none`=0, `minor`=1,
+`major`=2 rework events) and never mixes the enum into the mean.
 
 ### 5.3 Aggregation options (no HUMAN-approved weights)
 
@@ -240,8 +251,9 @@ declined/blocked tasks are visible (hiding hard work is not neutral).
 - A dispute names the criterion, the claim, and evidence.
 - Disputed ratings are excluded from aggregates until resolved; both versions remain
   visible.
-- Resolution requires a reviewer other than the disputant; the outcome is recorded with
-  reasons.
+- Resolution requires a resolver distinct from **both** the rating's author and the
+  disputant (or a HUMAN); the resolver and the outcome are recorded with reasons. The
+  rating's author cannot resolve a dispute about their own rating.
 - A pattern of upheld disputes against one reviewer downgrades that reviewer's weight.
 
 ### 5.5 Anti-gaming checklist

@@ -1,7 +1,7 @@
 # Akira — production specification
 
 **Document ID:** AKIRA-SPEC-001
-**Version:** 0.3 (v0.2 recorded HUMAN decisions AKIRA-D4–D6; v0.3 adds the v1 skill catalogue)
+**Version:** 0.4 (v0.2 recorded HUMAN decisions AKIRA-D4–D6; v0.3 added the v1 skill catalogue; v0.4 consolidates review round 1: append-only backup, guarded hard delete, recovery quarantine, availability vs capability, unit-separated accounting, task recovery transitions)
 **Date:** 2026-10-25
 **Status:** draft, not approved, not implemented
 **Base:** Akeru Bot `opencoredev/akeru-bot` at `524eb68a293c4b6a38acf722ab4232cfe5e22625` (2026-10-23T21:06:41Z)
@@ -22,10 +22,10 @@ and the acceptance criteria that close them.
 recorded decision deviates. MAY is optional. Every requirement has an ID used by the
 traceability matrix (`docs/10-tests-and-acceptance.md`).
 
-**Status per requirement.** All 204 requirements are *specified* in this draft: design,
+**Status per requirement.** All 209 requirements are *specified* in this draft: design,
 acceptance reference and owner exist. Where a requirement depends on a reversible
 assumption it cites it (A1–A10, §3.3); where it depends on a HUMAN answer it cites a
-register ID (`docs/13-open-decisions.md`, U1–U15). No requirement is *verified*: nothing
+register ID (`docs/13-open-decisions.md`, U1–U16). No requirement is *verified*: nothing
 was executed, and `docs/14-evidence-log.md` records what remains unproven.
 
 **Evidence labels.** Used throughout the companion documents and, where a claim drives a
@@ -497,12 +497,19 @@ automatic fallback only for classified infrastructure failures (rate limit, tran
 transport) when the alternate route meets the capability floor; **no** automatic
 fallback for capability gaps, safety blocks, unknown failures or exhausted credits unless
 the policy explicitly says so (MUST). A fallback that lowers capability below the floor
-is a policy violation, not a convenience.
+is a policy violation, not a convenience. A failure after an external action was
+dispatched (ledger state `dispatched` or `unknown`) — for example a 5xx after a tool
+request was sent — is `interrupted` or `failed_unknown`, never `failed_network`, and is
+ineligible for automatic fallback until the action is reconciled (MUST; AK-TSK-11).
 
 **AK-RTE-13.** Credit exhaustion MUST be a distinct terminal condition for the attempt:
 the task pauses with a monetary/quota reason and a recommended action (wait, switch
 account, switch route, escalate). It MUST NOT silently become a cheaper model (MUST).
 If no adequate route is available, the task blocks and asks, rather than degrading.
+Route candidates MUST record capability (`meetsFloor`) and availability (`available`,
+`quota_exhausted`, `auth`, `rate_limited`, `unknown`) as separate fields: quota, auth or
+rate state never clears or sets `meetsFloor`, and a route below the task's required skill
+support is `meetsFloor: false` however available it is (MUST).
 
 **AK-RTE-14.** Before a turn is dispatched on a new route, Akira MUST run a compatibility
 check: context budget, tool dialect, required skills present and executable, required
@@ -581,6 +588,8 @@ following are evidenced, not asserted: intended outcome; scope and exclusions;
 dependencies and interfaces; constraints; bounded subtasks and handoff boundaries;
 acceptance examples; independent validation method; unknowns either resolved or
 explicitly assigned to a named decision-maker (MUST). A long document is not evidence.
+These are nine named criteria (`dependencies` and `interfaces` are separate), each
+carrying an evidence link; a `pass` with no evidence link is invalid.
 
 **AK-TRG-07.** Readiness MUST be a scored checklist with per-criterion evidence links,
 returning `ready`, `ready-with-risks` (named risks accepted by policy or HUMAN) or
@@ -599,7 +608,11 @@ dialect it uses (MUST). Floors are configuration with an evidence record, not pr
 
 **AK-TRG-10.** Among routes that meet the floor, selection SHOULD prefer the lowest
 expected total delivery cost (including retries, review and rework), then latency.
-Below-floor routes MUST NOT be selected for cost reasons (MUST).
+Below-floor routes MUST NOT be selected for cost reasons (MUST). Cost ranking MUST
+compare like with like: within one auth class by default; ranking across auth classes
+uses a single labelled routing comparison unit (the API-equivalent price-table estimate,
+displayed as "routing comparison, not spend") and only when the routing policy enables
+it, otherwise the operator chooses (MUST; `docs/09-accounting.md` §1.7).
 
 **AK-TRG-11.** Adequacy estimates MUST be empirical: per-route, per-task-class accepted
 outcome rates with sample size and recency, derived from task ratings and rework
@@ -642,7 +655,13 @@ Schemas and state machines: `docs/04-data-model.md` §5–§8. Contracts:
 **AK-TSK-01.** A task MUST be an orchestration aggregate with a stable id and a state
 machine: `proposed → triaged → ready → running → (awaiting_input | blocked | paused) →
 review → done | failed | cancelled`; `reopened` is allowed from terminal states with a
-recorded reason (MUST). Transitions are events; projections are derived.
+recorded reason (MUST). Transitions are events; projections are derived. The canonical
+transition table (`docs/04-data-model.md` §4.1) MUST define every recovery edge:
+`awaiting_input`, `blocked` and `paused` each return to `ready` through a named event
+(answer recorded, blocker resolved, `task.resume`), and each attempt-outcome class has a
+defined next state (quota → `paused`; capability/tool-contract/safety → re-triage;
+interrupted/unknown → `blocked` or `awaiting_input` after reconciliation). A `not-ready`
+readiness result blocks only specification-led or below-floor routes (AK-TRG-07).
 
 **AK-TSK-02.** A task MUST carry: requester, assignee bot, acceptance criteria, route
 decision reference, priority, deadline (optional), dependencies, artifacts, review
@@ -756,7 +775,10 @@ provenance (authored, vendored, imported), and a license (MUST).
 **AK-SKL-04.** The registry MUST materialise skills per route through adapters with four
 operations: discover, register/project, can-execute, execute-and-verify (MUST). A route's
 support level MUST be one of: `native-verified`, `native-unverified`,
-`projected-unverified`, `prompt-injected`, `unsupported`.
+`projected-unverified`, `prompt-injected`, `unsupported`. Verification is orthogonal to
+the mechanism: every per-route entry carries a `verified` flag backed by an evidence
+record, including for `prompt-injected`; an entry without an evidence record is
+unverified whatever its mechanism (MUST; `docs/05-interfaces.md` §3).
 
 **AK-SKL-05.** `native-verified` requires an end-to-end execution on that route,
 including access to at least one supporting resource file, recorded with route, model,
@@ -818,9 +840,11 @@ roles and explicit routing rules.
 
 **AK-COL-02.** Message routing MUST be deterministic and explainable: a direct mention
 addresses one bot; a room rule (round-robin, lead, or explicit assignment) decides who
-answers when nobody is mentioned; the rule is visible in the room (MUST). Akeru's
-"boss answers every message, last mention wins" is retained only as the default rule
-configuration.
+answers when nobody is mentioned; the rule is visible in the room (MUST). The default
+rule for a new room is `mention` (multiple mentions: first-listed wins unless the room is
+configured last-wins; an unaddressed message goes to the lead or to no one, never
+broadcast). Akeru's "boss answers every message, last mention wins" is retained as the
+`lead-bot` rule configuration and applied to migrated Akeru groups.
 
 **AK-COL-03.** Bots MUST be able to act quietly: work on a task, update a board item and
 leave the conversation untouched (MUST).
@@ -835,7 +859,10 @@ new work and adds no information; the point is already answered by a newer messa
 another bot; the bot is waiting on a dependency and has nothing actionable; the bot is
 not addressed and has no evidence to add; the message is a duplicate within the dedupe
 window; quiet hours or an explicit room rule applies (MUST). The policy is data, not
-improvisation.
+improvisation. The silence reason codes in `docs/08-collaboration-and-accountability.md`
+§3.2 form a closed set that maps one-to-one onto these clauses (`no_evidence` is the
+"not addressed" clause; `policy_hold` is the explicit-room-rule clause); a directly
+addressed bot cannot be silent on a direct question.
 
 **AK-COL-06.** A silent turn MUST still journal what the bot did or checked, any spend,
 and why it stayed silent, visible to an operator and not to the room by default
@@ -903,7 +930,8 @@ from ratings, never edited directly.
 
 **AK-RAT-05.** A contested rating MUST be disputable: the rated bot or a HUMAN can open a
 dispute with evidence; disputed ratings are excluded from aggregates until resolved, and
-both positions remain visible (MUST).
+both positions remain visible (MUST). The resolver MUST be distinct from both the
+rating's author and the disputant (or a HUMAN) and is recorded (MUST).
 
 **AK-RAT-06.** Ratings without evidence (U6) (no artifact link, no acceptance-criteria
 reference) MUST be flagged low-confidence and MUST NOT move reputation beyond a bounded
@@ -967,7 +995,10 @@ base; Akira extends its dimensions.
 
 **AK-ACC-02.** Dimensions MUST include: bot, task, attempt, thread/room, route
 (harness/driver/provider/model/account instance), category (turn, tool, delegation,
-routine, review, observer, embed/recall, other), and parent-child linkage (MUST).
+routine, review, coordination, observer, media, other), and parent-child linkage (MUST).
+Akeru's legacy categories (`delegated`, `reflector`, `extraction`, `recall`) map
+deterministically onto this set at migration, keeping the original value
+(`docs/09-accounting.md` §3). Each record has exactly one category.
 Attribution to a room and to a parent task must not be inferred at display time from
 mutable state; it is recorded at write time.
 
@@ -979,27 +1010,34 @@ subset of output where reported; it MUST NOT be added again. Unavailable values 
 **AK-ACC-04.** Cost provenance MUST be one of: provider-reported charge, price-table
 estimate at a versioned price list, subscription-equivalent estimate, or unknown (MUST).
 API-equivalent estimates MUST NOT be presented as money spent on a subscription (MUST).
-Currency and price-table version are part of the record.
+Currency and price-table version are part of the record. Summaries MUST keep separate
+subtotals per currency and cost provenance (provider-reported, price-table estimate,
+subscription-equivalent, with unknown coverage); a combined figure, if shown, is a
+labelled *combined economic estimate, not spend* shown with its components (MUST).
 
 **AK-ACC-05.** Exclusive usage belongs to the record's owner; inclusive roll-ups sum
 exclusive descendants plus the owner's own turn usage, with explicit parent links. A
 child's tokens MUST NOT be counted twice in a parent total (MUST). The worked example in
-`docs/09-accounting.md` §4 is normative.
+`docs/09-accounting.md` §4 and its unit split (§4a) are normative.
 
 **AK-ACC-06.** Retries, failed attempts, cancelled work and fallback turns MUST be
 recorded and visible; cost-per-accepted-task includes them (MUST). Hiding failed spend
 is a defect.
 
-**AK-ACC-07.** Coordination and review overhead (observer, peer review, spec writing,
-handoffs) MUST be a visible category, not absorbed silently into delivery (MUST).
+**AK-ACC-07.** Coordination and review overhead (observer, peer review, triage, spec
+writing, handoffs) MUST be a visible category, not absorbed silently into delivery:
+overhead = `review` + `coordination` + `observer`; delivery is every other category
+(MUST).
 
 **AK-ACC-08.** Provider-reported plan meters and credit balances MUST be shown with
 source and freshness; unknown stays unknown. Akira MUST NOT derive a credit balance from
 its own ledger (MUST NOT).
 
 **AK-ACC-09.** Delayed or corrected provider telemetry MUST be handled by appending a
-correction record that supersedes the earlier value for cost, without double counting
-tokens (MUST). Akeru's cache-token correction path is the precedent.
+correction record that supersedes the earlier record as the effective usage snapshot for
+whichever token and cost fields have become known; queries select the effective revision
+once per logical usage record and never sum tokens across revisions (MUST). Akeru's
+cache-token correction path is the precedent.
 
 **AK-ACC-10.** Cached tokens MUST be reported separately, and "savings" MUST be derived
 from the price table, labelled as an estimate (MUST).
@@ -1016,8 +1054,12 @@ parent/child, with drill-down from a task to its records; exports include the le
 and MUST label measured, estimated, subscription and unavailable values distinctly
 (MUST).
 
-**AK-ACC-14.** A task's cost summary MUST separate delivery cost from review/observer
-overhead and from failed attempts (MUST).
+**AK-ACC-14.** A task's cost summary MUST separate delivery cost from review/
+coordination/observer overhead and from failed attempts (MUST). Cost-per-accepted-task
+is the complete attributable cost divided by the number of distinct accepted tasks;
+rework adds cost, not accepted tasks. Coverage is `(reported + estimated + subscription)
+/ (reported + estimated + subscription + unknown)` over cost-bearing records, `n/a` when
+there are none.
 
 **AK-ACC-15.** Usage records are append-only and audited; deletion is not a correction
 mechanism (MUST; AKIRA-D2).
@@ -1047,7 +1089,7 @@ and recording policy (MUST). Akeru's in-client voice (ChatGPT/OpenAI realtime or
 transcribe/reply/speak) is retained as a separate capability and MUST NOT be presented
 as telephony (MUST).
 
-**AK-SPC-03.** WhatsApp messaging MUST support text, media, templates (AKIRA-D4), inbound webhooks
+**AK-SPC-03.** WhatsApp messaging MUST support text, media, templates (scope U5), inbound webhooks
 and delivery states, with an honest `unknown` state when the provider may have accepted a
 send (MUST). Akeru's Cloud API channel, direct messages only, one bot per account and a
 public HTTPS origin are the base; Akira generalises the adapter but keeps the constraints
@@ -1194,8 +1236,9 @@ the only intended inbound surface; everything else stays private by default.
 
 **AK-SEC-08.** The system MUST record an audit trail for: credential changes, permission
 changes, approvals, destructive actions, connector actions, route overrides, template/
-persona activation and observer activation (MUST). Audit records are append-only and
-exportable.
+persona activation, observer activation, and export and restore operations (actor,
+scopes, bundle id, destination, checksum, result) (MUST). Audit records are append-only
+and exportable.
 
 **AK-SEC-09.** Autonomy MUST be bounded by spend and blast radius: per-task and per-bot
 concurrency, per-connector rate limits, approval gates for expensive operations, and a
@@ -1309,13 +1352,31 @@ and MUST NOT point at production credentials. Synthetic fixtures are the default
 **AK-OPS-14.** Every release MUST ship: changelog, migration notes, updated compatibility
 matrix, known limitations, and the Akeru revision it is based on (MUST).
 
+**AK-OPS-15.** A restored or rolled-back server MUST start in recovery quarantine:
+autonomous dispatch, routines, outbound channel delivery and external writes disabled;
+the original environment stopped or fenced; the recovery point and the uncertain interval
+recorded. Tasks and routines that could have acted in that interval are reconciled
+against preserved post-snapshot evidence or external state before release; where a prior
+effect cannot be established the task stays blocked for HUMAN reconciliation and is never
+replayed (MUST; `docs/12-operations.md` §5.3). A restore drill keeps these disabled.
+
+**AK-OPS-16.** Backups MUST be append-only: each run writes a new uniquely named
+generation and uses no deletion flag; earlier generations and database snapshots are
+preserved. Removing a backup generation is a separate operation requiring a HUMAN message
+naming the items (MUST; AKIRA-D2; `docs/12-operations.md` §5.2).
+
+**AK-OPS-17.** The server MUST NOT accept Akeru's upstream hard-delete command
+(`bot.delete`) directly: the decider rejects it unless issued through the `purge.request`
+guards (explicit ids, verified backup, `destructive` scope, audit record). Hiding the
+UI path is not sufficient; enforcement is at the command authority (MUST; AKIRA-D2).
+
 ---
 
 ## 18. Acceptance
 
 The normative acceptance suite is `docs/10-tests-and-acceptance.md`. This draft is
-accepted only when all twelve mandatory scenarios pass on a staging build, plus the
-requirement-level suites, with evidence attached:
+accepted only when all fifteen mandatory scenarios pass on a staging build, plus the
+requirement-level suites, with evidence attached (scenarios 13–15 were added in v0.4):
 
 1. Same named bot moves Codex → Claude → DeepSeek → Grok and back: identity, memory,
    goal, procedure, skill and task state preserved; provenance recorded.
@@ -1337,7 +1398,12 @@ requirement-level suites, with evidence attached:
     readiness scored, route and reason visible, re-triage on new evidence.
 11. Full export and restore of the working team state on a second environment.
 12. Deletion safety: archived bot still present after the retention window; no delete
-    command dispatched; purge only with an explicit named HUMAN request.
+    command dispatched; a direct `bot.delete` rejected without the purge guards; purge
+    only with an explicit named HUMAN request.
+13. Append-only backup: a later backup never removes earlier generations (T-13).
+14. Restore into recovery quarantine: no replay of effects missing from an older
+    snapshot (T-14).
+15. Skill catalogue completeness and availability gate (T-15).
 
 **AK-TST-01.** No requirement is "done" without a passing test that exercises the
 behaviour on the real integration point or a faithful stub, with the evidence linked
@@ -1381,7 +1447,7 @@ behaviour on the real integration point or a faithful stub, with the evidence li
 **Residual blockers before production:** disable retention in a built artifact and prove
 it; verify DeepSeek tool reliability end-to-end; verify skill execution on all four
 routes; prove export/restore; and set the budget/spend policy (U4) plus the remaining
-non-blocking choices (U4–U15). Host, subscription transport and distribution are settled
+non-blocking choices (U4–U16). Host, subscription transport and distribution are settled
 (AKIRA-D4–D6). None of these blocks specification review; all block a real-data launch.
 
 ---
@@ -1408,5 +1474,5 @@ non-blocking choices (U4–U15). Host, subscription transport and distribution a
 
 ---
 
-*End of specification. Version 0.1 — first complete draft. Nothing in this document has
+*End of specification. Version 0.4 — draft after review round 1. Nothing in this document has
 been verified by execution; evidence labels state what was inspected and what was not.*

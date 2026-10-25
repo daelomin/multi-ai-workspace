@@ -1,4 +1,5 @@
 {
+  "schemaVersion": "1.0",
   "id": "rtd_T142_2",
   "taskId": "task_T142",
   "attemptNumber": 2,
@@ -10,16 +11,16 @@
     "requiredReliability": "tool-transcript-verified"
   },
   "candidates": [
-    { "routeKey": "claude/sonnet-4.7", "meetsFloor": true, "estimatedCost": { "low": 1.2, "high": 2.4, "currency": "USD" }, "estimateBasis": "price table 2026-10-01", "support": "verified", "note": "native skills" },
-    { "routeKey": "deepseek/deepseek-chat", "meetsFloor": true, "estimatedCost": { "low": 0.3, "high": 0.7, "currency": "USD" }, "estimateBasis": "price table 2026-10-01", "support": "unknown", "note": "skills prompt-injected; tool transcript pending" },
-    { "routeKey": "codex/gpt-5.1-codex", "meetsFloor": false, "estimatedCost": { "low": 1.0, "high": 2.0, "currency": "USD" }, "estimateBasis": "subscription-equivalent", "support": "assumed", "note": "account quota exhausted at decision time" }
+    { "routeKey": "claude/sonnet-4.7", "meetsFloor": true, "available": "available", "availabilitySource": "provider meter, checked 2026-10-24T18:02:00Z", "estimatedCost": { "low": 1.2, "high": 2.4, "currency": "USD" }, "costUnit": "subscription-equivalent", "estimateBasis": "price table 2026-10-01", "support": "verified", "note": "native skills" },
+    { "routeKey": "deepseek/deepseek-chat", "meetsFloor": false, "available": "available", "availabilitySource": "provider probe, checked 2026-10-24T18:02:00Z", "estimatedCost": { "low": 0.3, "high": 0.7, "currency": "USD" }, "costUnit": "price-table", "estimateBasis": "price table 2026-10-01", "support": "unknown", "note": "below floor: skills are prompt-injected (not native-verified); tool transcript pending" },
+    { "routeKey": "codex/gpt-5.1-codex", "meetsFloor": true, "available": "quota_exhausted", "availabilitySource": "attempt 1 error class failed_quota, 2026-10-24T17:20:00Z", "estimatedCost": { "low": 1.0, "high": 2.0, "currency": "USD" }, "costUnit": "subscription-equivalent", "estimateBasis": "subscription-equivalent", "support": "assumed", "note": "capability adequate; account quota exhausted at decision time (availability, not capability)" }
   ],
   "chosen": {
     "routeKey": "claude/sonnet-4.7",
-    "reason": "Only verified route whose account has quota; native skill support; cost within the estimate band.",
+    "reason": "Only route that meets the floor and has an available account; native skill support; cost within the estimate band.",
     "alternativesRejected": [
-      "deepseek: support unknown for this skill until the injection test passes",
-      "codex: quota exhausted (failure class: quota_exhausted, not capability)"
+      "deepseek: below the native-verified skill floor (prompt-injected, unverified); not offered as an adequate resume route",
+      "codex: meets the floor but unavailable (failure class: failed_quota); not an adequacy decision"
     ]
   },
   "fallbackPolicy": "infrastructure-only",

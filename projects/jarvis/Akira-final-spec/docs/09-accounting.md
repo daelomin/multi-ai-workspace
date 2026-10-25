@@ -1,6 +1,6 @@
 # 09 — Token, cost and credit accounting
 
-**Status:** draft v0.3 · **Normative:** `spec.md` §12 · **Schema:** `docs/04-data-model.md` §5.
+**Status:** draft v0.4 · **Normative:** `spec.md` §12 · **Schema:** `docs/04-data-model.md` §5.
 
 The accounting system exists to answer three questions without lying:
 
@@ -23,7 +23,14 @@ The accounting system exists to answer three questions without lying:
    if the answer was good.
 6. **No cross-unit equivalence.** API dollars, subscription-equivalent dollars, plan
    percentages and credits are different units. They may be shown side by side, never
-   summed into one "spend" number.
+   summed into one "spend" number. Every summary keeps separate subtotals per currency and
+   cost provenance (§4a). Where a single figure is useful it is a *combined economic
+   estimate*, labelled as such, never called spend, and always shown with its components.
+7. **Routing compares like with like.** Cost-based route ranking (AK-TRG-10) runs within
+   one `auth_class` by default. Ranking across classes uses one named *routing comparison
+   unit* — the API-equivalent price-table estimate — only when the routing policy enables
+   it (proposed default: off, so a cross-class choice is made by the operator). The
+   comparison unit is displayed as "routing comparison, not spend".
 
 ---
 
@@ -37,6 +44,7 @@ The accounting system exists to answer three questions without lying:
 | Temporary worker / subagent | `tool` or `turn` with parent | same as turn | must not be hidden inside the parent's numbers |
 | Routine run | `routine` | turn records + a run record | run outcome and provider failure recorded |
 | Peer review / challenge | `review` | turn | reviewer's own route/account |
+| Triage, discovery, spec writing, handoff | `coordination` | turn | planning overhead; not delivery |
 | Observer | `observer` | turn | includes evaluation runs |
 | Media generation | `media` | provider-reported units | image count / video seconds / render job |
 | Telephony | `media`/`tool` | provider-reported minutes | per-call, with number and destination class |
@@ -53,9 +61,21 @@ owner        bot | task | room | observer | connector
 attribution  botId, taskId, attemptId, roomId, threadId, turnId,
              parentTaskId, parentUsageId
 route        harness, driver, provider, model, instanceId, accountLabel
-category     turn | tool | delegation | routine | review | observer | media | other
+category     turn | tool | delegation | routine | review | coordination | observer
+             | media | other
 measurement  provider-reported | estimated | subscription-equivalent | unknown
 ```
+
+**Category classes.** *Overhead* = `review` + `coordination` + `observer`. *Delivery* =
+every other category (`turn`, `tool`, `delegation`, `routine`, `media`, `other`). Every
+record belongs to exactly one category, so delivery + overhead = exclusive total.
+
+**Legacy category map (migration, `docs/04-data-model.md` §7).** Akeru values map
+deterministically: `turn`→`turn`, `tool`→`tool`, `routine`→`routine`,
+`delegated`→`delegation`, `observer`→`observer`, `reflector`→`observer`,
+`extraction`→`other`, `recall`→`other`, any unrecognised value→`other` (original value
+kept in `notes`). The original string is retained so the map can be revised without data
+loss. A pre-migration row keeps one valid category and counts once in exclusive totals.
 
 **Attribution rules.**
 
@@ -88,27 +108,49 @@ Task **T-142** "Fuel Atlas page v2", parent, accepted.
 | use-6 child T-143 (Stefano) | task T-143 | turn | estimated | 14,000 | 1,500 | $0.38 |
 | use-7 peer review (Sarah) | task T-142 | review | provider-reported | 3,000 | 300 | $0.09 |
 | use-8 observer p-12 evaluation | task T-142 | observer | provider-reported | 6,000 | 700 | $0.21 |
-| use-9 triage turn (cheap route) | task T-142 | turn | estimated | 4,000 | 400 | $0.15 |
+| use-9 triage turn (cheap route) | task T-142 | coordination | estimated | 4,000 | 400 | $0.15 |
 
-**Queries.**
+Cost provenance per record: use-1 and use-9 price-table estimate; use-2
+subscription-equivalent (Claude Max); use-3, use-7 and use-8 provider-reported; use-6
+price-table estimate; use-4 and use-5 carry no cost.
+
+**Queries.** The amounts below are the *combined economic estimate*; the unit split
+follows in §4a. They are never spend.
 
 - **Attempts only (delivery turns):** $0.31+$1.84+$0.52 = **$2.67**.
 - **Exclusive T-142** (records owned by T-142, any category): 0.31+1.84+0.52+0.00+0.00
   +0.09+0.21+0.15 = **$3.12**; tokens 12,000+41,000+9,000+3,000+6,000+4,000 = 75,000 in,
   1,000+6,100+800+300+700+400 = 9,300 out.
-- **Delivery-only T-142** (category `turn` + `tool`, excluding review/observer):
-  $0.31+$1.84+$0.52+$0.15 = **$2.82**.
-- **Overhead T-142** (review + observer): $0.09+$0.21 = **$0.30**.
+- **Delivery-only T-142** (every category except review/coordination/observer):
+  $0.31+$1.84+$0.52 = **$2.67**.
+- **Overhead T-142** (review + coordination + observer): $0.09+$0.15+$0.21 = **$0.45**.
+- **Delivery + overhead = exclusive:** 2.67 + 0.45 = 3.12.
 - **Child T-143 exclusive:** **$0.38**, 14,000 in / 1,500 out.
 - **Inclusive T-142** = exclusive T-142 + inclusive children = 3.12 + 0.38 = **$3.50**;
   tokens 89,000 in / 10,800 out.
+
+### 4a. Unit split of the worked example (normative)
+
+| Scope | Provider-reported charge | Price-table estimate | Subscription-equivalent | Combined economic estimate |
+|---|---|---|---|---|
+| Exclusive T-142 | $0.82 (use-3, 7, 8) | $0.46 (use-1, 9) | $1.84 (use-2) | $3.12 |
+| Child T-143 | — | $0.38 (use-6) | — | $0.38 |
+| Inclusive T-142 | $0.82 | $0.84 | $1.84 | $3.50 |
+| Overhead T-142 | $0.30 (use-7, 8) | $0.15 (use-9) | — | $0.45 |
+
+Coverage counts cost-bearing records per bucket (`reported`, `estimated`,
+`subscription`, `unknown`): exclusive 3 / 2 / 1 / 0; inclusive 3 / 3 / 1 / 0; overhead
+2 / 1 / 0 / 0. Zero-cost tool lifecycle records are not cost-bearing and are not counted.
+The buckets sum to the cost-bearing records; a subscription record is neither "reported"
+nor lost.
 - **Failed-attempt cost:** $0.31 (attempt #1) — visible, included in delivery cost, not
   hidden in a separate "waste" bucket that nobody reconciles.
 - **Cost per accepted task** (this task): $3.50. If T-142 had been rejected, the $3.12
   (or $3.50 with child) would still count in the denominator's numerator for the class.
 
 The UX sketch (`docs/06-ux.md` §3) shows attempts-only $2.67, inclusive $3.50 and
-overhead $0.45 (review + observer + triage); both views are queries over these records.
+overhead $0.45 (review + coordination + observer); both views are queries over these
+records.
 Any UI text must be generated from records, not from a hand-written sample.
 
 **Double-counting checks (must be automated):**
@@ -120,8 +162,12 @@ Any UI text must be generated from records, not from a hand-written sample.
 3. Reasoning tokens (1,200) are not added to output (6,100 include them).
 4. Cached input (11,000) is not added to uncached input (30,000) as if it were extra
    input; both sum to the 41,000 total input.
-5. A provider correction (e.g. cache tokens reported later) supersedes use-2's cost once,
-   without appending tokens twice.
+5. A provider correction (e.g. cache tokens reported later) supersedes use-2's effective
+   snapshot once (§7), without appending tokens twice.
+6. Every record belongs to exactly one category; delivery + overhead = exclusive, and
+   exclusive + child = inclusive.
+7. The per-provenance subtotals sum to the combined estimate, and no summary presents the
+   combined estimate without them.
 
 ---
 
@@ -166,7 +212,7 @@ the routing policy treats the route as availability-unknown, not as free.
 | Situation | Handling |
 |---|---|
 | Provider usage arrives after the turn | append a `correction` record that supersedes the estimate; do not edit |
-| Provider reports cache tokens later | correction updates cost only; tokens already counted once |
+| Provider reports cache tokens later | a correction is a superseding *effective usage snapshot*: it carries every token and cost field that is now known (e.g. the cached/uncached split of an input total, or tokens that were `null`). Queries select the effective revision once per logical usage record; superseded revisions stay for audit. Tokens are never summed across revisions |
 | Duplicate settlement (retry/receipt) | idempotency key prevents a second record; if it slips through, a reconciliation job marks one as duplicate (audited) |
 | Provider reports a charge with no token breakdown | record the charge as `provider-reported`, tokens null |
 | Turn failed before usage was reported | record `unavailable` with the failure class; cost may be zero or unknown, never invented |
@@ -185,13 +231,16 @@ attempts that ended. Discrepancies create an operator alert, not a silent fix.
 | Task | exclusive, inclusive, overhead, failed attempts, per-category, per-attempt | hide child cost or failed spend |
 | Bot | own turns, tasks it executed, reviews it gave/received, reputation context | conflate reviews given with work done |
 | Room | merged tasks and messages cost | double count a task mentioned twice |
-| Route | cost per accepted task, latency, failure rate | compare subscription-equivalent to API dollars as if equal |
+| Route | cost per accepted task, latency, failure rate | compare subscription-equivalent to API dollars as if equal (rank within an auth class, or use the labelled routing comparison unit, §1.7) |
 | Account | provider-reported meter, last refresh, staleness | infer a balance |
 | Observer | its own cost and evaluations | omit cost from the proposals it makes |
 | Team/day | total exclusive, coverage %, unknown count | present an incomplete total as complete |
 
-Coverage is a first-class number: `coverage = reported + estimated / (reported +
-estimated + unknown record count)` with the unknown reasons listed.
+Coverage is a first-class number: `coverage = (reported + estimated + subscription) /
+(reported + estimated + subscription + unknown)` over cost-bearing records, with the
+unknown reasons listed. With zero cost-bearing records coverage is `n/a`, not 100% or 0%.
+Example: 3 reported, 2 estimated, 1 subscription, 0 unknown → 6/6; adding 2 unknown →
+6/8 = 75%.
 
 ---
 
@@ -199,15 +248,20 @@ estimated + unknown record count)` with the unknown reasons listed.
 
 ```
 CPAT(route, taskClass) =
-  Σ exclusive delivery cost of all tasks of the class
-  + Σ child delivery cost
-  + Σ review/observer/coordination cost
-  ÷ number of accepted tasks of the class
+  ( Σ inclusive attributable cost of all tasks of the class, any category,
+    including failed attempts, rework, child work and overhead )
+  ÷ number of distinct accepted tasks of the class
 ```
+
+The numerator is each task's inclusive total, so overhead records are counted once (they
+are already inside the exclusive total; do not add them again). Reported per cost
+provenance (§4a); the combined estimate is labelled as such.
 
 - Rejected/abandoned tasks stay in the numerator (their cost was real) and out of the
   denominator.
-- Rework attempts are in both (cost and denominator).
+- Rework attempts add cost to the numerator only. An accepted task counts once in the
+  denominator however many attempts it took (one accepted task with three attempts: three
+  attempts of cost, denominator 1).
 - Human time is not monetised by the system unless a HUMAN supplies a rate; it is shown
   as hours, not invented dollars.
 - The metric is per route and task class, with sample size; a route with 3 samples is

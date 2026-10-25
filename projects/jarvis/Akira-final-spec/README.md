@@ -1,12 +1,12 @@
 # Akira specification review
 
-**Round 1** — independent review of Akira v0.3, the production specification for the
-Akeru spin-off.
+**Round 2** — independent review of Akira v0.4, the production specification for the
+Akeru spin-off (round 1 reviewed v0.3 and is consolidated).
 
-**Workflow status:** preflight passed; ready for a live round. HUMAN decisions AKIRA-D1
+**Workflow status:** round 1 consolidated; ready for round 2. HUMAN decisions AKIRA-D1
 (Akeru base, product named Akira) and AKIRA-D4–D6 (Linux single node, subscription
 logins permitted, private deployment) are recorded. The review input is **`spec.md`
-v0.3**, with its companion documents in `docs/` and representative records in
+v0.4**, with its companion documents in `docs/` and representative records in
 `evals/fixtures/`.
 
 Historical material is preserved and out of scope: the original options proposal and completed debate in the separate `jarvisbot` worktree (`projects/jarvis/JarvisBot/`). Do not review the old proposal as Akira's specification,
@@ -16,8 +16,11 @@ and do not rerun the option assessment.
 
 ## Current round
 
-**Round 1**: reviewers read the specification independently and write
-`reviews/round-1/<AGENT>.md`. Round 2+ reads the previous consolidation first.
+**Round 2**: reviewers read `spec.md` **v0.4** independently, after reading
+`reviews/round-1/CONSOLIDATION.md`, and write `reviews/round-2/<AGENT>.md`. Do not repeat
+findings accepted and merged in round 1. Round 1 is complete (38 findings from three
+reviewers, all accepted); its open HUMAN decisions (U4–U16) are carried forward in the
+consolidation and do not block review.
 
 **Imported-source note (2026-10-25).** The source folder had a CHATGPT review of v0.2. That historical review is not present in this registered loop and is not a completed pass here. All reviewers in this loop independently review the imported v0.3 package. The preflight passed; no live round has started.
 

@@ -1,6 +1,6 @@
 # 11 — Phased implementation backlog
 
-**Status:** draft v0.3 · **Normative scope:** `spec.md` (complete target) · **Estimates:** ranges, ±50%, no historical velocity data.
+**Status:** draft v0.4 · **Normative scope:** `spec.md` (complete target) · **Estimates:** ranges, ±50%, no historical velocity data.
 
 The plan specifies the complete target and defers features explicitly. It does not
 silently drop anything: deferred items are listed in §8 with the trigger that would pull
@@ -45,7 +45,10 @@ continuously from P1 (thin slices) and converges in P9.
 1. Build the pinned Akeru revision on Linux; record exact Node/pnpm/vp versions and
    artifact hash.
 2. Disable `ARCHIVED_BOT_RETENTION_DAYS`/sweep in a patch; write a synthetic-clock test
-   proving no delete command is dispatched; remove/guard the hard-delete UI path.
+   proving no delete command is dispatched; remove/guard the hard-delete UI path **and**
+   make the decider reject a direct `bot.delete` unless it carries the `purge.request`
+   guards (explicit ids, verified backup, `destructive` scope, audit); add the server-level
+   test (T-12).
 3. Prove the primary goal manually: one bot, memory fact, procedure, goal placeholder,
    `SKILL.md`, a partly completed task across Codex/Claude/DeepSeek/Grok and back; record
    exactly what survives and what does not.
@@ -110,7 +113,10 @@ main architectural risk (ADR-01).
 
 ## 5. Phase 3 — Routing, triage and readiness
 
-**Effort:** 4–6 ew · **Depends on:** P2 (interfaces), P5 partly (cost estimates).
+**Effort:** 4–6 ew · **Depends on:** P2 (interfaces) and a P2 prerequisite: the
+versioned price table and estimate-basis records (a small slice of P5 delivered with P2
+so cost bands exist before route selection; P5 later adds the full ledger extension,
+queries and views).
 
 **Work.**
 
@@ -311,8 +317,11 @@ supports them.
 | Security review | per release | 0.5–1 ew |
 | Price-table update | monthly or on vendor change | 0.25 ew |
 
-A steady-state estimate of **2–4 ew/quarter** for maintenance is a planning placeholder,
-not a measured figure. It must be replaced with actuals after two quarters.
+Summing the rows for one quarter (one rebase, three monthly provider checks, three
+price-table updates, one connector, one drill, one release security review) gives
+**≈4.75–7.75 ew/quarter**, plus 0.5 ew per additional connector. This sum is a planning
+placeholder, not a measured figure (the earlier 2–4 ew figure did not match the table).
+It must be replaced with actuals after two quarters.
 
 ---
 
