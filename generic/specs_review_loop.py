@@ -890,6 +890,10 @@ def main() -> None:
                     help="probe the backends of the selected reviewers (plus the consolidator), then exit")
     ap.add_argument("--skip-consolidator", action="store_true",
                     help="with --preflight: do not probe the Anthropic consolidator profile")
+    ap.add_argument("--no-consolidator", action="store_true",
+                    default=os.environ.get("CONSOLIDATOR", "1") == "0",
+                    help="no CLAUDE step: skip its preflight probe, run one round of reviews and stop "
+                         "(env CONSOLIDATOR=0)")
     ap.add_argument("--reviewers", default=os.environ.get("REVIEWERS", "CHATGPT,DEEPSEEK,GROK"),
                     help="comma-separated, from CHATGPT,DEEPSEEK,GROK,CURSOR (default CHATGPT,DEEPSEEK,GROK)")
     opts = ap.parse_args()
@@ -910,7 +914,7 @@ def main() -> None:
     except OSError:
         raise SystemExit(f"another review loop is already running ({LOG_DIR / '.loop.lock'})")
     if opts.preflight:
-        preflight(root, reviewers, not opts.skip_consolidator)
+        preflight(root, reviewers, not (opts.skip_consolidator or opts.no_consolidator))
         return
 
     ensure_branch(root)
@@ -925,6 +929,10 @@ def main() -> None:
                 totals[k] += v
         converged = totals["blocking"] == 0 and totals["major"] == 0
         log(f"round {n}: {totals['blocking']} blocking, {totals['major']} major, {totals['minor']} minor")
+        if opts.no_consolidator:
+            # Without CLAUDE nobody merges the reviews or moves the round, so one round is all there is.
+            log(f"round {n}: reviews done; no consolidator selected, stopping")
+            return
         do_consolidation(n, reviewers, converged, root, provenance)
         if converged:
             log(f"converged at round {n}: spec v{spec_version()}")

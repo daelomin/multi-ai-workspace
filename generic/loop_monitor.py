@@ -48,7 +48,8 @@ COLORS = {"preflight": "#eab308", "running": "#22c55e", "failed": "#ef4444", "co
 JARVIS_STATUS = {"preflight": "pending", "running": "in_progress", "failed": "failed", "complete": "completed", "pending": "pending"}
 
 
-def load_config(path: Path = CONFIG) -> list[dict]:
+def load_config(path: Path | None = None) -> list[dict]:
+    path = path or CONFIG  # read at call time, so a changed CONFIG is honoured
     if not path.is_file():
         raise SystemExit(f"no loop list: {path} (copy generic/loops.example.json)")
     loops = json.loads(path.read_text(encoding="utf-8"))["loops"]
@@ -61,6 +62,7 @@ def load_config(path: Path = CONFIG) -> list[dict]:
         l.setdefault("name", l["id"])
         l.setdefault("branch", f"agent/loop/{rl.slug(l['name'])}-review")
         l.setdefault("reviewers", DEFAULT_REVIEWERS)
+        l.setdefault("consolidator", True)  # False: reviews only, no CLAUDE step
         l.setdefault("autostart", False)
     return loops
 
@@ -210,7 +212,9 @@ def evaluate(loop: dict) -> dict:
         return out
     n = int(m.group(1))
     out["round"] = n
-    steps = [r.strip().upper() for r in loop["reviewers"].split(",") if r.strip()] + ["CLAUDE"]
+    steps = [r.strip().upper() for r in loop["reviewers"].split(",") if r.strip()]
+    if loop.get("consolidator", True):
+        steps.append("CLAUDE")
     first_open = None
     rdir = project / "reviews" / f"round-{n}"
     for step in steps:
@@ -236,6 +240,8 @@ def evaluate(loop: dict) -> dict:
         out.update(status="failed", detail=failed[0]["detail"])
     elif launch.get("exit") not in (None, 0):
         out.update(status="failed", detail=f"last launch exited {launch['exit']} (see automation/logs/monitor-launch.log)")
+    elif not loop.get("consolidator", True) and out["steps"] and all(x["status"] == "complete" for x in out["steps"]):
+        out.update(status="complete", detail="reviews done (no consolidator selected)")
     return out
 
 
@@ -257,13 +263,19 @@ def due(loops: list[dict], states: dict[str, dict]) -> dict | None:
     return None
 
 
+def agent_env(loop: dict) -> dict:
+    """Environment telling the launcher which agents this loop declared."""
+    return {**os.environ, "REVIEWERS": loop.get("reviewers", DEFAULT_REVIEWERS),
+            "CONSOLIDATOR": "1" if loop.get("consolidator", True) else "0"}
+
+
 def launch(loop: dict) -> None:
     logdir = WORKSPACE / loop["project"] / "automation" / "logs"
     logdir.mkdir(parents=True, exist_ok=True)
     mark = logdir / ".monitor.json"
     logf = open(logdir / "monitor-launch.log", "a")
     proc = subprocess.Popen([str(LAUNCHER), loop["project"], loop["name"], loop["branch"], "full"], cwd=WORKSPACE,
-                            stdin=subprocess.DEVNULL, stdout=logf, stderr=logf, start_new_session=True)
+                            env=agent_env(loop), stdin=subprocess.DEVNULL, stdout=logf, stderr=logf, start_new_session=True)
     mark.write_text(json.dumps({"pid": proc.pid, "started": time.strftime("%FT%T"), "exit": None}), encoding="utf-8")
     print(f"[{time.strftime('%T')}] launched {loop['id']} (pid {proc.pid})", flush=True)
     _watch_exit(proc, mark)
@@ -360,7 +372,7 @@ def write_jarvis(states: list[dict]) -> None:
                               "error": x["detail"] or None,
                               "metadata": {**meta, "round": r["n"], "duration_seconds": x.get("seconds"),
                                            **{k: x[k] for k in ("model", "effort", "tier", "reported") if x.get(k)}}}
-            prev = f"r{r['n']}-CLAUDE"
+            prev = f"r{r['n']}-CLAUDE" if f"r{r['n']}-CLAUDE" in nodes else None
         (mem / f"graph_{run_id}.json").write_text(json.dumps({"run_id": run_id, "nodes": nodes}, indent=2), encoding="utf-8")
         entries = [{"timestamp": now, "run_id": run_id, "decision": "run_start", "message": s["name"]}]
         if s["status"] == "complete":

@@ -5,7 +5,7 @@
 #   <name>         commit/prompt label, e.g. FuelBuddy
 #   [branch]       default agent/loop/<name lower-case>-review
 #   preflight      probe all backends, no spec changes
-#   one            one live round (CHATGPT,DEEPSEEK,GROK), max-rounds 1
+#   one            one live round of $REVIEWERS (default CHATGPT,DEEPSEEK,GROK), max-rounds 1
 #   full           up to 5 rounds
 # Per-project wrappers (projects/<p>/.../automation/run_review_loop.sh) just call this with their values.
 # The DeepSeek key is read from the environment, or prompted (hidden, never written to disk).
@@ -40,16 +40,27 @@ export CURSOR_AGENT_BIN="${CURSOR_AGENT_BIN:-$(command -v cursor-agent || comman
 export CODEX_EXTRA_ARGS="${CODEX_EXTRA_ARGS:--c sandbox_workspace_write.network_access=true -c 'model_reasoning_effort=\"medium\"'}"
 export DEEPSEEK_ACCEPT_UNVERIFIED="${DEEPSEEK_ACCEPT_UNVERIFIED:-0}"   # decision D2: default refuse
 export REVIEW_MAX_ROUNDS="${REVIEW_MAX_ROUNDS:-5}"
+# Agents declared for this loop (the wizard and the monitor pass them from generic/loops.json).
+# Only these are checked, probed and run; CONSOLIDATOR=0 means no CLAUDE step (reviews only).
 REVIEWERS="${REVIEWERS:-CHATGPT,DEEPSEEK,GROK}"
+CONSOLIDATOR="${CONSOLIDATOR:-1}"
+export REVIEWERS CONSOLIDATOR
+has() { [[ ",$REVIEWERS," == *",$1,"* ]]; }
 
 mode="${1:-preflight}"
 
 # --- sanity checks ---
-for bin in git python3 codex claude "$CURSOR_AGENT_BIN"; do
+bins=(git python3)
+has CHATGPT && bins+=(codex)
+{ has DEEPSEEK || [ "$CONSOLIDATOR" != 0 ]; } && bins+=(claude)
+{ has GROK || has CURSOR; } && bins+=("$CURSOR_AGENT_BIN")
+for bin in "${bins[@]}"; do
   command -v "$bin" >/dev/null 2>&1 || { echo "missing binary: $bin" >&2; exit 1; }
 done
 [ -f "$LOOP" ] || { echo "not found: $LOOP" >&2; exit 1; }
-[ -d "$ANTHROPIC_CLAUDE_CONFIG_DIR" ] || { echo "Anthropic profile missing: $ANTHROPIC_CLAUDE_CONFIG_DIR (run: CLAUDE_CONFIG_DIR=$ANTHROPIC_CLAUDE_CONFIG_DIR claude, then /login)" >&2; exit 1; }
+if [ "$CONSOLIDATOR" != 0 ]; then
+  [ -d "$ANTHROPIC_CLAUDE_CONFIG_DIR" ] || { echo "Anthropic profile missing: $ANTHROPIC_CLAUDE_CONFIG_DIR (run: CLAUDE_CONFIG_DIR=$ANTHROPIC_CLAUDE_CONFIG_DIR claude, then /login)" >&2; exit 1; }
+fi
 
 # The loop script must already support the reviewers asked for (roadmap Phase 3 adds GROK).
 if [[ "$REVIEWERS" == *GROK* ]] && ! grep -q "run_cursor_agent" "$LOOP"; then
@@ -60,7 +71,7 @@ fi
 
 source ~/.credentials
 # --- DeepSeek key: env first, else hidden prompt; never written anywhere ---
-if [ -z "${DEEPSEEK_API_KEY:-}" ]; then
+if has DEEPSEEK && [ -z "${DEEPSEEK_API_KEY:-}" ]; then
   read -rsp "DeepSeek API key: " DEEPSEEK_API_KEY; echo
   export DEEPSEEK_API_KEY
 fi
@@ -72,12 +83,12 @@ cd "$REPO"
 
 case "$mode" in
   preflight)
-    python3 "$LOOP" "${PROJECT_ARGS[@]}" --preflight ;;
+    python3 "$LOOP" "${PROJECT_ARGS[@]}" --reviewers "$REVIEWERS" --preflight ;;
   one)
-    python3 "$LOOP" "${PROJECT_ARGS[@]}" --preflight
+    python3 "$LOOP" "${PROJECT_ARGS[@]}" --reviewers "$REVIEWERS" --preflight
     python3 "$LOOP" "${PROJECT_ARGS[@]}" --reviewers "$REVIEWERS" --max-rounds 1 ;;
   full)
-    python3 "$LOOP" "${PROJECT_ARGS[@]}" --preflight
+    python3 "$LOOP" "${PROJECT_ARGS[@]}" --reviewers "$REVIEWERS" --preflight
     python3 "$LOOP" "${PROJECT_ARGS[@]}" --reviewers "$REVIEWERS" --max-rounds "$REVIEW_MAX_ROUNDS" ;;
   *)
     echo "usage: $0 <project-dir> <name> [branch] {preflight|one|full}" >&2; exit 2 ;;

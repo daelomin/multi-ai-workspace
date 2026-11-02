@@ -254,3 +254,35 @@ class Chaining(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Agents(Base):
+    """Agents ticked at the declaration: unticked ones are neither steps nor launcher work."""
+
+    def test_no_consolidator_drops_claude_step_and_completes_after_reviews(self):
+        p = self.project("a")
+        loop = self.loop("a", reviewers="DEEPSEEK", consolidator=False)
+        s = lm.evaluate(loop)
+        self.assertEqual([x["name"] for x in s["steps"]], ["DEEPSEEK"])
+        self.assertEqual(s["status"], "pending")
+        (p / "reviews" / "round-2").mkdir()
+        (p / "reviews" / "round-2" / "DEEPSEEK.md").write_text(GOOD)
+        s = lm.evaluate(loop)
+        self.assertEqual(s["status"], "complete")
+        lm.JARVIS_DIR = self.root / ".jarvis" / "tracker"
+        lm.write_jarvis([s])
+        graph = json.loads((lm.JARVIS_DIR / "memory" / "graph_review-loop-a.json").read_text())
+        self.assertNotIn("r2-CLAUDE", graph["nodes"])
+        self.assertIn("r2-DEEPSEEK", graph["nodes"])
+
+    def test_launcher_env_carries_declared_agents(self):
+        env = lm.agent_env(self.loop("a", reviewers="DEEPSEEK", consolidator=False))
+        self.assertEqual((env["REVIEWERS"], env["CONSOLIDATOR"]), ("DEEPSEEK", "0"))
+        env = lm.agent_env({"id": "b"})
+        self.assertEqual((env["REVIEWERS"], env["CONSOLIDATOR"]), (lm.DEFAULT_REVIEWERS, "1"))
+
+    def test_config_defaults_keep_old_entries_on_all_agents(self):
+        cfg = self.root / "loops.json"
+        cfg.write_text(json.dumps({"loops": [{"id": "a", "project": "projects/a"}]}))
+        (l,) = lm.load_config(cfg)
+        self.assertEqual((l["reviewers"], l["consolidator"]), (lm.DEFAULT_REVIEWERS, True))

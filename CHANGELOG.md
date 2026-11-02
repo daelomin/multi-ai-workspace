@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-11-02
+**Agent:** CLAUDE
+**Files:** `generic/loop_wizard.py`, `generic/loop_wizard.html`, `generic/loop_monitor.py`, `generic/run_review_loop.sh`, `generic/specs_review_loop.py`, `generic/tests/*`, `CHANGELOG.md`
+**Change:** Agent selection per loop. The Review Loop Assistant now has DeepSeek / Claude / Grok / ChatGPT checkboxes when a loop is created, and an "Agents in this loop" step for an existing loop. Ticks are stored in `generic/loops.json` (`reviewers`, `consolidator`); the launcher, the monitor's auto-launch and the Jarvis graph only check, probe and run the ticked agents (no codex/cursor binary, DeepSeek key or Anthropic profile needed for an unticked one). Without Claude the loop runs one round of reviews and stops (`--no-consolidator` / `CONSOLIDATOR=0`). Entries without the fields keep all four agents.
+**Remaining:** HUMAN: on the laptop, pull, open the assistant, pick dk-metaprep, untick ChatGPT and Grok, Save agents.
+**Verification:** `python3 -m unittest discover -s generic/tests` (57 tests) passes; the assistant page was driven in a headless browser (saving DeepSeek + Claude on a test loop wrote `reviewers: DEEPSEEK, consolidator: true`). No live model run.
+
 ## 2026-10-21
 **Agent:** CLAUDE
 **Files:** `projects/fuelbuddy/charging-diagnostic/reviews/round-4/CONSOLIDATION.md`, `projects/fuelbuddy/charging-diagnostic/spec.md`, `projects/fuelbuddy/charging-diagnostic/README.md`, `CHANGELOG.md`

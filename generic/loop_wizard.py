@@ -7,7 +7,7 @@ Safety: listens on 127.0.0.1 only; every request needs the token (kept in generi
 header, against DNS rebinding); the page can only trigger the fixed actions below, with validated
 arguments, never an arbitrary shell command. Paid-backend runs (`one`, `full`) are confirmed in the page.
 
-Actions: state, loops, git_status, commit, create_loop, register, monitor_start/stop, job (preflight|one|full), retry.
+Actions: state, loops, git_status, commit, create_loop, register, set_agents, monitor_start/stop, job (preflight|one|full), retry.
 """
 
 from __future__ import annotations
@@ -59,6 +59,22 @@ FOLDER_RE = re.compile(r"^projects/[\w.-]+/[\w.-]+$")
 NAME_RE = re.compile(r"^[\w -]{2,30}$")
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,40}$")
 BRANCH_RE = re.compile(r"^[\w./-]{1,80}$")
+AGENTS = ("CHATGPT", "DEEPSEEK", "GROK", "CLAUDE")  # CLAUDE = the consolidator; the others review
+
+
+def agent_fields(a: dict) -> dict:
+    """loops.json fields for the agents ticked in the page (all four when the page sends none)."""
+    picked = a.get("agents")
+    if picked is None:
+        return {}
+    picked = [str(x).upper() for x in picked]
+    bad = [x for x in picked if x not in AGENTS]
+    if bad:
+        raise ValueError(f"unknown agent(s) {bad}; choose from {list(AGENTS)}")
+    reviewers = [x for x in AGENTS if x in picked and x != "CLAUDE"]
+    if not reviewers:
+        raise ValueError("tick at least one reviewer (ChatGPT, DeepSeek or Grok)")
+    return {"reviewers": ",".join(reviewers), "consolidator": "CLAUDE" in picked}
 
 
 def sh(cmd: list[str], cwd: Path | None = None) -> tuple[int, str]:
@@ -97,7 +113,8 @@ def a_state(_: dict) -> dict:
 
 
 def a_loops(_: dict) -> dict:
-    return {"loops": [{"id": l["id"], "name": l["name"], "project": l["project"], "branch": l["branch"]} for l in loops()]}
+    return {"loops": [{"id": l["id"], "name": l["name"], "project": l["project"], "branch": l["branch"],
+                       "agents": l["reviewers"].split(",") + (["CLAUDE"] if l["consolidator"] else [])} for l in loops()]}
 
 
 def a_git_status(_: dict) -> dict:
@@ -200,7 +217,7 @@ def a_create_loop(a: dict) -> dict:
     log.append(f"wrote {folder}/spec.md, README.md, automation/.gitignore")
     step("git add + commit", sh(["git", "add", "--", folder]))
     step("git commit", sh(["git", "commit", "-m", f"HUMAN: add {name} spec for the review loop", "--", folder]))
-    entry = {"id": lid, "project": folder, "name": name, "branch": branch}
+    entry = {"id": lid, "project": folder, "name": name, "branch": branch, **agent_fields(a)}
     for k in ("after", "autostart"):
         if a.get(k):
             entry[k] = a[k]
@@ -218,12 +235,25 @@ def a_register(a: dict) -> dict:
     lid = rl.slug(name)
     if any(l["id"] == lid for l in raw_loops()):
         raise ValueError(f"loop id {lid!r} is already registered")
-    entry = {"id": lid, "project": folder, "name": name}
+    entry = {"id": lid, "project": folder, "name": name, **agent_fields(a)}
     for k in ("after", "autostart", "branch"):
         if a.get(k):
             entry[k] = a[k]
     save_loops(raw_loops() + [entry])
     return {"ok": True, "id": lid}
+
+
+def a_set_agents(a: dict) -> dict:
+    """Change which agents an already registered loop uses (takes effect at its next preflight/run)."""
+    entries = raw_loops()
+    for e in entries:
+        if e["id"] == a.get("id"):
+            fields = agent_fields({"agents": a.get("agents") or []})
+            e.update(fields)
+            save_loops(entries)
+            who = fields["reviewers"] + (" + CLAUDE consolidation" if fields["consolidator"] else ", no consolidation")
+            return {"ok": True, "output": f"{e['id']}: {who}"}
+    raise ValueError(f"unknown loop {a.get('id')!r}")
 
 
 def monitor_alive() -> bool:
@@ -264,7 +294,7 @@ def a_job(a: dict) -> dict:
     jid = uuid.uuid4().hex[:8]
     logf = open(JOBS / f"{jid}.log", "w")
     p = subprocess.Popen([str(lm.LAUNCHER), l["project"], l["name"], l["branch"], mode], cwd=WORKSPACE,
-                         stdin=subprocess.DEVNULL, stdout=logf, stderr=subprocess.STDOUT, start_new_session=True)
+                         env=lm.agent_env(l), stdin=subprocess.DEVNULL, stdout=logf, stderr=subprocess.STDOUT, start_new_session=True)
     (JOBS / f"{jid}.json").write_text(json.dumps({"pid": p.pid, "mode": mode, "loop": l["id"], "exit": None}))
     import threading
 
@@ -283,7 +313,7 @@ def a_retry(a: dict) -> dict:
 
 
 ACTIONS = {"state": a_state, "loops": a_loops, "git_status": a_git_status, "commit": a_commit,
-           "create_loop": a_create_loop, "register": a_register, "monitor_start": a_monitor_start,
+           "create_loop": a_create_loop, "register": a_register, "set_agents": a_set_agents, "monitor_start": a_monitor_start,
            "monitor_stop": a_monitor_stop, "job": a_job, "retry": a_retry}
 
 

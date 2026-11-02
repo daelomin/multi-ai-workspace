@@ -119,13 +119,36 @@ function ask(q, options) {
 function form(q, fields, done) {
   say(q);
   const box = el('', 'msg');
-  box.innerHTML = fields.map(f => `<label>${f.label}</label>` + (f.options
+  box.innerHTML = fields.map(f => `<label>${f.label}</label>` + (f.checks ? agentBoxes(f.id, f.checks)
+    : f.options
     ? `<select id="f_${f.id}">${f.options.map(o => `<option value="${esc(o[0])}">${esc(o[1])}</option>`).join('')}</select>`
     : `<input id="f_${f.id}" placeholder="${f.ph || ''}" value="${f.value || ''}">`)).join('') + '<div class="err" id="ferr"></div><button class="primary">Continue</button>';
   box.querySelector('button').onclick = () => {
     const v = {};
-    for (const f of fields) { v[f.id] = document.getElementById('f_' + f.id).value.trim(); if (f.re && !f.re.test(v[f.id])) { document.getElementById('ferr').textContent = f.msg; return; } }
-    box.remove(); you(fields.map(f => `${f.short}: ${v[f.id]}`).join(' · ')); done(v);
+    for (const f of fields) {
+      if (f.checks) { v[f.id] = tickedAgents(box, f.id); const m = agentsError(v[f.id]); if (m) { document.getElementById('ferr').textContent = m; return; } continue; }
+      v[f.id] = document.getElementById('f_' + f.id).value.trim(); if (f.re && !f.re.test(v[f.id])) { document.getElementById('ferr').textContent = f.msg; return; }
+    }
+    box.remove(); you(fields.map(f => `${f.short}: ${f.checks ? agentNames(v[f.id]) : v[f.id]}`).join(' · ')); done(v);
+  };
+}
+
+// ---------- agents ----------
+// CLAUDE is the consolidator; the others are reviewers. Unticked agents are not checked, probed or run.
+const AGENTS = [['DEEPSEEK', 'DeepSeek'], ['CLAUDE', 'Claude (consolidation)'], ['GROK', 'Grok'], ['CHATGPT', 'ChatGPT']];
+const agentBoxes = (id, ticked) => `<div class="files" id="f_${id}">` + AGENTS.map(([k, label]) =>
+  `<label><input type="checkbox" data-agent="${k}" ${ticked.includes(k) ? 'checked' : ''}>${label}</label>`).join('') + '</div>';
+const tickedAgents = (root, id) => [...root.querySelectorAll(`#f_${id} input:checked`)].map(c => c.dataset.agent);
+const agentNames = list => AGENTS.filter(([k]) => list.includes(k)).map(([, l]) => l.split(' ')[0]).join(', ') || 'none';
+const agentsError = list => list.some(a => a !== 'CLAUDE') ? '' : 'Tick at least one reviewer (DeepSeek, Grok or ChatGPT).';
+function agentsStep(loop) {
+  const d = el(`<h3>Agents in this loop</h3><p class="note">Only ticked agents are checked in preflight and run in the review. Without Claude, the loop runs one round of reviews and stops (no consolidation).</p>${agentBoxes('ag_' + loop.id, loop.agents)}<div class="err"></div><div class="row"><button class="primary">Save agents</button></div><pre hidden></pre>`, 'step ok');
+  const btn = d.querySelector('button'), pre = d.querySelector('pre'), err = d.querySelector('.err');
+  btn.onclick = async () => {
+    const agents = tickedAgents(d, 'ag_' + loop.id), m = agentsError(agents);
+    err.textContent = m; if (m) return;
+    try { const r = await api('set_agents', {id: loop.id, agents}); pre.hidden = false; pre.textContent = r.output; loop.agents = agents; }
+    catch (e) { err.textContent = e.message; }
   };
 }
 
@@ -176,9 +199,9 @@ function gitStep() {
   };
 }
 const monitorStep = () => step('Start the monitor', 'Keeps the colours fresh, and launches chained loops. It keeps running after you close this page.', 'Start monitor', () => api('monitor_start', {}));
-const preflightStep = id => step('Check the backends (preflight)', 'Probes ChatGPT/DeepSeek/Grok/Claude. Takes a minute or two; no spec changes.', 'Run preflight', show => runJob(id, 'preflight', show));
+const preflightStep = id => step('Check the backends (preflight)', 'Probes only the ticked agents. Takes a minute or two; no spec changes.', 'Run preflight', show => runJob(id, 'preflight', show));
 const runSteps = id => {
-  step('Run one round', 'One review round (all reviewers + consolidation). Uses the paid backends.', 'Run one round', show => runJob(id, 'one', show), {confirm: 'Run one live round? This uses the paid AI backends.'});
+  step('Run one round', 'One review round (the ticked reviewers, then Claude\'s consolidation if ticked). Uses the paid backends.', 'Run one round', show => runJob(id, 'one', show), {confirm: 'Run one live round? This uses the paid AI backends.'});
   step('…or run up to 5 rounds', 'Stops by itself when a round has no blocking/major findings.', 'Run full loop', show => runJob(id, 'full', show), {confirm: 'Run the FULL loop (up to 5 rounds)? This uses the paid AI backends.'});
 };
 const again = () => ask('Anything else?', [['Start over', () => { chat.innerHTML = ''; start(); }]]);
@@ -198,7 +221,7 @@ async function existing() {
   if (!loops.length) { say('No loops are registered yet. Create one first.'); return again(); }
   form('Which loop?', [{id: 'id', short: 'Loop', label: 'Loop', options: loops.map(l => [l.id, `${l.name} (${l.project})`])}], v => {
     say('Do these in order. Each button runs the step for you.');
-    gitStep(); monitorStep(); preflightStep(v.id); runSteps(v.id); again();
+    agentsStep(loops.find(l => l.id === v.id)); gitStep(); monitorStep(); preflightStep(v.id); runSteps(v.id); again();
   });
 }
 
@@ -207,6 +230,7 @@ async function newLoop(chain) {
   const fields = [
     {id: 'folder', short: 'Folder', label: 'Spec folder (projects/<project>/<spec>)', value: 'projects/', re: /^projects\/[\w.-]+\/[\w.-]+$/, msg: 'Use projects/<project>/<spec>, e.g. projects/acme/billing-spec'},
     {id: 'name', short: 'Name', label: 'Short name (used in commit messages)', ph: 'MySpec', re: /^[\w -]{2,30}$/, msg: 'Letters, digits and spaces, 2–30 characters'},
+    {id: 'agents', short: 'Agents', label: 'Agents in the loop (unticked ones are not required in preflight or review)', checks: AGENTS.map(([k]) => k)},
   ];
   if (chain) {
     if (!loops.length) { say('There is no loop to chain after yet.'); return again(); }
@@ -216,7 +240,7 @@ async function newLoop(chain) {
   form('Where should the new spec live, and what do you call it?', fields, v => {
     say(`I'll create a branch, the spec and README skeletons, commit them, and register the loop${chain ? ' (chained)' : ''}.`);
     step('Create the loop', 'Creates branch <code>agent/loop/&lt;name&gt;-review</code> from your current branch, writes spec.md + README.md, commits only that folder, and adds it to the monitor.', 'Create it',
-      () => api('create_loop', {folder: v.folder, name: v.name, ...(chain ? {after: v.after, autostart: v.auto === 'yes'} : {})}),
+      () => api('create_loop', {folder: v.folder, name: v.name, agents: v.agents, ...(chain ? {after: v.after, autostart: v.auto === 'yes'} : {})}),
       {after: r => {
         say(`Created loop <b>${esc(r.id)}</b> on branch <code>${esc(r.branch)}</code>. <b>Edit <code>${esc(v.folder)}/spec.md</code> with the real spec and commit it</b> before the loop runs (it reviews that file).`);
         gitStep(); monitorStep();

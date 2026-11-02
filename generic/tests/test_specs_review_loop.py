@@ -344,3 +344,40 @@ class GitFlow(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NoConsolidator(unittest.TestCase):
+    """CLAUDE unticked: not probed in preflight, and a run stops after one round of reviews."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.proj = Path(self.tmp.name) / "p"
+        (self.proj / "reviews/round-2").mkdir(parents=True)
+        (self.proj / "spec.md").write_text("version 0.3\n")
+        (self.proj / "README.md").write_text("**Round 2**\n")
+        (self.proj / "reviews/round-2/DEEPSEEK.md").write_text(GOOD)
+        git(self.proj, "init", "-q")
+
+    def run_main(self, *args, env=None):
+        argv = ["x", "--project", str(self.proj), "--name", "X", "--reviewers", "DEEPSEEK", *args]
+        with mock.patch.object(sys, "argv", argv), mock.patch.dict(os.environ, env or {}), \
+                mock.patch.object(rl, "repo_root", return_value=self.proj), \
+                mock.patch.object(rl, "ensure_branch"), \
+                mock.patch.object(rl, "do_review", return_value={}) as review, \
+                mock.patch.object(rl, "do_consolidation") as consolidate, \
+                mock.patch.object(rl, "preflight") as pre:
+            rl.main()
+        return review, consolidate, pre
+
+    def test_reviews_only_by_flag_or_env(self):
+        for args, env in ((["--no-consolidator"], {}), ([], {"CONSOLIDATOR": "0"})):
+            review, consolidate, _ = self.run_main(*args, env=env)
+            review.assert_called_once()
+            consolidate.assert_not_called()
+
+    def test_preflight_skips_claude_probe(self):
+        _, _, pre = self.run_main("--preflight", "--no-consolidator")
+        self.assertEqual(pre.call_args.args[1:], (["DEEPSEEK"], False))
+        _, _, pre = self.run_main("--preflight")
+        self.assertEqual(pre.call_args.args[1:], (["DEEPSEEK"], True))
