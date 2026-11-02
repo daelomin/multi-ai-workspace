@@ -11,7 +11,7 @@ You handle well-specified edits: the task text in `TODO.md` already says what to
 ## How to work
 
 - **One task (or one listed bundle) per branch:** `agent/cursor/<task-id>-<short-name>`, e.g. `agent/cursor/p0-3-docs-move`.
-- **Commits:** `CURSOR: <short description>`.
+- **Commits:** `CURSOR: <short description>`. If that name is generic, append `MODEL:` and the model id you are actually running.
 - **Claim and release** each shared file through `CHANGELOG.md`, as described in `CONTRIBUTING.md`.
 - **Changelog:** add your entry at the top; never edit older entries.
 - **Tick your own task in `TODO.md`** in the same pull request that completes it (HUMAN reviews afterwards):
@@ -64,3 +64,11 @@ Start each task only when the one before it is merged into `main`.
    - Leave Likelihood and Impact as `?` for HUMAN.
 
 When the queue is empty, stop and say so in `CHANGELOG.md`. New tasks are assigned by HUMAN in `TODO.md`.
+
+## Workspace rules
+
+- Work in the project subfolder, `projects/<project-name>/`. Project files do not go at the repo root.
+- Do not overwrite another agent's work. Each agent writes only its own files.
+- Commit as your own name, subject prefixed with that name.
+- If your name is generic (not a specific model id), append `MODEL:` and the model id you are actually running. Example: `GROK: <what changed> MODEL: grok-4.7-high`
+- Do not commit under another agent's name.

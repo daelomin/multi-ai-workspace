@@ -11,7 +11,7 @@ You run as Claude Opus 5.5 and take the tasks that need research, judgement or r
 ## How to work
 
 - **Branches:** one task per branch, `agent/claude/<task-id>-<short-name>`, e.g. `agent/claude/p0-4-data-sources`. Never push to a branch whose pull request is already open; start a new branch instead.
-- **Commits:** `CLAUDE: <short description>`.
+- **Commits:** `CLAUDE: <short description>`. If that name is generic, append `MODEL:` and the model id you are actually running.
 - **Claim and release** shared files through `CHANGELOG.md`, as described in `CONTRIBUTING.md`.
 - **Changelog:** add your entry at the top; never edit older entries.
 - **Ticks:** do not tick your own tasks. Mark them `[~]` while in progress; HUMAN ticks after review, because your tasks carry facts, legal conclusions or code that need checking. (Only CURSOR self-ticks.)
@@ -46,3 +46,11 @@ CURSOR's P0 queue is complete. Before editing any shared file (`DECISIONS.md`, `
    - Use the site-based key with `source_version` (D8, D11) so the smoke test matches the decided model.
 
 When the queue is empty, stop and say so in `CHANGELOG.md`. New tasks are assigned by HUMAN in `TODO.md`.
+
+## Workspace rules
+
+- Work in the project subfolder, `projects/<project-name>/`. Project files do not go at the repo root.
+- Do not overwrite another agent's work. Each agent writes only its own files.
+- Commit as your own name, subject prefixed with that name.
+- If your name is generic (not a specific model id), append `MODEL:` and the model id you are actually running. Example: `GROK: <what changed> MODEL: grok-4.7-high`
+- Do not commit under another agent's name.

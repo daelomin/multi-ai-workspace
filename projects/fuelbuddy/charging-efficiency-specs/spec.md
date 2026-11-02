@@ -1,0 +1,1 @@
+FuelAtlas_Charging_Accessory_Charger_Research_Spec.md

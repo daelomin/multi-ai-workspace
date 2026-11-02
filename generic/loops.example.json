@@ -1,0 +1,8 @@
+{
+  "loops": [
+    {"id": "fuelbuddy", "project": "projects/fuelbuddy/charging-diagnostic", "name": "FuelBuddy",
+     "branch": "agent/loop/fuelbuddy-review", "reviewers": "CHATGPT,DEEPSEEK,GROK"},
+    {"id": "next-spec", "project": "projects/<project>/<spec-name>", "name": "NextSpec",
+     "after": "fuelbuddy", "autostart": false}
+  ]
+}
