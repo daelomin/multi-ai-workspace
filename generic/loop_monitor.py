@@ -317,6 +317,8 @@ def launcher_env(loop: dict) -> dict:
     env.pop("LOOP_WORKTREE", None)
     if loop.get("worktree"):
         env["LOOP_WORKTREE"] = str(loop_root(loop))
+    if loop.get("reviewers"):
+        env["REVIEWERS"] = loop["reviewers"]
     return env
 
 

@@ -10,7 +10,8 @@
 # Per-project wrappers (projects/<p>/.../automation/run_review_loop.sh) just call this with their values.
 # LOOP_WORKTREE=<dir>  run in that git worktree (its own branch and files) instead of the main checkout, so several
 #                      loops can run at once. The engine code always comes from the main checkout.
-# The DeepSeek key is read from the environment, or prompted (hidden, never written to disk).
+# REVIEWERS (default CHATGPT,DEEPSEEK,GROK) and loop.json's "reviewers"/"consolidator" decide which agents take part.
+# The DeepSeek key (only when DEEPSEEK reviews) is read from the environment, or prompted (hidden, never written to disk).
 set -euo pipefail
 
 REPO="${REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
@@ -51,11 +52,16 @@ mode="${1:-preflight}"
 python3 "$REPO/generic/loop_project.py" validate --project "$ROOT/$PROJECT" --name "$NAME" --branch "$BRANCH"
 
 # --- sanity checks ---
-for bin in git python3 codex claude "$CURSOR_AGENT_BIN"; do
+# Only the agents actually involved (REVIEWERS + consolidator backend) are required or probed.
+CONSOLIDATOR_BACKEND="$(python3 -c 'import sys; from pathlib import Path; sys.path.insert(0, sys.argv[1]); import loop_project; print(loop_project.load(Path(sys.argv[2])).get("consolidator", {}).get("backend", "CLAUDE"))' "$REPO/generic" "$ROOT/$PROJECT")"
+needed=(git python3)
+{ [[ ",$REVIEWERS," == *,CHATGPT,* ]] || [ "$CONSOLIDATOR_BACKEND" = "CHATGPT" ]; } && needed+=(codex)
+{ [[ ",$REVIEWERS," == *,DEEPSEEK,* ]] || [ "$CONSOLIDATOR_BACKEND" = "CLAUDE" ]; } && needed+=(claude)
+{ [[ ",$REVIEWERS," == *,GROK,* ]] || [[ ",$REVIEWERS," == *,CURSOR,* ]]; } && needed+=("$CURSOR_AGENT_BIN")
+for bin in "${needed[@]}"; do
   command -v "$bin" >/dev/null 2>&1 || { echo "missing binary: $bin" >&2; exit 1; }
 done
 [ -f "$LOOP" ] || { echo "not found: $LOOP" >&2; exit 1; }
-CONSOLIDATOR_BACKEND="$(python3 -c 'import sys; from pathlib import Path; sys.path.insert(0, sys.argv[1]); import loop_project; print(loop_project.load(Path(sys.argv[2])).get("consolidator", {}).get("backend", "CLAUDE"))' "$REPO/generic" "$ROOT/$PROJECT")"
 [ "$CONSOLIDATOR_BACKEND" != "CLAUDE" ] || [ -d "$ANTHROPIC_CLAUDE_CONFIG_DIR" ] || { echo "Anthropic profile missing: $ANTHROPIC_CLAUDE_CONFIG_DIR (run: CLAUDE_CONFIG_DIR=$ANTHROPIC_CLAUDE_CONFIG_DIR claude, then /login)" >&2; exit 1; }
 
 # The loop script must already support the reviewers asked for (roadmap Phase 3 adds GROK).
@@ -67,7 +73,7 @@ fi
 
 if [ -f "$HOME/.credentials" ]; then source "$HOME/.credentials"; fi
 # --- DeepSeek key: env first, else hidden prompt; never written anywhere ---
-if [ -z "${DEEPSEEK_API_KEY:-}" ]; then
+if [[ ",$REVIEWERS," == *,DEEPSEEK,* ]] && [ -z "${DEEPSEEK_API_KEY:-}" ]; then
   read -rsp "DeepSeek API key: " DEEPSEEK_API_KEY; echo
   export DEEPSEEK_API_KEY
 fi

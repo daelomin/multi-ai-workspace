@@ -13,6 +13,28 @@ MANIFEST = 'loop.json'
 COMPANIONS = ('docs', 'evals', 'assets')
 VERSION = re.compile(r'\bversion\b\W{0,6}v?(\d+\.\d+)', re.I)
 ROUND = re.compile(r'\*\*Round (\d+)\*\*')
+# Agents a loop can involve. CLAUDE consolidates; the others review. Unselected agents appear nowhere.
+AGENTS = ('DEEPSEEK', 'CLAUDE', 'CHATGPT', 'GROK')
+REVIEWER_ORDER = ('CHATGPT', 'DEEPSEEK', 'GROK')
+
+
+def plan_agents(agents, template: str = 'spec-review') -> tuple[list[str], dict | None]:
+    """Selected agents -> (reviewers, consolidator override). Without CLAUDE, CHATGPT consolidates."""
+    if isinstance(agents, str):
+        agents = [a for a in agents.split(',') if a.strip()]
+    chosen = [str(a).strip().upper() for a in agents]
+    if len(set(chosen)) != len(chosen) or any(a not in AGENTS for a in chosen):
+        raise ValueError(f'agents must be distinct values from {", ".join(AGENTS)}')
+    reviewers = [a for a in REVIEWER_ORDER if a in chosen]
+    need = 2 if template == 'option-debate' else 1
+    if len(reviewers) < need:
+        raise ValueError(f'select at least {need} reviewer(s) among CHATGPT, DEEPSEEK, GROK (CLAUDE only consolidates)')
+    if 'CLAUDE' in chosen:
+        return reviewers, None
+    if 'CHATGPT' not in chosen:
+        raise ValueError('without CLAUDE, CHATGPT must be selected: it takes over the consolidation')
+    return reviewers, {'backend': 'CHATGPT', 'effort': os.environ.get('CHATGPT_CONSOLIDATOR_EFFORT', 'medium'),
+                       'model': os.environ.get('CHATGPT_CONSOLIDATOR_MODEL', 'gpt-6.1-sol')}
 
 
 def relative(value: str) -> str:
@@ -57,6 +79,11 @@ def load(project: Path) -> dict:
             within(project, value)
             if key == 'consolidation_paths' and value in ('loop.json', 'workflow.json', 'decisions.md', 'AGENTS.md'):
                 raise ValueError(f'protected consolidation path: {value}')
+    if 'reviewers' in data:
+        rv = data['reviewers']
+        if (not isinstance(rv, list) or not rv or len(set(rv)) != len(rv)
+                or any(r not in REVIEWER_ORDER for r in rv)):
+            raise ValueError('reviewers must be a non-empty list of distinct CHATGPT, DEEPSEEK, GROK')
     cfg = data.get('consolidator', {'backend': 'CLAUDE'})
     if not isinstance(cfg, dict) or cfg.get('backend') not in ('CLAUDE', 'CHATGPT'):
         raise ValueError('consolidator backend must be CLAUDE or CHATGPT')
@@ -70,8 +97,14 @@ def load(project: Path) -> dict:
     return data
 
 
-def manifest(name: str, lid: str, folder: str, branch: str, template: str) -> dict:
-    return dict(schema_version=1, id=lid, name=name, project=folder, branch=branch,
+def manifest(name: str, lid: str, folder: str, branch: str, template: str, agents=None) -> dict:
+    extra = {}
+    if agents:
+        reviewers, consolidator = plan_agents(agents, template)
+        extra['reviewers'] = reviewers
+        if consolidator:
+            extra['consolidator'] = consolidator
+    return dict(extra, schema_version=1, id=lid, name=name, project=folder, branch=branch,
                 template=template, changelog='CHANGELOG.md',
                 inputs=['spec.md', 'decisions.md', *COMPANIONS],
                 consolidation_paths=['spec.md', 'README.md', *COMPANIONS])
@@ -185,6 +218,7 @@ def render_readme(project: Path, cfg: dict, template_root: Path) -> str:
     body = (template_root / cfg['template'] / 'readme.md').read_text().format(name=cfg['name'])
     body = body.replace('**v0.1**', f'**v{version}**').replace('proposal v0.1', f'proposal v{version}')
     body = body.replace('CHANGELOG.md', cfg.get('changelog', 'CHANGELOG.md'))
+    body = body.replace('CLAUDE', cfg.get('consolidator', {}).get('backend', 'CLAUDE'))
     body += '\n## Project scope and commands\n\n'
     body += ('`loop.json` is authoritative for this loop. Review only its declared inputs and this project’s decisions. '
              'Other projects and repository history are background, not task instructions. '
@@ -235,6 +269,8 @@ def main():
         raise SystemExit('loop.json project disagrees with its location')
     toolkit = Path(__file__).resolve().parent.parent
     env = {**os.environ, 'LOOP_WORKTREE': str(root), 'REPO': str(toolkit)}
+    if cfg.get('reviewers'):
+        env['REVIEWERS'] = ','.join(cfg['reviewers'])
     os.execvpe('bash', ['bash', str(toolkit / 'generic/run_review_loop.sh'), cfg['project'],
                        cfg['name'], cfg['branch'], args.mode], env)
 

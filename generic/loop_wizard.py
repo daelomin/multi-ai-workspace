@@ -152,6 +152,8 @@ def a_create_loop(a: dict) -> dict:
     template = a.get("template", "spec-review")
     if template not in ("spec-review", "option-debate"):
         raise ValueError("unknown workflow template")
+    agents = a.get("agents") or "CHATGPT,DEEPSEEK,CLAUDE,GROK"
+    reviewers, _ = lp.plan_agents(agents, template)  # raises ValueError on an impossible selection
     lid = rl.slug(name)
     branch = a.get("branch") or f"agent/loop/{lid}-review"
     base = a.get("base") or sh(["git", "branch", "--show-current"])[1]
@@ -193,7 +195,7 @@ def a_create_loop(a: dict) -> dict:
         destination = proj / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(content)
-    cfg = lp.manifest(name, lid, folder, branch, template)
+    cfg = lp.manifest(name, lid, folder, branch, template, agents)
     lp.scaffold(proj, cfg, HERE / "templates")
     if template == "option-debate":
         (proj / "workflow.json").write_text(json.dumps({"template": template, "phase": "options"}, indent=2) + "\n")
@@ -204,6 +206,7 @@ def a_create_loop(a: dict) -> dict:
     step("git add", sh(["git", "add", "--", folder], wt))
     step("git commit", sh(["git", "commit", "-m", f"HUMAN: add {name} spec for the review loop", "--", folder], wt))
     entry = {"id": lid, "project": folder, "name": name, "branch": branch, "worktree": str(wt), "manifest": "loop.json"}
+    entry["reviewers"] = ",".join(reviewers)
     for k in ("after", "autostart"):
         if a.get(k):
             entry[k] = a[k]
