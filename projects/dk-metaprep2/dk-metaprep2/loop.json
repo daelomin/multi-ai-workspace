@@ -1,0 +1,26 @@
+{
+  "reviewers": [
+    "DEEPSEEK"
+  ],
+  "schema_version": 1,
+  "id": "dk-metaprep2",
+  "name": "dk-metaprep2",
+  "project": "projects/dk-metaprep2/dk-metaprep2",
+  "branch": "agent/loop/dk-metaprep2-review",
+  "template": "spec-review",
+  "changelog": "CHANGELOG.md",
+  "inputs": [
+    "spec.md",
+    "decisions.md",
+    "docs",
+    "evals",
+    "assets"
+  ],
+  "consolidation_paths": [
+    "spec.md",
+    "README.md",
+    "docs",
+    "evals",
+    "assets"
+  ]
+}
