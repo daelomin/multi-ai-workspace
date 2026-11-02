@@ -4,7 +4,7 @@ Review rounds for `spec.md`. Loop rules: `generic/REVIEW_LOOP_GUIDELINE.md`.
 
 ## Current round
 
-**Round 1** — reviewing `spec.md` **v0.1**. Reviews go in `reviews/round-1/`.
+**Round 2** — reviewing `spec.md` **v0.2**. Reviews go in `reviews/round-2/`.
 *(Updated by CLAUDE at each consolidation.)*
 
 | File | What it is |
