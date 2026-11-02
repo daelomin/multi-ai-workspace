@@ -1,7 +1,7 @@
-version = v0.2
+version = v0.3
 date = 2026-11-02
 
-> **Status of DistroKid rules (v0.2):** every DistroKid-specific rule in this spec is traceable through §11 and marked *Required*, *Recommended* or *App policy*. Items marked *unverified* come from reviewer reports of DistroKid help pages that could not be fetched directly and must be re-checked before release. Open HUMAN decisions are listed once, in §12.
+> **Status of DistroKid rules (v0.3):** every DistroKid-specific rule in this spec is traceable through §11 and marked *Required*, *Recommended* or *App policy*. Items marked *unverified* come from reviewer reports of DistroKid help pages that could not be fetched directly and must be re-checked before release. Open HUMAN decisions are listed once, in §12.
 
 Below is a detailed technical specification for a **Qt-based desktop application** designed to prepare, validate, and export a 100% DistroKid‑compliant metadata package. The tool does not attempt to bypass DistroKid’s lack of a public API; instead, it focuses on **eliminating metadata errors** by providing a single interface for all required and recommended fields, enforcing strict validation, and exporting a manifest that can be used with existing form‑filling bridges (e.g., DISTROPILOT, ReleaseBrief) or for manual entry with confidence.
 
@@ -14,7 +14,7 @@ The application (“DK‑MetaPrep”) allows an artist, manager, or label to:
 - Define a release (single, EP, album) with all DistroKid‑required fields.
 - Define each track with its own metadata, including identifiers and contributor credits.
 - Validate every field against DistroKid’s rules (formats, lengths, required‑ness).
-- Export a **canonical manifest** in CSV and/or JSON that maps 1:1 to the DistroKid upload form fields.
+- Export a **canonical manifest** in CSV and/or JSON whose fields are mapped to the DistroKid upload form fields (mapping table in `docs/`; the manifest is an internal format, see §6.1).
 - Optionally push the manifest to a browser‑based form‑filling extension via a local bridge, or use an embedded WebEngine view to assist manual filling (with user supervision).
 
 **Out of scope:** automated submission without user review, bypassing CAPTCHAs, or any action that violates DistroKid’s terms of service.
@@ -28,7 +28,7 @@ The application (“DK‑MetaPrep”) allows an artist, manager, or label to:
 | **UI** | Qt Widgets (or Qt Quick Controls 2) | Multi‑page wizard: Release → Tracks → Contributors → Review → Export |
 | **Data Model** | Qt Core (`QAbstractItemModel` for tracks and contributors) + SQLite (via `QtSql`) | Persist projects locally, support undo/redo, session recovery |
 | **Validation Engine** | Custom C++ classes + `QRegularExpression` | Field‑level and cross‑field validation |
-| **Exporters** | `QJsonDocument`, `QTextStream` (CSV) | Generate DISTROPILOT‑compatible JSON, generic CSV, and a human‑readable “upload sheet” |
+| **Exporters** | `QJsonDocument`, `QTextStream` (CSV) | Generate the canonical JSON manifest (§6.1; DISTROPILOT via a future adapter, DKM2‑D8), generic CSV, and a human‑readable “upload sheet” |
 | **Bridge (optional)** | `QtWebEngine` + `QWebChannel` or local HTTP server | Expose the validated manifest to a browser extension (e.g., via `localhost` endpoint) or inject data into the DistroKid page under user control |
 
 ---
@@ -43,29 +43,29 @@ The schema is split into three levels: **Release**, **Track**, and **Contributor
 |-------|------------------|------|-------------------|------------------------|
 | **Artist / Band Name** | Required | String | No spammy text; consistent with track credits. | “Artist/Band Name” |
 | **Release Title** | Required | String | Exact title, including version info if applicable. | “Album Title” |
-| **Release Type** | Required | Enum (Single, EP, Album) | Determines track‑count expectations. | “Release Type” |
+| **Release Type** | Required | Enum (Single, EP, Album) | Checked against DistroKid’s track‑count and duration classification (§4.3); a contradiction is a warning. | “Release Type” |
 | **Release Date** | Required (custom date plan‑gated, see §3.4) | Date (ISO, no time component) | No DistroKid hard minimum. Warnings only, see §4.2. “Today” = local date at validation time. | “Release Date” |
 | **UPC** | **Not an input** | — | DistroKid generates the UPC for every upload; no custom UPC is accepted. The tool never asks for or validates one. An optional read‑only `assigned_upc` can be recorded after upload. Internal catalog key: `release_id`. | “UPC” (read‑only) |
 | **Label Name** | Required; plan‑gated (see §3.4) | String | Defaults to the artist name where the plan does not allow a custom label. | “Record Label” |
 | **Language** | Required | Enum (BCP‑47 tag) | Primary language of the release, from the bundled reference data (§3.5). | “Language” |
 | **Primary Genre** | Required | Enum | From the bundled genre list (§3.5). | “Primary Genre” |
 | **Secondary Genre** | Optional | Enum | Optional second genre. | “Secondary Genre” |
-| **Cover Art File** | Required | File path | Square (1:1); JPEG; RGB/sRGB; minimum 1000×1000 px (error); 3000×3000 px recommended (warning). File must exist and decode. Maximum file size per DistroKid’s current limit (§11, unverified). | “Album Artwork” |
+| **Cover Art File** | Required | File path | Square (1:1); JPEG; RGB/sRGB; minimum 1000×1000 px (error); 3000×3000 px recommended (warning). File must exist and decode. DistroKid publishes no maximum artwork file size (§11, unverified); the app applies none. | “Album Artwork” |
 | **Explicit Flag (release‑level default)** | Required | Boolean | Can be overridden per track. | “Explicit Content” |
-| **Territories** | Default worldwide; plan‑gated (see §3.4) | List of ISO 3166‑1 alpha‑2 codes | Per‑country exclusions are a post‑upload request on higher plans, not an upload‑time list. | “Territories” |
-| **AI Disclosure** | Optional (newer field) | Set of `lyrics`, `vocals`, `instrumental`, `audio`, or `none` | Categories as reported by DistroKid (unverified, §11); multiple allowed; `none` is exclusive. | “AI Disclosure” |
+| **Excluded Territories** | Optional; default empty = worldwide; plan‑gated (see §3.4) | List of ISO 3166‑1 alpha‑2 codes | Per‑country exclusions are a post‑upload request on higher plans, not an upload‑time form value. The list is a record used to prepare that request (checklist in the upload sheet); it is exported as `excluded_territories` and never treated as a form field. Exact plan gating: DKM2‑D1. | none (post‑upload request) |
+| **AI Disclosure** | Required (“no AI” is a valid answer) | `ai_used` boolean + set of `lyrics`, `music`, `all_audio`, `part_of_audio`; `artist_persona` answer when `all_audio` | Categories as reported for DistroKid’s AI Credits step (unverified, §11). `ai_used = false` means no categories; categories require `ai_used = true`. `artist_persona` (boolean) is asked only when `all_audio` is selected. | “AI Credits” |
 
-**Required release‑level fields:** release title, release type, artist, language, primary genre, cover art, explicit default. Release date is required but defaults to “as soon as processed” on plans without custom dates. UPC is assigned by DistroKid and is not an input.
+**Required release‑level fields:** release title, release type, artist, language, primary genre, cover art, explicit default, AI disclosure answer (`ai_used`). Release date is required but defaults to “as soon as processed” on plans without custom dates. UPC is assigned by DistroKid and is not an input.
 
 ### 3.2 Track‑Level Fields
 
 | Field | DistroKid Status | Type | Validation / Notes | Maps to DistroKid Form |
 |-------|------------------|------|-------------------|------------------------|
 | **Track Title** | Required | String | No version info or featured artists in title (use separate fields). | “Song Title” |
-| **ISRC** | Optional (own ISRC only on plans that allow it, see §3.4; otherwise DistroKid assigns) | String (12 chars, normalised without hyphens) | Supply if you have an existing catalog; auto‑assignment risks fragmented records. | “ISRC” |
+| **ISRC** | Optional (own ISRC only on plans that allow it, see §3.4; otherwise DistroKid assigns) | String (12 chars, normalised without hyphens) + `isrc_source` (`user` \| `distrokid`) | Supply if you have an existing catalog; auto‑assignment risks fragmented records. `isrc_source` is `distrokid` when no own ISRC is supplied or the plan does not allow one (§3.4), and `user` otherwise; with `already_released = true` and no ISRC, a warning asks for the existing ISRC. | “ISRC” |
 | **Primary Artist** | Required (inherited from release, but can override) | String | Must match release artist unless it’s a collaboration. | “Primary Artist” |
 | **Featured Artists** | Optional | List of strings | Comma‑separated in UI; exported as array. | “Featured Artists” |
-| **Audio File** | Required | File path | Must exist and decode. DistroKid accepts WAV, MP3, FLAC, M4A, AIFF, CDDA and WMA (unverified, §11). 44.1 kHz / 16‑bit stereo is an **app policy** recommendation (warning), not a DistroKid rule. | “Audio File” |
+| **Audio File** | Required | File path | Must exist and decode. DistroKid accepts WAV, MP3, FLAC, M4A, AIFF and WMA (unverified, §11); legacy formats such as CDDA are not accepted. File‑name, size and length limits are those in §11. 44.1 kHz / 16‑bit stereo is an **app policy** recommendation (warning), not a DistroKid rule. | “Audio File” |
 | **Duration** | Derived | Seconds (read‑only) | Computed from decoded audio; shown in the Tracks table. | Implicit |
 | **Explicit Flag** | Required | Boolean | Per‑track override of release default. | “Explicit” |
 | **Version / Remix Info** | Optional | String | E.g., “Radio Edit”, “Remix”. | “Version” |
@@ -74,14 +74,14 @@ The schema is split into three levels: **Release**, **Track**, and **Contributor
 | **Lyrics** | Optional | Text (multiline) | Can be pasted or loaded from file. | “Lyrics” |
 | **Track Number** | Auto‑generated | Integer | Derived from order in UI. | Implicit |
 
-**Required track‑level fields:** track title, primary artist name, and an audio file that exists and decodes. ISRC is required in the export only in the sense that either the user’s own ISRC or “DistroKid assigns” is recorded.
+**Required track‑level fields:** track title, primary artist name, and an audio file that exists and decodes. ISRC is required in the export only in the sense that `isrc_source` is recorded: the user’s own ISRC (`user`) or “DistroKid assigns” (`distrokid`, ISRC omitted).
 
 ### 3.3 Contributor‑Level Fields (Songwriters & Publishers)
 
 DistroKid asks for the real (legal) name of each songwriter; IPI/PRO/publisher data are optional but their payment utility depends on accuracy. The model below is the single normative contributor model.
 
 **Data model.**
-- `contributors` — global identity: legal name, IPI, PRO. Deduplicated on (legal name, IPI, PRO).
+- `contributors` — global identity keyed by an internal `contributor_id`: legal name, IPI, PRO. A Publisher is a `contributors` row (legal name = publisher name, IPI = publisher IPI) used with role Publisher. (legal name, IPI, PRO) is a match hint, not a unique constraint: auto‑link only on a non‑null IPI (or IPI + PRO); otherwise offer a merge suggestion the user confirms. Two contributors with the same name and no IPI stay separate until merged.
 - `track_credits` — links a track to a `contributor_id` with one or more roles and, where applicable, `writer_share` (0–100, 2 dp) and `publisher_share` (0–100, 2 dp, publisher credits only).
 - “Copy from another track” **copies** credit rows (not links); the contributor identity itself stays shared.
 
@@ -89,9 +89,9 @@ DistroKid asks for the real (legal) name of each songwriter; IPI/PRO/publisher d
 |-------|--------|------|-------------------|
 | **Legal Name** | Required for each Songwriter credit; Strongly Recommended otherwise | String | Real name, as registered with PRO. |
 | **Role** | Required for each credit | Enum (Songwriter, Performer, Producer, Engineer, Publisher, Remixer) | Songwriter carries `writer_share`; Publisher carries `publisher_share`; Performer, Producer, Engineer and Remixer carry no share. |
-| **IPI / CAE Number** | Strongly Recommended | String | 9‑digit IPI Name Number validated; 11‑digit forms accepted with a warning only, until HUMAN decides (§12, DKM2‑D6). |
+| **IPI / CAE Number** | Strongly Recommended | String | 9‑digit IPI Name Number validated (error if malformed); 11‑digit forms accepted with a warning only, until HUMAN decides (§12, DKM2‑D6). |
 | **PRO Affiliation** | Strongly Recommended | Enum (bundled list, §3.5) | Required if IPI is provided. |
-| **Publisher Name / IPI** | Strongly Recommended | String | Attributes of a Publisher credit only (no duplicate on writer rows). |
+| **Publisher name / IPI** | Strongly Recommended for Publisher credits | — | No separate fields: for a Publisher credit these are the contributor’s Legal Name and IPI. Nothing is stored on writer rows. |
 | **writer_share** | Required on every Songwriter credit when the track has more than one Songwriter; a sole Songwriter defaults to 100.00 | Decimal (0–100, 2 dp) | Sum over Songwriter credits of a track = 100.00 ±0.01. |
 | **publisher_share** | Optional | Decimal (0–100, 2 dp) | Separate layer; never enters the writer total. |
 | **Signed Date** | Optional | Date | For split sheets. |
@@ -120,6 +120,8 @@ The app is offline‑first, so enums are bundled as versioned JSON assets in `as
 
 The validation engine runs continuously (or on “Validate” button) and categorises issues into **Errors** (block export) and **Warnings** (allow export but flag).
 
+**Two stages.** *File checks* (existence, decode, duration, format, size, SHA‑256, image dimensions and colour profile) run at import and when a file changes, off the UI thread. Their results (“file facts”) are cached keyed by path + size + mtime (+ SHA‑256 once computed). *Rule evaluation* runs over metadata and cached file facts only and never reads media files; this is the stage covered by the performance target in §8. A file with no cached facts yet is shown as “checking” and blocks export until its facts are available.
+
 ### 4.1 Hard Validation Rules (Errors)
 
 | Rule | Applies To | Rationale |
@@ -132,7 +134,7 @@ The validation engine runs continuously (or on “Validate” button) and catego
 | Cover art must exist, decode, be JPEG, RGB/sRGB, square (width == height) and ≥ 1000×1000 px. | Release | DistroKid artwork rule. |
 | Each Songwriter credit has a legal name. | Contributor | DistroKid asks for songwriters’ real names. |
 | If IPI is provided, PRO must be selected. | Contributor | IPI alone is insufficient for matching. |
-| IPI must be a valid 9‑digit IPI Name Number; 11‑digit values produce a warning (DKM2‑D6). | Contributor | Malformed identifiers. |
+| A 9‑digit IPI Name Number that fails validation is an error. An 11‑digit CAE form is not an error: it is accepted with a warning until DKM2‑D6 is decided. | Contributor | Malformed identifiers. |
 
 There is **no UPC rule** and **no release‑date minimum** among the errors: UPC is assigned by DistroKid, and DistroKid sets no hard minimum lead time.
 
@@ -151,7 +153,7 @@ There is **no UPC rule** and **no release‑date minimum** among the errors: UPC
 
 ### 4.3 Cross‑Field Checks
 
-- **Release type vs. track count**: A “Single” should have 1 track; an “EP” 2–6 (a 2‑track release is an EP with a warning); an “Album” 7+. Warn if inconsistent. The exact DistroKid boundaries are unverified (§11).
+- **Release type vs. track count and duration**: per DistroKid (unverified, §11) a Single is 1–3 tracks, an EP 4–6 tracks under 30 minutes in total, an Album 7+ tracks or any release over 30 minutes. The app derives a suggested type from track count and total duration and warns when the selected Release Type differs. Warning only until HUMAN decides otherwise. The single‑track length edge (reported as 10 minutes) is low confidence and not enforced.
 - **Artist name consistency**: The primary artist on each track should match the release artist unless a featured artist is explicitly listed.
 - **ISRC uniqueness**: No duplicate ISRCs within a project; an optional catalog check is a future extension (§9).
 - **Total album duration** within DistroKid’s limit (§11, unverified).
@@ -163,9 +165,9 @@ There is **no UPC rule** and **no release‑date minimum** among the errors: UPC
 The UI is a **wizard‑style** interface with a persistent navigation sidebar.
 
 ### 5.1 Release Screen
-- Fields: Artist/Band Name, Release Title, Release Type (dropdown), Release Date (calendar picker; disabled with the DistroKid default shown when the plan does not allow custom dates), a read‑only note “DistroKid will assign a UPC”, Label, Language, Primary/Secondary Genre, Territories (multi‑select, where the plan allows), target plan selector and “already released” checkbox.
+- Fields: Artist/Band Name, Release Title, Release Type (dropdown), Release Date (calendar picker; disabled with the DistroKid default shown when the plan does not allow custom dates), a read‑only note “DistroKid will assign a UPC”, Label, Language, Primary/Secondary Genre, Excluded territories (optional multi‑select recording the post‑upload exclusion request, §3.1; default worldwide), target plan selector and “already released” checkbox.
 - Cover Art: drag‑and‑drop area with preview and dimension, format and colour‑profile check.
-- Explicit default toggle and AI disclosure category checkboxes.
+- Explicit default toggle; “AI used?” yes/no, with category checkboxes (lyrics, music, all audio, part of audio) and the artist‑persona question when “all audio” is checked.
 
 ### 5.2 Tracks Screen
 - A table/list of tracks with columns: `#`, Title, ISRC, Duration, Status (Valid / Errors).
@@ -183,7 +185,7 @@ The UI is a **wizard‑style** interface with a persistent navigation sidebar.
   - Legal Name
   - IPI/CAE
   - PRO (dropdown)
-  - Publisher Name / Publisher IPI (enabled only for Publisher rows)
+  - (For Publisher rows, Legal Name and IPI/CAE are the publisher’s name and IPI.)
   - Writer share % (Songwriter rows) or publisher share % (Publisher rows), numeric spinbox with 2 decimals; disabled for other roles.
 - A live **Writer Share Total** indicator shows `X.XX% / 100.00%` (Songwriter rows only) and turns red if ≠ 100.
 - “Add Contributor” button; “Copy from another track” option to reuse credits.
@@ -195,7 +197,7 @@ The UI is a **wizard‑style** interface with a persistent navigation sidebar.
 - A checklist of DistroKid‑specific reminders (e.g., “Register with your PRO and The MLC separately – this tool does not do that for you”).
 
 ### 5.5 Export Screen
-- Choose format: **JSON (DISTROPILOT‑compatible)** or **CSV (human‑readable / importable)**.
+- Choose format: **JSON (canonical manifest, §6.1)** or **CSV (human‑readable / importable)**.
 - Preview the generated manifest (read‑only text view).
 - “Save to file” and “Copy to clipboard” buttons.
 - Optional: “Send to browser bridge” button (see Section 6.2).
@@ -210,10 +212,12 @@ The JSON structure mirrors the data model. The manifest is an **internal, versio
 
 Contract rules (normative):
 - `manifest_version` (integer, currently 1) at the top level; a JSON Schema file for each version is shipped in `docs/` and used by golden fixtures (one single, one EP, one album) in `evals/`.
-- Enum wire values are lower‑case: `type` ∈ `single|ep|album`; `role` ∈ `songwriter|performer|producer|engineer|publisher|remixer`.
-- `release_date` is an ISO 8601 date (`YYYY-MM-DD`), no time component. `language` is a BCP‑47 tag. `territories` are ISO 3166‑1 alpha‑2.
-- Unavailable or DistroKid‑assigned values are omitted, never emitted as empty strings; `null` means “user explicitly left blank”.
-- Paths are file names relative to the project folder plus a SHA‑256, never absolute paths.
+- Enum wire values are lower‑case: `type` ∈ `single|ep|album`; `role` ∈ `songwriter|performer|producer|engineer|publisher|remixer`; `target_plan` ∈ `musician|musician_plus|ultimate`; `isrc_source` ∈ `user|distrokid`; `ai_disclosure.categories` ⊆ `lyrics|music|all_audio|part_of_audio`.
+- `release_date` is an ISO 8601 date (`YYYY-MM-DD`), no time component. `language` is a BCP‑47 tag. `excluded_territories` are ISO 3166‑1 alpha‑2.
+- Optional text has three states: key **absent** = not applicable, unavailable on the plan, or DistroKid‑assigned; `null` = user explicitly left blank; otherwise a non‑empty string. Empty strings are never emitted.
+- Every track carries `primary_artist`, always emitted (equal to `release.artist` unless overridden), so the per‑track override of §3.2 is never lost. Goldens must include a track with an override.
+- A track carries `isrc_source`; `isrc` is present only when `isrc_source` is `user`.
+- Paths are file names relative to the project’s `media/` folder (§7) plus a SHA‑256, never absolute paths.
 - `target_plan`, `already_released`, and the reference‑data asset versions are recorded.
 
 ```json
@@ -234,18 +238,20 @@ Contract rules (normative):
     "secondary_genre": "Rock",
     "cover_art": { "file": "cover.jpg", "sha256": "…" },
     "explicit": false,
-    "territories": ["US", "GB", "DE", "FR"],
-    "ai_disclosure": ["none"]
+    "excluded_territories": [],
+    "ai_disclosure": { "ai_used": false, "categories": [] }
   },
   "tracks": [
     {
       "track_number": 1,
       "title": "First Song",
+      "primary_artist": "Example Artist",
+      "isrc_source": "user",
       "isrc": "USABC1234567",
       "audio": { "file": "track1.wav", "sha256": "…", "duration_seconds": 215.4 },
       "explicit": false,
       "featured_artists": ["Featured Artist"],
-      "version": "",
+      "version": null,
       "lyrics": "...",
       "credits": [
         {
@@ -297,7 +303,9 @@ Using `QtWebEngine`, the app can open `https://distrokid.com/new` in an embedded
 | **Qt Network** | Local HTTP server (via `QTcpServer`) for browser‑extension bridge. |
 | **Qt Json** | Serialisation/deserialisation of the manifest. |
 
-**Data Persistence:** Projects are stored as SQLite databases with a `.dkmeta` extension. The schema includes tables `release`, `tracks`, `contributors` (global identities, §3.3) and `track_credits` (track ↔ contributor, roles, `writer_share`, `publisher_share`). This allows undo/redo and session recovery.
+**Project container.** A project is a folder containing `<name>.dkmeta` (the SQLite database) and a `media/` subfolder. Audio and cover files are copied into `media/` on import (the original is left untouched), so manifest paths are relative to `media/` and SHA‑256 values are reproducible across machines. The browser bridge serves the manifest only, never media files.
+
+**Data Persistence:** The project database is a SQLite file with a `.dkmeta` extension. The schema includes tables `release`, `tracks`, `contributors` (global identities with internal `contributor_id`, publishers included, §3.3), `file_facts` (cached results of §4 file checks) and `track_credits` (track ↔ contributor, roles, `writer_share`, `publisher_share`). This allows undo/redo and session recovery.
 
 **Undo/Redo:** Implemented via `QUndoStack` for field edits and list operations.
 
@@ -313,7 +321,7 @@ Proposed baseline (pending DKM2‑D9, §12): Qt 6.x LTS, C++17 or later, CMake; 
 |-------------|--------|
 | **Cross‑platform** | Windows 10+, macOS 12+, Linux (AppImage/Flatpak). |
 | **Offline‑first** | All validation and export functions work without internet. Browser bridge is optional. |
-| **Performance** | Validation of a 20‑track album with 10 contributors per track completes in < 200 ms. |
+| **Performance** | Rule evaluation (§4, stage 2) of a 20‑track album with 10 contributors per track, over cached file facts, completes in < 200 ms. File checks run at import or file change, asynchronously, and have no fixed budget. |
 | **Accessibility** | Keyboard navigation, screen‑reader labels for all form controls. |
 | **Security** | The app itself stores no credentials. If assisted entry ships (DKM2‑D7), its embedded browser is off‑the‑record so no DistroKid session persists. Browser bridge requirements: §6.3. |
 | **Localisation** | UI strings externalised in `.ts` files; initial release in English. |
@@ -345,12 +353,15 @@ All rows were reported by reviewer DEEPSEEK on 2026-11-02 from search‑indexed 
 | UPC assigned by DistroKid, no custom UPC | support.distrokid.com/hc/en-us/articles/360013648913 | Required (unverified) |
 | Own ISRC / custom label / custom date plan‑gated; worldwide default | …/360013648913, …/360013648113, …/52677658186003 | Required (unverified) |
 | Cover art: JPEG, RGB, min 1000×1000, ideal 3000×3000 | …/360013534334 | Required / Recommended (unverified) |
-| Audio formats, 24‑bit/96 kHz ceiling, 1 GB and length limits | …/360013647753 | Required (unverified) |
+| Audio formats (WAV, MP3, M4A, FLAC, AIFF, WMA; CDDA is legacy and not accepted), 24‑bit/96 kHz ceiling, 1 GB and length limits | …/360013647753 | Required (unverified) |
+| No published maximum cover‑art file size | …/360013534334 | Absence of a rule (unverified); no app cap |
+| Release type: Single 1–3, EP 4–6 under 30 min, Album 7+ or over 30 min | support.distrokid.com/hc/en-us/articles/55115193705875 | Recommended (unverified; 10‑minute edge low confidence) |
 | Songwriter real names | …/360013545554 | Required (unverified) |
 | Apple Music Writer / Performer / Production credits | help.apple.com/itc/musicstyleguide/en.lproj/itce0a71e240.html | Required by Apple (unverified) |
 | Release lead time 3 weeks (Spotify) / ~4 weeks (DistroKid) | Spotify pitch guidance; …/52677658186003 | Recommended (unverified; sources vary) |
 | 44.1 kHz / 16‑bit stereo audio | none | App policy |
-| AI disclosure categories | DistroKid 2026 reports | Recommended (unverified, may change) |
+| AI Credits step: lyrics / music / all audio / part of audio, artist‑persona follow‑up, “no AI” answer | support.distrokid.com/hc/en-us/articles/50784235803411 | Required answer (unverified, may change) |
+| Excluded territories as post‑upload request | …/360013648113 | Required (unverified; DKM2‑D1) |
 | DISTROPILOT / ReleaseBrief compatibility | none | Assumption — verify before release |
 
 ---
@@ -359,7 +370,7 @@ All rows were reported by reviewer DEEPSEEK on 2026-11-02 from search‑indexed 
 
 | ID | Decision | Origin |
 |----|----------|--------|
-| DKM2‑D1 | Confirm the supported plan matrix and whether plan modelling (§3.4) is in v1 scope. | DEEPSEEK‑2 |
+| DKM2‑D1 | Confirm the supported plan matrix (including territory-exclusion gating, §3.1) and whether plan modelling (§3.4) is in v1 scope. | DEEPSEEK‑2, DEEPSEEK‑23 |
 | DKM2‑D2 | Make 3000×3000 cover art an error rather than a warning? | DEEPSEEK‑4 |
 | DKM2‑D3 | Enforce a 21‑day release lead time as an app policy (error) or keep warnings only? | DEEPSEEK‑5 |
 | DKM2‑D4 | Keep 44.1 kHz / 16‑bit stereo as an app policy (warning) or an error? | DEEPSEEK‑6 |
