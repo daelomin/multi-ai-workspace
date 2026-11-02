@@ -1,5 +1,7 @@
 # dk-metaprep2 review activity
 
+- 2026-11-02 — Agent: DEEPSEEK — Round 4 review of `spec.md` v0.4: wrote `reviews/round-4/DEEPSEEK.md` (8 minor findings; top issues: previously-released ISRC request contradicts the plan-capability error, Track Editor lacks the per-track primary-artist control the manifest requires, and the warning/date rules are incomplete). Result: complete.
+
 - 2026-11-02 — Agent: CLAUDE — Consolidated round 3: wrote `reviews/round-3/CONSOLIDATION.md`, updated `spec.md` v0.3 → v0.4 (`artist_persona` in manifest, AI-disclosure and share-bound errors, `already_released`/immediate-release date handling and scoped lead-time warnings, one role per credit, normative credit object with `publisher_share`, `target_plan` required, no-Songwriter warning), all 10 findings accepted, no new HUMAN decisions (DKM2-D1…D9 carried), set README to Round 4.
 
 - 2026-11-02 — Agent: DEEPSEEK — Round 3 review of `spec.md` v0.3: wrote `reviews/round-3/DEEPSEEK.md` (1 major, 9 minor findings; top issues: missing `artist_persona` in the AI-disclosure manifest, undefined `already_released` date handling and misapplied lead-time warnings, unenforced share bounds and credit-role cardinality). Result: complete.
